@@ -1,37 +1,55 @@
 import { activeCues } from "./cues";
 import type { Track, TrackStyle } from "./types";
 
-const DEFAULT_STYLES: Record<string, Omit<TrackStyle, "offset">> = {
-  fa: { position: "bottom", size: 34, color: "#ffffff", mode: "show", boxed: false },
-  en: { position: "bottom", size: 30, color: "#ffe9a8", mode: "show", boxed: false },
-  other: { position: "top", size: 28, color: "#d6f0ff", mode: "show", boxed: false },
+const LANG_DEFAULTS: Record<string, Pick<TrackStyle, "position" | "size" | "color">> = {
+  fa: { position: "bottom", size: 34, color: "#ffffff" },
+  en: { position: "bottom", size: 30, color: "#ffe9a8" },
+  other: { position: "top", size: 28, color: "#d6f0ff" },
 };
+
+/** The style a track starts with when its series has nothing saved for it. */
+export function defaultStyle(track: Track): TrackStyle {
+  const base = LANG_DEFAULTS[track.lang] ?? LANG_DEFAULTS.other!;
+  return { ...base, enabled: track.defaultEnabled, mode: "show", boxed: false, offset: 0 };
+}
 
 /** One subtitle track drawn on the overlay. */
 export class TrackView {
-  readonly style: TrackStyle;
   private readonly el: HTMLDivElement;
   private shownKey = "";
 
-  constructor(readonly track: Track) {
-    const base = DEFAULT_STYLES[track.lang] ?? DEFAULT_STYLES.other!;
-    this.style = { ...base, offset: 0 };
+  constructor(
+    public track: Track,
+    readonly style: TrackStyle,
+  ) {
     this.el = document.createElement("div");
     this.el.className = "track";
-    this.el.lang = track.lang;
     this.applyStyle();
+  }
+
+  /** Drawn by the overlay (text tracks), not by mpv (picture-based ones). */
+  get isText(): boolean {
+    return this.track.status !== "image";
+  }
+
+  /** Replaces the track data, e.g. when an embedded track finishes extracting. */
+  setTrack(track: Track): void {
+    this.track = track;
+    this.applyStyle();
+    this.invalidate();
   }
 
   applyStyle(): void {
     const s = this.style;
     const parent = document.getElementById(s.position === "top" ? "subs-top" : "subs-bottom")!;
     if (this.el.parentElement !== parent) parent.append(this.el);
+    this.el.lang = this.track.lang;
     this.el.style.fontSize = `${s.size}px`;
     this.el.style.color = s.color;
     this.el.classList.toggle("rtl", this.track.rtl);
     this.el.classList.toggle("blur", s.mode === "blur");
     this.el.classList.toggle("boxed", s.boxed);
-    this.el.hidden = s.mode === "hide";
+    this.el.hidden = !s.enabled || s.mode === "hide" || !this.isText;
   }
 
   /** Forces a redraw on the next frame (after an offset change, for example). */
@@ -45,6 +63,7 @@ export class TrackView {
   }
 
   render(videoTime: number): void {
+    if (this.el.hidden) return;
     const idx = activeCues(this.track.cues, this.trackTime(videoTime));
     const key = idx.join(",");
     if (key === this.shownKey) return;
@@ -52,6 +71,10 @@ export class TrackView {
     this.el.replaceChildren(
       ...idx.flatMap((i) => this.track.cues[i]!.text.split("\n").map(renderLine)),
     );
+  }
+
+  remove(): void {
+    this.el.remove();
   }
 }
 

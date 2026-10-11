@@ -1,5 +1,5 @@
-//! Subtitle loading: finding sidecar files, decoding legacy encodings,
-//! parsing SRT / WebVTT into cues, and fixing common Persian text problems.
+//! Subtitle text: finding sidecar files, decoding legacy encodings, parsing
+//! SRT / WebVTT into cues, and fixing common Persian text problems.
 
 use std::{
     fs,
@@ -18,16 +18,13 @@ pub struct Cue {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct Track {
-    pub id: usize,
-    pub label: String,
-    pub lang: String,
-    pub rtl: bool,
-    pub cues: Vec<Cue>,
-}
-
 const SUB_EXTENSIONS: &[&str] = &["srt", "vtt"];
+
+pub fn is_subtitle_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| SUB_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+}
 
 /// Subtitle files next to `video` whose names start with the video's name,
 /// e.g. `Movie.fa.srt` and `Movie.en.srt` for `Movie.mkv`.
@@ -44,34 +41,22 @@ pub fn find_sidecars(video: &Path) -> Vec<PathBuf> {
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| {
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-            let ext = p.extension().and_then(|e| e.to_str()).unwrap_or_default();
-            name.starts_with(stem) && SUB_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str())
+            name.starts_with(stem) && is_subtitle_file(p)
         })
         .collect();
     found.sort();
     found
 }
 
-/// Loads every file as a track. Files that fail to load are reported and skipped.
-pub fn load_tracks(files: &[PathBuf]) -> Vec<Track> {
-    files
-        .iter()
-        .filter_map(|path| match load_track(path) {
-            Ok(track) => Some(track),
-            Err(err) => {
-                eprintln!("beyt: skipping {}: {err:#}", path.display());
-                None
-            }
-        })
-        .enumerate()
-        .map(|(id, track)| Track { id, ..track })
-        .collect()
+/// Cues from a subtitle file, with Persian fixes applied when the text is RTL.
+pub struct Loaded {
+    pub cues: Vec<Cue>,
+    pub rtl: bool,
 }
 
-fn load_track(path: &Path) -> Result<Track> {
+pub fn load_file(path: &Path) -> Result<Loaded> {
     let bytes = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
-    let text = decode(&bytes);
-    let mut cues = parse(&text);
+    let mut cues = parse(&decode(&bytes));
     anyhow::ensure!(!cues.is_empty(), "no subtitle lines found");
 
     let rtl = is_mostly_rtl(cues.iter().map(|c| c.text.as_str()));
@@ -80,13 +65,7 @@ fn load_track(path: &Path) -> Result<Track> {
             cue.text = fix_persian(&cue.text);
         }
     }
-
-    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-    let lang = lang_from_file_name(&file_name)
-        .unwrap_or(if rtl { "fa" } else { "en" })
-        .to_string();
-    let label = format!("{} ({file_name})", language_name(&lang));
-    Ok(Track { id: 0, label, lang, rtl, cues })
+    Ok(Loaded { cues, rtl })
 }
 
 /// Decodes subtitle bytes to text: UTF-8/UTF-16 with a BOM, plain UTF-8,
@@ -206,24 +185,44 @@ pub fn fix_persian(text: &str) -> String {
         .join("\n")
 }
 
-/// Language code from a name like `Movie.fa.srt` or `Movie.English.srt`.
-fn lang_from_file_name(name: &str) -> Option<&'static str> {
+/// Language code from a subtitle name like `Movie.fa.srt` or `Movie.English.srt`.
+///
+/// Only the part after the video's own name is searched, so a title word such
+/// as "It" in `It.2017.srt` is not taken for Italian. Without a video name,
+/// only the last tag is checked.
+pub fn lang_from_file_name(name: &str, video_stem: Option<&str>) -> Option<&'static str> {
     let stem = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
-    stem.rsplit(['.', '_', '-', ' ']).find_map(|tag| {
-        Some(match tag.to_ascii_lowercase().as_str() {
-            "fa" | "fas" | "per" | "persian" | "farsi" => "fa",
-            "en" | "eng" | "english" => "en",
-            _ => return None,
-        })
+    let tags = match video_stem.and_then(|v| stem.strip_prefix(v)) {
+        Some(rest) => rest,
+        None => stem.rsplit(['.', '_', '-', ' ']).next().unwrap_or_default(),
+    };
+    tags.rsplit(['.', '_', '-', ' ']).find_map(normalize_lang)
+}
+
+/// Two-letter code for a language tag ("per", "fas", "Persian" → "fa").
+/// Covers the languages subtitle releases commonly carry.
+pub fn normalize_lang(tag: &str) -> Option<&'static str> {
+    Some(match tag.to_ascii_lowercase().as_str() {
+        "fa" | "fas" | "per" | "persian" | "farsi" => "fa",
+        "en" | "eng" | "english" => "en",
+        "ar" | "ara" | "arabic" => "ar",
+        "tr" | "tur" | "turkish" => "tr",
+        "fr" | "fra" | "fre" | "french" => "fr",
+        "de" | "deu" | "ger" | "german" => "de",
+        "es" | "spa" | "spanish" => "es",
+        "it" | "ita" | "italian" => "it",
+        "ru" | "rus" | "russian" => "ru",
+        "ja" | "jpn" | "japanese" => "ja",
+        "ko" | "kor" | "korean" => "ko",
+        "zh" | "zho" | "chi" | "chinese" => "zh",
+        "he" | "heb" | "hebrew" => "he",
+        "ur" | "urd" | "urdu" => "ur",
+        _ => return None,
     })
 }
 
-fn language_name(code: &str) -> &str {
-    match code {
-        "fa" => "Persian",
-        "en" => "English",
-        other => other,
-    }
+pub fn is_rtl_lang(code: &str) -> bool {
+    matches!(code, "fa" | "ar" | "he" | "ur")
 }
 
 #[cfg(test)]
@@ -273,9 +272,13 @@ mod tests {
 
     #[test]
     fn detects_language_from_file_name() {
-        assert_eq!(lang_from_file_name("Movie.fa.srt"), Some("fa"));
-        assert_eq!(lang_from_file_name("Movie.2019.English.srt"), Some("en"));
-        assert_eq!(lang_from_file_name("Movie_per.srt"), Some("fa"));
-        assert_eq!(lang_from_file_name("Movie.srt"), None);
+        assert_eq!(lang_from_file_name("Movie.fa.srt", Some("Movie")), Some("fa"));
+        assert_eq!(lang_from_file_name("Movie.English.forced.srt", Some("Movie")), Some("en"));
+        assert_eq!(lang_from_file_name("Movie_per.srt", Some("Movie")), Some("fa"));
+        assert_eq!(lang_from_file_name("Movie.srt", Some("Movie")), None);
+        // Title words before the video name's end are not language tags.
+        assert_eq!(lang_from_file_name("It.2017.srt", Some("It.2017")), None);
+        assert_eq!(lang_from_file_name("It.2017.srt", None), None);
+        assert_eq!(lang_from_file_name("whatever.eng.srt", None), Some("en"));
     }
 }

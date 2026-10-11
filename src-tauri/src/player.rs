@@ -10,7 +10,6 @@ use std::{
     ffi::{CString, c_char, c_void},
     rc::Rc,
     sync::OnceLock,
-    time::Duration,
 };
 
 use anyhow::{Result, anyhow};
@@ -20,7 +19,7 @@ use libmpv2::{
     render::{OpenGLInitParams, RenderContext, RenderParam, RenderParamApiType},
 };
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, WebviewWindow};
+use tauri::WebviewWindow;
 
 /// Creates the mpv instance. It lives for the whole process, which lets the
 /// render context borrow it from GTK callbacks.
@@ -175,12 +174,16 @@ fn current_framebuffer() -> i32 {
 
 // ---------- playback state for the overlay ----------
 
+/// The `playback` event payload. The overlay extrapolates between events,
+/// so these only have to correct drift.
 #[derive(Clone, Serialize)]
 pub struct Playback {
     pub time: f64,
     pub paused: bool,
     pub speed: f64,
     pub duration: f64,
+    /// At the end of the file (playback stops there because of `keep-open`).
+    pub eof: bool,
 }
 
 pub fn playback(mpv: &Mpv) -> Playback {
@@ -189,16 +192,6 @@ pub fn playback(mpv: &Mpv) -> Playback {
         paused: mpv.get_property("pause").unwrap_or(true),
         speed: mpv.get_property("speed").unwrap_or(1.0),
         duration: mpv.get_property("duration").unwrap_or(0.0),
+        eof: mpv.get_property("eof-reached").unwrap_or(false),
     }
-}
-
-/// Sends the playback position to the overlay 20 times a second. The overlay
-/// extrapolates between updates, so this only has to correct drift.
-pub fn spawn_clock(app: AppHandle, mpv: &'static Mpv) {
-    std::thread::spawn(move || {
-        loop {
-            let _ = app.emit("playback", playback(mpv));
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    });
 }

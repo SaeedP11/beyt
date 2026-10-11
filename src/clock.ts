@@ -3,7 +3,7 @@ import type { Playback } from "./types";
 // mpv reports the position a few times a second. Between reports the clock is
 // extrapolated so cues switch on the right frame, not on the next report.
 
-let last: Playback = { time: 0, paused: true, speed: 1, duration: 0 };
+let last: Playback = { time: 0, paused: true, speed: 1, duration: 0, eof: false };
 let at = performance.now();
 
 export function update(p: Playback): void {

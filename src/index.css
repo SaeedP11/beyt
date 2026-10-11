@@ -1,0 +1,118 @@
+/* PrimeReact's theme sits between Tailwind's base and utilities, so
+   Tailwind classes can always adjust a PrimeReact component. */
+@layer theme, base, primereact, components, utilities;
+
+@import "tailwindcss";
+@import "primereact/resources/themes/lara-dark-blue/theme.css" layer(primereact);
+@import "primeicons/primeicons.css";
+@import "vazirmatn/Vazirmatn-font-face.css";
+
+@theme {
+  --font-sans: "Vazirmatn", "Inter", "Noto Sans", sans-serif;
+  --color-ink-950: #0b0c0f;
+  --color-ink-900: #111318;
+  --color-ink-850: #171a20;
+  --color-ink-800: #1d2027;
+  --color-ink-700: #2a2e37;
+  --color-ink-600: #3a3f4b;
+  --color-accent: #60a5fa;
+}
+
+:root {
+  color-scheme: dark;
+  /* PrimeReact reads its font from here. */
+  --font-family: var(--font-sans);
+  --sub-font-latin: "Inter", "Noto Sans", sans-serif;
+  --sub-font-persian: "Vazirmatn", "Noto Naskh Arabic", sans-serif;
+  --sub-outline: 0 0 2px #000, 0 0 2px #000, 0 0 3px #000, 0 0 4px #000;
+  /* Raised while the control bar shows, so subtitles move above it. */
+  --controls-offset: 0px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  /* Transparent so the mpv video underneath shows through. */
+  background: transparent;
+  user-select: none;
+}
+
+body.idle {
+  cursor: none;
+}
+
+/* ---------- subtitles (drawn by TrackView, outside React) ---------- */
+
+.sub-stack {
+  position: absolute;
+  inset-inline: 4%;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  pointer-events: none;
+  transition: bottom 200ms ease;
+}
+.sub-stack.bottom {
+  bottom: calc(6% + var(--controls-offset));
+  flex-direction: column-reverse;
+}
+.sub-stack.top {
+  top: 5%;
+  flex-direction: column;
+}
+
+.track {
+  text-align: center;
+  line-height: 1.35;
+  font-family: var(--sub-font-latin);
+  text-shadow: var(--sub-outline);
+  transition: filter 120ms ease;
+  pointer-events: auto;
+}
+.track:empty {
+  display: none;
+}
+.track .line {
+  display: block;
+  unicode-bidi: plaintext;
+}
+.track .line span {
+  padding: 0 0.04em;
+  border-radius: 3px;
+}
+.track .line span:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+.track.rtl {
+  font-family: var(--sub-font-persian);
+}
+.track.blur {
+  filter: blur(7px);
+}
+.track.blur:hover {
+  filter: none;
+}
+.track.boxed .line {
+  display: table;
+  margin: 0 auto;
+  padding: 0.05em 0.4em;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 6px;
+}
+
+/* ---------- PrimeReact touches ---------- */
+
+.p-sidebar.panel {
+  background: rgb(17 19 24 / 0.94);
+  backdrop-filter: blur(10px);
+}
+.p-progressbar.thin {
+  height: 4px;
+  background: var(--color-ink-700);
+}
+.p-toast {
+  max-width: min(26rem, 90vw);
+}
