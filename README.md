@@ -11,26 +11,39 @@ Design doc: https://claude.ai/code/artifact/b8b79f1d-fec3-401d-ad8e-f2513ef35b14
 ```sh
 nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node
 npm install
-./scripts/make-sample.sh         # 60 s sync-test video + EN/FA subtitles
+./scripts/make-sample.sh         # sample videos + EN/FA subtitles
+./scripts/build-dictionary.sh    # offline EN↔FA dictionary (Wiktionary, CC BY-SA)
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"
 ```
 
 Subtitle files next to the video that start with its name (`Movie.fa.srt`,
 `Movie.en.srt`) load on their own; more can be passed after the video path.
 
+Every key can be changed in Settings → Keyboard shortcuts; press `?` in the app for the full list.
+
 | Key | Action |
 | --- | --- |
 | Space | Pause / play |
-| ← / → | Seek 5 s |
+| ← / → | Seek (step set in Settings) |
+| ↑ / ↓ , M | Volume, mute |
+| - / = , 0 | Slower, faster, normal speed |
 | A / D | Previous / next subtitle line |
 | S | Replay current line |
 | Tab | Select next track |
+| Click a word | Dictionary popup (pauses); Save word adds it to Vocabulary |
+| W | Save the current line to Vocabulary |
+| P | Auto-pause after each line |
+| R | Transcript (both languages, click to jump) |
+| L | Subtitles panel |
 | [ / ] | Selected track offset −/+ 100 ms |
 | B | Selected track: show / blur / hide |
 | T | Selected track: top / bottom |
 | F, double-click | Fullscreen |
 | I | Info panel |
-| Q | Quit |
+| Esc | Back to the library |
+| ? or F1 | All keyboard shortcuts |
+| , | Settings |
+| Ctrl+Q | Quit |
 
 ## Layout
 

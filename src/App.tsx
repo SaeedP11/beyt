@@ -6,26 +6,43 @@ import * as clock from "./clock";
 import { Hud } from "./components/Hud";
 import { Library } from "./components/Library";
 import { PlayerChrome } from "./components/PlayerChrome";
+import { type Section, SettingsDialog } from "./components/SettingsDialog";
+import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SubtitlePanel } from "./components/SubtitlePanel";
+import { Transcript } from "./components/Transcript";
 import { UpNextCard } from "./components/UpNextCard";
+import { WordPopup, type WordPopupHandle } from "./components/WordPopup";
 import { player, useLang } from "./hooks";
-import { type Lang, defaultLang, setLang } from "./i18n";
+import { type Action, bindingTable, eventKey } from "./keymap";
+import { getSettings, loadSettings, useSettings } from "./settings";
 import { setToastHandler, toast } from "./ui";
-
-const IDLE_MS = 2500;
 
 type Screen = "loading" | "library" | "player";
 
+/** Actions that work on the library screen too. */
+const GLOBAL_ACTIONS = new Set<Action>(["help", "settings", "fullscreen", "quit", "back"]);
+
 export function App() {
   const lang = useLang();
+  const { keymap } = useSettings();
   const [screen, setScreen] = useState<Screen>("loading");
   const [lastFolder, setLastFolder] = useState<string | null>(null);
-  const [autoplay, setAutoplay] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [hudOpen, setHudOpen] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<Section>("general");
   const [controls, setControls] = useState(true);
   const toastRef = useRef<Toast>(null);
+  const wordPopup = useRef<WordPopupHandle>(null);
   const idleTimer = useRef<number | undefined>(undefined);
+
+  const openSettings = useCallback((section?: Section) => {
+    if (section) setSettingsSection(section);
+    setHelpOpen(false);
+    setSettingsOpen(true);
+  }, []);
 
   // ---------- opening and closing ----------
 
@@ -44,6 +61,7 @@ export function App() {
 
   const backToLibrary = useCallback(async () => {
     setPanelOpen(false);
+    setTranscriptOpen(false);
     await player.close();
     setScreen("library");
   }, []);
@@ -56,11 +74,9 @@ export function App() {
     started.current = true;
     setToastHandler((msg, ms) => toastRef.current?.show({ severity: "secondary", detail: msg, life: ms }));
     void (async () => {
-      const settings = await api.appSettings();
-      setLang((settings.uiLanguage as Lang | undefined) ?? defaultLang());
-      player.autoplayNext = settings.autoplayNext !== false;
-      setAutoplay(player.autoplayNext);
-      setLastFolder(typeof settings.lastFolder === "string" ? settings.lastFolder : null);
+      const saved = await api.appSettings();
+      loadSettings(saved);
+      setLastFolder(typeof saved.lastFolder === "string" ? saved.lastFolder : null);
 
       await events.playback((p) => {
         clock.update(p);
@@ -87,10 +103,10 @@ export function App() {
     clearTimeout(idleTimer.current);
     idleTimer.current = window.setTimeout(() => {
       if (!clock.snapshot().paused) setControls(false);
-    }, IDLE_MS);
+    }, getSettings().controlsHideDelay * 1000);
   }, []);
 
-  const showControls = screen === "player" && (controls || panelOpen);
+  const showControls = screen === "player" && (controls || panelOpen || transcriptOpen);
   useEffect(() => {
     document.documentElement.style.setProperty("--controls-offset", showControls ? "84px" : "0px");
     document.body.classList.toggle("idle", screen === "player" && !showControls);
@@ -99,45 +115,64 @@ export function App() {
   // ---------- keyboard ----------
 
   useEffect(() => {
+    const table = bindingTable(keymap);
     const onKey = (e: KeyboardEvent) => {
+      // Dialogs handle their own keys (Escape closes them).
+      if (helpOpen || settingsOpen) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
-      const key = e.key.toLowerCase();
+      const key = eventKey(e);
+      const action = key ? table.get(key) : undefined;
+      if (!action) return;
       const playing = screen === "player";
+      if (!playing && !GLOBAL_ACTIONS.has(action)) return;
 
-      if (key === "escape") {
-        if (panelOpen) setPanelOpen(false);
-        else if (player.cancelCountdown()) {
-          /* autoplay cancelled */
-        } else if (playing) void backToLibrary();
-      } else if (key === "f") {
-        void api.toggleFullscreen();
-      } else if (key === "q" && e.ctrlKey) {
-        void api.quit();
-      } else if (!playing) {
-        return;
-      } else if (key === "l") {
-        setPanelOpen((o) => !o);
-      } else if (key === "i") {
-        setHudOpen((o) => !o);
-      } else if (!player.handleKey(e)) {
-        return;
+      switch (action) {
+        case "back":
+          if (panelOpen || transcriptOpen) {
+            setPanelOpen(false);
+            setTranscriptOpen(false);
+          } else if (!player.cancelCountdown() && playing) {
+            void backToLibrary();
+          }
+          break;
+        case "help":
+          setHelpOpen(true);
+          break;
+        case "settings":
+          openSettings();
+          break;
+        case "fullscreen":
+          void api.toggleFullscreen();
+          break;
+        case "quit":
+          void api.quit();
+          break;
+        case "subtitles":
+          setPanelOpen((o) => !o);
+          break;
+        case "transcript":
+          setTranscriptOpen((o) => !o);
+          break;
+        case "info":
+          setHudOpen((o) => !o);
+          break;
+        default:
+          if (!player.runAction(action)) return;
       }
       e.preventDefault();
       if (playing) wake();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [screen, panelOpen, backToLibrary, wake]);
+  }, [keymap, screen, panelOpen, transcriptOpen, helpOpen, settingsOpen, backToLibrary, openSettings, wake]);
 
-  const changeLanguage = (next: Lang) => {
-    setLang(next);
-    void api.setAppSetting("uiLanguage", next);
-  };
-  const changeAutoplay = (on: boolean) => {
-    player.autoplayNext = on;
-    setAutoplay(on);
-    void api.setAppSetting("autoplayNext", on);
+  /** A click on a subtitle word opens its dictionary popup. */
+  const pickWord = (e: React.MouseEvent) => {
+    const el = e.target as HTMLElement;
+    if (el.tagName !== "SPAN" || el.classList.contains("line")) return;
+    const picked = player.wordContext(el);
+    if (picked && picked.word.trim()) wordPopup.current?.open(e, el, picked);
   };
 
   const rtl = lang === "fa";
@@ -145,8 +180,8 @@ export function App() {
   return (
     <div className="relative h-full text-zinc-100" onMouseMove={screen === "player" ? wake : undefined}>
       {/* TrackView draws subtitle lines into these two stacks. */}
-      <div id="subs-top" className="sub-stack top" />
-      <div id="subs-bottom" className="sub-stack bottom" />
+      <div id="subs-top" className="sub-stack top" onClick={pickWord} />
+      <div id="subs-bottom" className="sub-stack bottom" onClick={pickWord} />
 
       {screen === "player" && (
         <PlayerChrome
@@ -154,22 +189,33 @@ export function App() {
           onBack={() => void backToLibrary()}
           onToggleSubtitles={() => setPanelOpen((o) => !o)}
           onToggleInfo={() => setHudOpen((o) => !o)}
+          onToggleTranscript={() => setTranscriptOpen((o) => !o)}
+          onHelp={() => setHelpOpen(true)}
+          onSettings={() => openSettings()}
         />
       )}
       {screen === "player" && hudOpen && <Hud />}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
+      <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={() => setTranscriptOpen(false)} />
       <UpNextCard />
+      <WordPopup ref={wordPopup} />
 
       {screen === "library" && (
         <Library
           folder={lastFolder}
-          autoplay={autoplay}
           onPlay={(path) => void play(path)}
-          onLanguage={changeLanguage}
-          onAutoplay={changeAutoplay}
+          onHelp={() => setHelpOpen(true)}
+          onSettings={() => openSettings()}
         />
       )}
 
+      <ShortcutsDialog visible={helpOpen} onHide={() => setHelpOpen(false)} onCustomise={() => openSettings("shortcuts")} />
+      <SettingsDialog
+        visible={settingsOpen}
+        section={settingsSection}
+        onSection={setSettingsSection}
+        onHide={() => setSettingsOpen(false)}
+      />
       <Toast ref={toastRef} position={rtl ? "top-left" : "top-right"} />
     </div>
   );

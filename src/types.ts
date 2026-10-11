@@ -95,3 +95,56 @@ export interface TrackStyle {
 export interface SeriesSettings {
   tracks: Record<string, TrackStyle>;
 }
+
+export interface DictEntry {
+  fa: string;
+  pos: string;
+  roman: string | null;
+  glosses: string[];
+}
+
+export interface Lookup {
+  word: string;
+  /** The form that matched ("run" for "running"), or null when nothing did. */
+  matched: string | null;
+  entries: DictEntry[];
+}
+
+/** A clicked subtitle word with what is needed to look it up and save it. */
+export interface PickedWord {
+  word: string;
+  lang: string;
+  rtl: boolean;
+  /** The whole subtitle line the word is in. */
+  sentence: string;
+  /** The other language's line shown at the same time, if any. */
+  translation: string | null;
+  /** The line's span in video time (offsets applied). */
+  start: number;
+  end: number;
+}
+
+export interface NewVocab {
+  word: string | null;
+  meaning: string | null;
+  sentence: string;
+  translation: string | null;
+  lang: string;
+  video: string;
+  start: number;
+  end: number;
+}
+
+export interface VocabItem extends NewVocab {
+  id: number;
+  /** File names in the vocab media folder. */
+  screenshot: string | null;
+  audio: string | null;
+  createdAt: number;
+  exported: boolean;
+}
+
+export interface AnkiResult {
+  added: number[];
+  skipped: number;
+}

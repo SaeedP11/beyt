@@ -4,7 +4,6 @@ import { ProgressBar } from "primereact/progressbar";
 import { usePlayer } from "../hooks";
 import { t } from "../i18n";
 
-const AUTOPLAY_SECONDS = 5;
 
 /** "Up next" card shown at the end of an episode, counting down to autoplay. */
 export function UpNextCard() {
@@ -19,7 +18,7 @@ export function UpNextCard() {
         {next.name}
       </div>
       <ProgressBar
-        value={((AUTOPLAY_SECONDS - next.seconds) / AUTOPLAY_SECONDS) * 100}
+        value={((next.total - next.seconds) / next.total) * 100}
         showValue={false}
         className="thin mt-3"
       />

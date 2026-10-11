@@ -27,7 +27,7 @@ export function Hud() {
             </div>
           );
         })}
-      <div className="mt-3 text-xs text-zinc-400">{t("keys")}</div>
+      <div className="mt-3 text-xs text-zinc-400">{t("helpHint")}</div>
     </div>
   );
 }

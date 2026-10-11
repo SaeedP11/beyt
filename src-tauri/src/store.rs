@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub struct Store {
     db: Mutex<Connection>,
@@ -46,6 +46,21 @@ const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS app_settings (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS vocab (
+        id          INTEGER PRIMARY KEY,
+        word        TEXT,              -- NULL when a whole line was saved
+        meaning     TEXT,
+        sentence    TEXT NOT NULL,
+        translation TEXT,
+        lang        TEXT NOT NULL,
+        video       TEXT NOT NULL,
+        start       REAL NOT NULL,
+        end         REAL NOT NULL,
+        screenshot  TEXT,              -- file name in the vocab media folder
+        audio       TEXT,
+        created_at  INTEGER NOT NULL,
+        exported    INTEGER NOT NULL DEFAULT 0
     );
 ";
 
@@ -95,6 +110,11 @@ impl Store {
              ON CONFLICT(path) DO UPDATE SET position = ?2, duration = ?3, updated_at = ?4",
             params![path, position, duration, now()],
         )?;
+        Ok(())
+    }
+
+    pub fn clear_watch_history(&self) -> Result<()> {
+        self.db().execute("DELETE FROM watch", [])?;
         Ok(())
     }
 
@@ -160,6 +180,102 @@ impl Store {
     }
 }
 
+/// A word or line the user saved, before its media is captured.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewVocab {
+    pub word: Option<String>,
+    pub meaning: Option<String>,
+    pub sentence: String,
+    pub translation: Option<String>,
+    pub lang: String,
+    pub video: String,
+    pub start: f64,
+    pub end: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VocabItem {
+    pub id: i64,
+    pub word: Option<String>,
+    pub meaning: Option<String>,
+    pub sentence: String,
+    pub translation: Option<String>,
+    pub lang: String,
+    pub video: String,
+    pub start: f64,
+    pub end: f64,
+    /// File names in the vocab media folder.
+    pub screenshot: Option<String>,
+    pub audio: Option<String>,
+    pub created_at: i64,
+    pub exported: bool,
+}
+
+impl Store {
+    pub fn add_vocab(&self, v: &NewVocab) -> Result<i64> {
+        let db = self.db();
+        db.execute(
+            "INSERT INTO vocab (word, meaning, sentence, translation, lang, video, start, end, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![v.word, v.meaning, v.sentence, v.translation, v.lang, v.video, v.start, v.end, now()],
+        )?;
+        Ok(db.last_insert_rowid())
+    }
+
+    pub fn set_vocab_media(&self, id: i64, screenshot: Option<&str>, audio: Option<&str>) -> Result<()> {
+        self.db().execute(
+            "UPDATE vocab SET screenshot = ?2, audio = ?3 WHERE id = ?1",
+            params![id, screenshot, audio],
+        )?;
+        Ok(())
+    }
+
+    /// Newest first.
+    pub fn list_vocab(&self) -> Result<Vec<VocabItem>> {
+        let db = self.db();
+        let mut stmt = db.prepare(
+            "SELECT id, word, meaning, sentence, translation, lang, video, start, end,
+                    screenshot, audio, created_at, exported
+             FROM vocab ORDER BY created_at DESC, id DESC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(VocabItem {
+                id: r.get(0)?,
+                word: r.get(1)?,
+                meaning: r.get(2)?,
+                sentence: r.get(3)?,
+                translation: r.get(4)?,
+                lang: r.get(5)?,
+                video: r.get(6)?,
+                start: r.get(7)?,
+                end: r.get(8)?,
+                screenshot: r.get(9)?,
+                audio: r.get(10)?,
+                created_at: r.get(11)?,
+                exported: r.get::<_, i64>(12)? != 0,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Removes an item, returning it so its media files can be deleted.
+    pub fn delete_vocab(&self, id: i64) -> Result<Option<VocabItem>> {
+        let item = self.list_vocab()?.into_iter().find(|v| v.id == id);
+        self.db().execute("DELETE FROM vocab WHERE id = ?1", [id])?;
+        Ok(item)
+    }
+
+    pub fn mark_exported(&self, ids: &[i64]) -> Result<()> {
+        let db = self.db();
+        for id in ids {
+            db.execute("UPDATE vocab SET exported = 1 WHERE id = ?1", [id])?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -185,5 +301,30 @@ mod tests {
         assert_eq!(store.series_settings("/shows/x").unwrap(), Some(v));
         store.set_app_setting("uiLanguage", &serde_json::json!("fa")).unwrap();
         assert_eq!(store.app_settings().unwrap()["uiLanguage"], "fa");
+    }
+
+    #[test]
+    fn vocab_round_trip() {
+        let store = Store::in_memory().unwrap();
+        let id = store
+            .add_vocab(&NewVocab {
+                word: Some("run".into()),
+                meaning: Some("دویدن".into()),
+                sentence: "I run every day".into(),
+                translation: Some("هر روز می‌دوم".into()),
+                lang: "en".into(),
+                video: "/v.mkv".into(),
+                start: 1.0,
+                end: 2.5,
+            })
+            .unwrap();
+        store.set_vocab_media(id, Some("a.jpg"), Some("a.mp3")).unwrap();
+        store.mark_exported(&[id]).unwrap();
+        let items = store.list_vocab().unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].screenshot.as_deref(), Some("a.jpg"));
+        assert!(items[0].exported);
+        assert!(store.delete_vocab(id).unwrap().is_some());
+        assert!(store.list_vocab().unwrap().is_empty());
     }
 }

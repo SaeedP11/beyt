@@ -1,16 +1,12 @@
 import { activeCues } from "./cues";
+import { getSettings } from "./settings";
 import type { Track, TrackStyle } from "./types";
-
-const LANG_DEFAULTS: Record<string, Pick<TrackStyle, "position" | "size" | "color">> = {
-  fa: { position: "bottom", size: 34, color: "#ffffff" },
-  en: { position: "bottom", size: 30, color: "#ffe9a8" },
-  other: { position: "top", size: 28, color: "#d6f0ff" },
-};
 
 /** The style a track starts with when its series has nothing saved for it. */
 export function defaultStyle(track: Track): TrackStyle {
-  const base = LANG_DEFAULTS[track.lang] ?? LANG_DEFAULTS.other!;
-  return { ...base, enabled: track.defaultEnabled, mode: "show", boxed: false, offset: 0 };
+  const defaults = getSettings().subtitleDefaults;
+  const base = track.lang === "fa" || track.lang === "en" ? defaults[track.lang] : defaults.other;
+  return { ...base, enabled: track.defaultEnabled, mode: "show", offset: 0 };
 }
 
 /** One subtitle track drawn on the overlay. */
@@ -44,6 +40,7 @@ export class TrackView {
     const parent = document.getElementById(s.position === "top" ? "subs-top" : "subs-bottom")!;
     if (this.el.parentElement !== parent) parent.append(this.el);
     this.el.lang = this.track.lang;
+    this.el.dataset.track = String(this.track.id);
     this.el.style.fontSize = `${s.size}px`;
     this.el.style.color = s.color;
     this.el.classList.toggle("rtl", this.track.rtl);
@@ -69,7 +66,7 @@ export class TrackView {
     if (key === this.shownKey) return;
     this.shownKey = key;
     this.el.replaceChildren(
-      ...idx.flatMap((i) => this.track.cues[i]!.text.split("\n").map(renderLine)),
+      ...idx.flatMap((i) => this.track.cues[i]!.text.split("\n").map((text) => renderLine(text, i))),
     );
   }
 
@@ -79,10 +76,11 @@ export class TrackView {
 }
 
 /** One subtitle line, a span per word so the word popup can attach later. */
-function renderLine(text: string): HTMLElement {
+function renderLine(text: string, cueIndex: number): HTMLElement {
   const line = document.createElement("span");
   line.className = "line";
   line.dir = "auto";
+  line.dataset.cue = String(cueIndex);
   for (const part of text.split(/(\s+)/)) {
     if (!part) continue;
     if (/^\s+$/.test(part)) {

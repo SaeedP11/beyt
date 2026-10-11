@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Downloads Wiktionary's Persian entries (kaikki.org extract, CC BY-SA) and
+# builds Beyt's offline dictionary into the app's data folder.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+mkdir -p data
+src=data/kaikki-persian.jsonl
+if [[ ! -s $src ]]; then
+  curl -fL --progress-bar -o "$src.part" https://kaikki.org/dictionary/Persian/kaikki.org-dictionary-Persian.jsonl
+  mv "$src.part" "$src"
+fi
+
+dest="${XDG_DATA_HOME:-$HOME/.local/share}/app.beyt.player/dictionary.db"
+mkdir -p "$(dirname "$dest")"
+(cd src-tauri && cargo run --quiet --bin build_dictionary -- "../$src" "$dest")

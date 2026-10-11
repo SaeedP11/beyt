@@ -1,13 +1,14 @@
 import { api } from "./api";
 import * as clock from "./clock";
-import { cueIndexAt, neighbourCue } from "./cues";
+import { activeCues, cueIndexAt, neighbourCue } from "./cues";
 import { languageName, t } from "./i18n";
 import { TrackView, defaultStyle } from "./overlay";
-import type { Media, Mode, Playback, Track, TrackStyle, TrackUpdate } from "./types";
+import type { Cue, Media, Mode, Playback, PickedWord, Track, TrackStyle, TrackUpdate } from "./types";
+import type { Action } from "./keymap";
+import { getSettings } from "./settings";
 import { debounce, fmtTime, toast } from "./ui";
 
 const MODES: Mode[] = ["show", "blur", "hide"];
-const AUTOPLAY_SECONDS = 5;
 
 export function trackLabel(track: Track): string {
   const parts = [languageName(track.lang)];
@@ -23,9 +24,11 @@ function baseName(path: string): string {
 export class Player {
   media: Media | null = null;
   views: TrackView[] = [];
-  autoplayNext = true;
+  /** Pause at the end of every line of the selected track (shadowing practice). */
+  autoPause = false;
+  private pendingLineEnd: number | null = null;
   /** The next episode, counting down to autoplay. */
-  upNext: { path: string; name: string; seconds: number } | null = null;
+  upNext: { path: string; name: string; seconds: number; total: number } | null = null;
   /** Bumped on every change the UI should show (tracks, styles, up next). */
   version = 0;
 
@@ -46,7 +49,12 @@ export class Player {
 
   async open(path: string): Promise<Media> {
     this.cancelCountdown();
-    const media = await api.openMedia(path);
+    const settings = getSettings();
+    const media = await api.openMedia(path, {
+      preferredLanguages: settings.preferredLanguages,
+      resume: settings.resumePlayback,
+    });
+    this.autoPause = settings.autoPauseDefault;
     this.clearViews();
     this.media = media;
     clock.jump(media.resumedAt ?? 0);
@@ -132,6 +140,35 @@ export class Player {
 
   render(time: number): void {
     for (const v of this.views) v.render(time);
+    this.checkAutoPause(time);
+  }
+
+  // ---------- auto-pause ----------
+
+  toggleAutoPause(): void {
+    this.autoPause = !this.autoPause;
+    this.pendingLineEnd = null;
+    toast(this.autoPause ? t("autoPauseOn") : t("autoPauseOff"));
+    this.changed();
+  }
+
+  /** Pauses right after the selected track's current line ends. */
+  private checkAutoPause(time: number): void {
+    const v = this.selectedView();
+    if (!this.autoPause || !v || clock.snapshot().paused) {
+      this.pendingLineEnd = null;
+      return;
+    }
+    const tt = v.trackTime(time);
+    const cue = v.track.cues[cueIndexAt(v.track.cues, tt)];
+    if (cue && tt < cue.end) {
+      this.pendingLineEnd = cue.end;
+    } else if (this.pendingLineEnd !== null) {
+      // Only when playback ran past the end, not when a seek jumped over it.
+      const ranPast = tt - this.pendingLineEnd < 0.5;
+      this.pendingLineEnd = null;
+      if (ranPast) void api.setPause(true);
+    }
   }
 
   // ---------- end of file ----------
@@ -147,13 +184,14 @@ export class Player {
   }
 
   private async playNextSoon(): Promise<void> {
-    if (!this.autoplayNext || !this.media) return;
+    if (!getSettings().autoplayNext || !this.media) return;
     const next = await api.nextVideo(this.media.path);
     if (!next) {
       toast(t("lastEpisode"), 4000);
       return;
     }
-    this.upNext = { path: next, name: baseName(next).replace(/\.[^.]+$/, ""), seconds: AUTOPLAY_SECONDS };
+    const seconds = getSettings().autoplayDelay;
+    this.upNext = { path: next, name: baseName(next).replace(/\.[^.]+$/, ""), seconds, total: seconds };
     this.changed();
     this.countdown = window.setInterval(() => {
       if (!this.upNext) return;
@@ -191,7 +229,42 @@ export class Player {
     return views[this.selected % Math.max(views.length, 1)];
   }
 
-  private seekTo(time: number): void {
+  /** A clicked word element (inside a TrackView line) with its line and translation. */
+  wordContext(wordEl: HTMLElement): PickedWord | null {
+    const trackId = wordEl.closest<HTMLElement>(".track")?.dataset.track;
+    const cueIndex = Number(wordEl.closest<HTMLElement>(".line")?.dataset.cue);
+    const view = this.views.find((v) => String(v.track.id) === trackId);
+    const cue = view?.track.cues[cueIndex];
+    if (!view || !cue) return null;
+    return { word: wordEl.textContent ?? "", ...this.lineContext(view, cue) };
+  }
+
+  /** A line in video time, with the other language's line shown alongside it. */
+  private lineContext(view: TrackView, cue: Cue): Omit<PickedWord, "word"> {
+    const start = cue.start + view.style.offset;
+    const end = cue.end + view.style.offset;
+    const other = this.views.find((v) => v !== view && v.isText && v.style.enabled);
+    const otherCues = other ? activeCues(other.track.cues, other.trackTime((start + end) / 2)) : [];
+    const translation = otherCues.map((i) => other!.track.cues[i]!.text).join("\n") || null;
+    return { lang: view.track.lang, rtl: view.track.rtl, sentence: cue.text, translation, start, end };
+  }
+
+  /** Saves the selected track's current line (W) to the vocabulary. */
+  async saveCurrentLine(): Promise<void> {
+    const v = this.selectedView();
+    if (!v || !this.media) return;
+    const cue = v.track.cues[cueIndexAt(v.track.cues, v.trackTime(clock.now()))];
+    if (!cue) return;
+    const { rtl: _rtl, ...line } = this.lineContext(v, cue);
+    try {
+      await api.saveVocab({ ...line, word: null, meaning: null, video: this.media.path }, captureOptions());
+      toast(t("lineSaved"));
+    } catch (e) {
+      toast(String(e), 5000);
+    }
+  }
+
+  seekTo(time: number): void {
     const target = Math.max(0, time);
     clock.jump(target);
     void api.seekAbsolute(target);
@@ -211,62 +284,90 @@ export class Player {
     if (i >= 0) this.seekTo(v.track.cues[i]!.start + v.style.offset);
   }
 
-  /** Handles a playback key; returns false if the key isn't one. */
-  handleKey(e: KeyboardEvent): boolean {
+  /** Runs a playback or subtitle action; returns false if it isn't one. */
+  runAction(action: Action): boolean {
     const v = this.selectedView();
-    switch (e.key.toLowerCase()) {
-      case " ":
+    const { seekStep } = getSettings();
+    switch (action) {
+      case "togglePause":
         void api.togglePause();
         break;
-      case "arrowleft":
-        this.seekTo(clock.now() - 5);
+      case "seekBack":
+        this.seekTo(clock.now() - seekStep);
         break;
-      case "arrowright":
-        this.seekTo(clock.now() + 5);
+      case "seekForward":
+        this.seekTo(clock.now() + seekStep);
         break;
-      case "home":
+      case "restart":
         this.seekTo(0);
         break;
-      case "a":
+      case "volumeUp":
+      case "volumeDown":
+        void api
+          .adjustProperty("volume", action === "volumeUp" ? 5 : -5)
+          .then((n) => toast(t("volumeToast", { n: Math.round(n) })));
+        break;
+      case "mute":
+        void api.toggleMute().then((muted) => toast(muted ? t("muted") : t("unmuted")));
+        break;
+      case "speedUp":
+      case "speedDown":
+        void api
+          .adjustProperty("speed", action === "speedUp" ? 0.1 : -0.1)
+          .then((n) => toast(t("speedToast", { n: n.toFixed(2).replace(/0$/, "") })));
+        break;
+      case "speedReset":
+        void api.setMpvOption("speed", "1").then(() => toast(t("speedToast", { n: "1.0" })));
+        break;
+      case "prevLine":
         this.jumpLine(-1);
         break;
-      case "d":
+      case "nextLine":
         this.jumpLine(1);
         break;
-      case "s":
+      case "replayLine":
         this.replayLine();
         break;
-      case "tab": {
+      case "autoPause":
+        this.toggleAutoPause();
+        break;
+      case "saveLine":
+        void this.saveCurrentLine();
+        break;
+      case "nextTrack": {
         const views = this.textViews();
         if (!views.length) break;
         this.selected = (this.selected + 1) % views.length;
         toast(t("selected", { name: trackLabel(this.selectedView()!.track) }));
         break;
       }
-      case "[":
-      case "]": {
+      case "offsetMinus":
+      case "offsetPlus": {
         if (!v) break;
-        const offset = Math.round((v.style.offset + (e.key === "]" ? 0.1 : -0.1)) * 10) / 10;
+        const offset = Math.round((v.style.offset + (action === "offsetPlus" ? 0.1 : -0.1)) * 10) / 10;
         this.updateStyle(v, { offset });
         toast(t("offsetToast", { name: trackLabel(v.track), ms: Math.round(offset * 1000) }));
-        this.changed();
         break;
       }
-      case "b":
+      case "cycleMode":
         if (!v) break;
         this.updateStyle(v, { mode: MODES[(MODES.indexOf(v.style.mode) + 1) % MODES.length]! });
         toast(`${trackLabel(v.track)}: ${t(v.style.mode)}`);
-        this.changed();
         break;
-      case "t":
+      case "togglePosition":
         if (!v) break;
         this.updateStyle(v, { position: v.style.position === "top" ? "bottom" : "top" });
         toast(`${trackLabel(v.track)}: ${t(v.style.position)}`);
-        this.changed();
         break;
       default:
         return false;
     }
     return true;
   }
+}
+
+/** Vocabulary capture options from the Learning settings. */
+export function captureOptions(): { padding: number; screenshot: boolean } {
+  const s = getSettings();
+  return { padding: s.clipPadding / 1000, screenshot: s.saveScreenshots };
 }

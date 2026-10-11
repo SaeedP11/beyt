@@ -51,12 +51,12 @@ body.idle {
   inset-inline: 4%;
   display: flex;
   align-items: center;
-  gap: 0.35em;
+  gap: var(--sub-gap, 0.35em);
   pointer-events: none;
   transition: bottom 200ms ease;
 }
 .sub-stack.bottom {
-  bottom: calc(6% + var(--controls-offset));
+  bottom: calc(var(--sub-bottom, 6%) + var(--controls-offset));
   flex-direction: column-reverse;
 }
 .sub-stack.top {
@@ -115,4 +115,20 @@ body.idle {
 }
 .p-toast {
   max-width: min(26rem, 90vw);
+}
+
+.track .line span.picked {
+  background: rgb(96 165 250 / 0.45);
+}
+.track .line span:not(.line) {
+  cursor: pointer;
+}
+
+.beyt-tabs .p-tabview-nav,
+.beyt-tabs .p-tabview-nav-link,
+.beyt-tabs .p-tabview-panels {
+  background: transparent;
+}
+.beyt-tabs .p-tabview-panels {
+  padding: 1.5rem 0 0;
 }

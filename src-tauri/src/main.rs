@@ -1,9 +1,11 @@
 // Beyt: a dual-subtitle video player for language learning.
 
+mod dict;
 mod media;
 mod player;
 mod store;
 mod subs;
+mod vocab;
 
 use std::{
     fmt::Display,
@@ -29,6 +31,10 @@ struct App {
     cache_dir: PathBuf,
     initial_file: Option<PathBuf>,
     current: Mutex<Option<Current>>,
+    /// Screenshots and audio clips of saved vocabulary.
+    vocab_media: PathBuf,
+    /// Offline dictionary; `None` until scripts/build-dictionary.sh has run.
+    dictionary: Option<dict::Dictionary>,
 }
 
 struct Current {
@@ -76,6 +82,16 @@ struct TrackUpdate {
     track: Track,
 }
 
+/// Settings that shape how a file opens.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenOptions {
+    /// Languages to show by default when the series has no saved choice.
+    preferred_languages: Vec<String>,
+    /// Continue from the saved position.
+    resume: bool,
+}
+
 // ---------- commands: opening media ----------
 
 #[tauri::command]
@@ -84,7 +100,12 @@ fn initial_file(app: State<App>) -> Option<String> {
 }
 
 #[tauri::command]
-async fn open_media(app: State<'_, App>, handle: AppHandle, path: String) -> Result<Media, String> {
+async fn open_media(
+    app: State<'_, App>,
+    handle: AppHandle,
+    path: String,
+    options: OpenOptions,
+) -> Result<Media, String> {
     let video = PathBuf::from(&path);
     if !video.is_file() {
         return Err(format!("not a file: {path}"));
@@ -96,7 +117,8 @@ async fn open_media(app: State<'_, App>, handle: AppHandle, path: String) -> Res
         .watch_state(&path)
         .map_err(err)?
         .filter(|w| {
-            w.position > RESUME_MARGIN_START
+            options.resume &&
+                w.position > RESUME_MARGIN_START
                 && (w.duration <= 0.0 || w.position < w.duration - RESUME_MARGIN_END)
         })
         .map(|w| w.position);
@@ -105,7 +127,7 @@ async fn open_media(app: State<'_, App>, handle: AppHandle, path: String) -> Res
     app.mpv.set_property("pause", false).map_err(|e| format!("{e:?}"))?;
     player::load(app.mpv, &path).map_err(err)?;
 
-    let tracks = media::tracks_for(&video);
+    let tracks = media::tracks_for(&video, &options.preferred_languages);
     *app.current() = Some(Current { path: video.clone(), tracks: tracks.clone() });
     spawn_extraction(&handle, &video, &tracks);
 
@@ -191,6 +213,142 @@ fn stop(app: State<App>) -> Result<(), String> {
     app.mpv.command("stop", &[]).map_err(|e| format!("{e:?}"))
 }
 
+// ---------- commands: dictionary ----------
+
+/// Looks up a subtitle word: English words in Persian, Persian words in English.
+#[tauri::command]
+async fn lookup_word(app: State<'_, App>, word: String, lang: String) -> Result<dict::Lookup, String> {
+    let dictionary = app
+        .dictionary
+        .as_ref()
+        .ok_or("The offline dictionary is not installed. Run scripts/build-dictionary.sh.")?;
+    if lang == "fa" { dictionary.lookup_persian(&word) } else { dictionary.lookup_english(&word) }.map_err(err)
+}
+
+// ---------- commands: vocabulary ----------
+
+/// Saves a word or line with a screenshot of the current frame and an audio
+/// clip of the line.
+#[tauri::command]
+async fn save_vocab(
+    app: State<'_, App>,
+    item: store::NewVocab,
+    capture: vocab::CaptureOptions,
+) -> Result<store::VocabItem, String> {
+    let id = app.store.add_vocab(&item).map_err(err)?;
+    let span = (item.start, item.end);
+    let (shot, audio) = vocab::capture(app.mpv, &app.vocab_media, id, Path::new(&item.video), span, &capture);
+    app.store.set_vocab_media(id, shot.as_deref(), audio.as_deref()).map_err(err)?;
+    app.store
+        .list_vocab()
+        .map_err(err)?
+        .into_iter()
+        .find(|v| v.id == id)
+        .ok_or_else(|| "saved item disappeared".into())
+}
+
+#[tauri::command]
+fn list_vocab(app: State<App>) -> Result<Vec<store::VocabItem>, String> {
+    app.store.list_vocab().map_err(err)
+}
+
+#[tauri::command]
+fn delete_vocab(app: State<App>, id: i64) -> Result<(), String> {
+    if let Some(item) = app.store.delete_vocab(id).map_err(err)? {
+        vocab::delete_media(&app.vocab_media, &item);
+    }
+    Ok(())
+}
+
+/// Sends items not yet exported to Anki through AnkiConnect.
+#[tauri::command]
+async fn export_anki(app: State<'_, App>, anki: vocab::AnkiConfig) -> Result<vocab::AnkiResult, String> {
+    let pending: Vec<_> = app.store.list_vocab().map_err(err)?.into_iter().filter(|v| !v.exported).collect();
+    let result = vocab::export_to_anki(&pending, &app.vocab_media, &anki).map_err(|e| format!("{e:#}"))?;
+    app.store.mark_exported(&result.added).map_err(err)?;
+    Ok(result)
+}
+
+/// Writes all items to a CSV file; returns the folder the media was copied to.
+#[tauri::command]
+async fn export_csv(app: State<'_, App>, path: String) -> Result<String, String> {
+    let items = app.store.list_vocab().map_err(err)?;
+    let media = vocab::export_csv(&items, &app.vocab_media, Path::new(&path)).map_err(|e| format!("{e:#}"))?;
+    Ok(media.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn vocab_media_dir(app: State<App>) -> String {
+    app.vocab_media.to_string_lossy().into_owned()
+}
+
+#[tauri::command]
+async fn test_anki(anki: vocab::AnkiConfig) -> Result<i64, String> {
+    vocab::test_anki(&anki).map_err(|e| format!("{e:#}"))
+}
+
+// ---------- commands: settings and data ----------
+
+/// mpv options the settings screen may change.
+const MPV_OPTIONS: &[&str] = &["hwdec", "speed", "volume"];
+
+#[tauri::command]
+fn set_mpv_option(app: State<App>, name: String, value: String) -> Result<(), String> {
+    if !MPV_OPTIONS.contains(&name.as_str()) {
+        return Err(format!("not a settable option: {name}"));
+    }
+    app.mpv.set_property(&name, value.as_str()).map_err(|e| format!("{e:?}"))
+}
+
+/// Adds `delta` to volume (0–130) or speed (0.25–4); returns the new value.
+#[tauri::command]
+fn adjust_property(app: State<App>, name: String, delta: f64) -> Result<f64, String> {
+    let (min, max) = match name.as_str() {
+        "volume" => (0.0, 130.0),
+        "speed" => (0.25, 4.0),
+        _ => return Err(format!("not adjustable: {name}")),
+    };
+    let current: f64 = app.mpv.get_property(&name).map_err(|e| format!("{e:?}"))?;
+    let next = ((current + delta) * 100.0).round() / 100.0;
+    let next = next.clamp(min, max);
+    app.mpv.set_property(&name, next).map_err(|e| format!("{e:?}"))?;
+    Ok(next)
+}
+
+#[tauri::command]
+fn toggle_mute(app: State<App>) -> Result<bool, String> {
+    app.mpv.command("cycle", &["mute"]).map_err(|e| format!("{e:?}"))?;
+    app.mpv.get_property("mute").map_err(|e| format!("{e:?}"))
+}
+
+#[tauri::command]
+fn clear_watch_history(app: State<App>) -> Result<(), String> {
+    app.store.clear_watch_history().map_err(err)
+}
+
+#[tauri::command]
+fn clear_subtitle_cache(app: State<App>) -> Result<(), String> {
+    match std::fs::remove_dir_all(&app.cache_dir) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+        _ => Ok(()),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DataInfo {
+    data_dir: String,
+    dictionary_entries: Option<i64>,
+}
+
+#[tauri::command]
+fn data_info(app: State<App>, handle: AppHandle) -> Result<DataInfo, String> {
+    Ok(DataInfo {
+        data_dir: handle.path().app_data_dir().map_err(err)?.to_string_lossy().into_owned(),
+        dictionary_entries: app.dictionary.as_ref().and_then(|d| d.entry_count().ok()),
+    })
+}
+
 // ---------- commands: library ----------
 
 #[tauri::command]
@@ -244,6 +402,13 @@ fn set_app_setting(app: State<App>, key: String, value: serde_json::Value) -> Re
 fn toggle_pause(app: State<App>, handle: AppHandle) -> Result<(), String> {
     app.mpv.command("cycle", &["pause"]).map_err(|e| format!("{e:?}"))?;
     // Tell the overlay now rather than on the next clock tick.
+    let _ = handle.emit("playback", player::playback(app.mpv));
+    Ok(())
+}
+
+#[tauri::command]
+fn set_pause(app: State<App>, handle: AppHandle, paused: bool) -> Result<(), String> {
+    app.mpv.set_property("pause", paused).map_err(|e| format!("{e:?}"))?;
     let _ = handle.emit("playback", player::playback(app.mpv));
     Ok(())
 }
@@ -305,6 +470,20 @@ fn main() {
             initial_file,
             open_media,
             add_subtitle,
+            lookup_word,
+            save_vocab,
+            list_vocab,
+            delete_vocab,
+            export_anki,
+            export_csv,
+            vocab_media_dir,
+            test_anki,
+            set_mpv_option,
+            adjust_property,
+            toggle_mute,
+            clear_watch_history,
+            clear_subtitle_cache,
+            data_info,
             stop,
             list_folder,
             recent_files,
@@ -313,6 +492,7 @@ fn main() {
             app_settings,
             set_app_setting,
             toggle_pause,
+            set_pause,
             seek_absolute,
             set_mpv_subtitle,
             toggle_fullscreen,
@@ -322,7 +502,18 @@ fn main() {
             let paths = app.path();
             let store = Store::open(&paths.app_data_dir()?.join("beyt.db"))?;
             let cache_dir = paths.app_cache_dir()?.join("subtitles");
-            app.manage(App { mpv, store, cache_dir, initial_file: cli_file.clone(), current: Mutex::new(None) });
+            let dictionary = dict::Dictionary::open(&paths.app_data_dir()?.join("dictionary.db"))
+                .inspect_err(|e| eprintln!("beyt: no offline dictionary ({e:#}); run scripts/build-dictionary.sh"))
+                .ok();
+            app.manage(App {
+                mpv,
+                store,
+                cache_dir,
+                vocab_media: paths.app_data_dir()?.join("vocab-media"),
+                initial_file: cli_file,
+                current: Mutex::new(None),
+                dictionary,
+            });
 
             let window = app.get_webview_window("main").expect("main window");
             player::attach_video(&window, mpv)?;

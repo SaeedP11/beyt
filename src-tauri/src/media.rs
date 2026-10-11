@@ -196,9 +196,9 @@ pub fn embedded_tracks(video: &Path) -> Result<Vec<Track>> {
 }
 
 /// All subtitle tracks for a video: sidecar files first, then embedded ones.
-/// Ids and keys are assigned, and a Persian and an English track are picked
+/// Ids and keys are assigned, and one track per preferred language is picked
 /// to show by default.
-pub fn tracks_for(video: &Path) -> Vec<Track> {
+pub fn tracks_for(video: &Path, preferred: &[String]) -> Vec<Track> {
     let stem = video.file_stem().and_then(|s| s.to_str());
     let mut tracks: Vec<Track> =
         subs::find_sidecars(video).iter().map(|p| file_track(p, stem)).collect();
@@ -207,7 +207,7 @@ pub fn tracks_for(video: &Path) -> Vec<Track> {
         Err(err) => eprintln!("beyt: no embedded subtitles for {}: {err:#}", video.display()),
     }
     number_tracks(&mut tracks, 0);
-    pick_defaults(&mut tracks);
+    pick_defaults(&mut tracks, preferred);
     tracks
 }
 
@@ -225,9 +225,9 @@ pub fn number_tracks(tracks: &mut [Track], first: usize) {
     }
 }
 
-/// One Persian and one English text track, preferring full (not forced) and
-/// default-flagged ones. With neither language present, the first text track.
-fn pick_defaults(tracks: &mut [Track]) {
+/// One text track per preferred language, preferring full (not forced) and
+/// default-flagged ones. With none of them present, the first text track.
+fn pick_defaults(tracks: &mut [Track], preferred: &[String]) {
     let score = |t: &Track| -> Option<i32> {
         if !matches!(t.status, TrackStatus::Ready | TrackStatus::Loading) {
             return None;
@@ -240,11 +240,11 @@ fn pick_defaults(tracks: &mut [Track]) {
         })
     };
     let mut picked = false;
-    for lang in ["fa", "en"] {
+    for lang in preferred {
         let best = tracks
             .iter()
             .enumerate()
-            .filter(|(_, t)| t.lang == lang)
+            .filter(|(_, t)| &t.lang == lang)
             .filter_map(|(i, t)| score(t).map(|s| (s, i)))
             .max_by_key(|&(s, i)| (s, std::cmp::Reverse(i)));
         if let Some((_, i)) = best {
@@ -450,7 +450,7 @@ mod tests {
             track("fa", TrackSource::File { path: "a".into() }, TrackStatus::Ready),
             track("ja", embedded(false, true), TrackStatus::Loading),
         ];
-        pick_defaults(&mut tracks);
+        pick_defaults(&mut tracks, &["fa".into(), "en".into()]);
         let on: Vec<bool> = tracks.iter().map(|t| t.default_enabled).collect();
         assert_eq!(on, [false, true, false, true, false]);
     }
@@ -461,7 +461,7 @@ mod tests {
             track("ja", embedded(false, false), TrackStatus::Image),
             track("ja", embedded(false, false), TrackStatus::Loading),
         ];
-        pick_defaults(&mut tracks);
+        pick_defaults(&mut tracks, &["fa".into(), "en".into()]);
         assert!(!tracks[0].default_enabled && tracks[1].default_enabled);
     }
 }

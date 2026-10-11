@@ -13,10 +13,21 @@ interface Props {
   onBack: () => void;
   onToggleSubtitles: () => void;
   onToggleInfo: () => void;
+  onToggleTranscript: () => void;
+  onHelp: () => void;
+  onSettings: () => void;
 }
 
 /** Title bar and control bar over the video; they fade out while watching. */
-export function PlayerChrome({ visible, onBack, onToggleSubtitles, onToggleInfo }: Props) {
+export function PlayerChrome({
+  visible,
+  onBack,
+  onToggleSubtitles,
+  onToggleInfo,
+  onToggleTranscript,
+  onHelp,
+  onSettings,
+}: Props) {
   usePlayer();
   const p = usePlayback(8);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -78,6 +89,27 @@ export function PlayerChrome({ visible, onBack, onToggleSubtitles, onToggleInfo 
           </span>
           <div className="flex-1" />
           <Button
+            icon="pi pi-stopwatch"
+            rounded
+            text={!player.autoPause}
+            aria-label={t("autoPause")}
+            aria-pressed={player.autoPause}
+            tooltip={`${t("autoPause")} (P)`}
+            tooltipOptions={{ position: "top" }}
+            onClick={() => player.toggleAutoPause()}
+            className={player.autoPause ? "" : "text-white"}
+          />
+          <Button
+            icon="pi pi-align-left"
+            rounded
+            text
+            aria-label={t("transcript")}
+            tooltip={`${t("transcript")} (R)`}
+            tooltipOptions={{ position: "top" }}
+            onClick={onToggleTranscript}
+            className="text-white"
+          />
+          <Button
             icon="pi pi-comments"
             rounded
             text
@@ -95,6 +127,26 @@ export function PlayerChrome({ visible, onBack, onToggleSubtitles, onToggleInfo 
             tooltip={`${t("info")} (I)`}
             tooltipOptions={{ position: "top" }}
             onClick={onToggleInfo}
+            className="text-white"
+          />
+          <Button
+            icon="pi pi-question-circle"
+            rounded
+            text
+            aria-label={t("shortcutsTitle")}
+            tooltip={`${t("shortcutsTitle")} (?)`}
+            tooltipOptions={{ position: "top" }}
+            onClick={onHelp}
+            className="text-white"
+          />
+          <Button
+            icon="pi pi-cog"
+            rounded
+            text
+            aria-label={t("settings")}
+            tooltip={`${t("settings")} (,)`}
+            tooltipOptions={{ position: "top" }}
+            onClick={onSettings}
             className="text-white"
           />
           <Button

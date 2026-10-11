@@ -1,33 +1,28 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "primereact/button";
-import { Dialog } from "primereact/dialog";
-import { Dropdown } from "primereact/dropdown";
-import { InputSwitch } from "primereact/inputswitch";
 import { ProgressBar } from "primereact/progressbar";
+import { TabPanel, TabView } from "primereact/tabview";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api";
-import { useLang } from "../hooks";
-import { type Lang, t } from "../i18n";
+import { t } from "../i18n";
 import type { Folder, FolderEntry, Recent } from "../types";
 import { toast } from "../ui";
+import { VocabularyView } from "./VocabularyView";
 
 const VIDEO_EXTENSIONS = ["mkv", "mp4", "m4v", "webm", "avi", "mov", "ts", "m2ts", "wmv", "flv", "ogv"];
 const WATCHED = 0.92;
 
 interface Props {
   folder: string | null;
-  autoplay: boolean;
   onPlay: (path: string) => void;
-  onLanguage: (lang: Lang) => void;
-  onAutoplay: (on: boolean) => void;
+  onHelp: () => void;
+  onSettings: () => void;
 }
 
-export function Library({ folder: initialFolder, autoplay, onPlay, onLanguage, onAutoplay }: Props) {
-  const lang = useLang();
+export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: Props) {
   const [recent, setRecent] = useState<Recent[]>([]);
   const [folder, setFolder] = useState<Folder | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const showFolder = useCallback(async (path: string) => {
     try {
@@ -73,67 +68,57 @@ export function Library({ folder: initialFolder, autoplay, onPlay, onLanguage, o
             <Button icon="pi pi-play" label={t("openFile")} onClick={() => void pickFile()} />
             <Button icon="pi pi-folder-open" label={t("openFolder")} outlined onClick={() => void pickFolder()} />
             <Button
+              icon="pi pi-question-circle"
+              rounded
+              text
+              severity="secondary"
+              aria-label={t("shortcutsTitle")}
+              tooltip={`${t("shortcutsTitle")} (?)`}
+              tooltipOptions={{ position: "bottom" }}
+              onClick={onHelp}
+            />
+            <Button
               icon="pi pi-cog"
               rounded
               text
               severity="secondary"
               aria-label={t("settings")}
-              tooltip={t("settings")}
+              tooltip={`${t("settings")} (,)`}
               tooltipOptions={{ position: "bottom" }}
-              onClick={() => setSettingsOpen(true)}
+              onClick={onSettings}
             />
           </div>
         </header>
 
-        {empty && (
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-ink-600 px-6 py-20 text-center">
-            <i className="pi pi-video text-5xl text-zinc-500" />
-            <p className="text-lg text-zinc-300">{t("dropHint")}</p>
-            <p className="text-sm text-zinc-500">{t("appTagline")}</p>
-          </div>
-        )}
+        <TabView className="beyt-tabs">
+          <TabPanel header={t("libraryTab")} leftIcon="pi pi-home me-2">
+            {empty && (
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-ink-600 px-6 py-20 text-center">
+                <i className="pi pi-video text-5xl text-zinc-500" />
+                <p className="text-lg text-zinc-300">{t("dropHint")}</p>
+                <p className="text-sm text-zinc-500">{t("appTagline")}</p>
+              </div>
+            )}
 
-        {recent.length > 0 && (
-          <section className="mb-12">
-            <SectionTitle>{t("recent")}</SectionTitle>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4">
-              {recent.map((r) => (
-                <RecentCard key={r.path} item={r} onPlay={onPlay} />
-              ))}
-            </div>
-          </section>
-        )}
+            {recent.length > 0 && (
+              <section className="mb-12">
+                <SectionTitle>{t("recent")}</SectionTitle>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4">
+                  {recent.map((r) => (
+                    <RecentCard key={r.path} item={r} onPlay={onPlay} />
+                  ))}
+                </div>
+              </section>
+            )}
 
-        {folder && <FolderView folder={folder} onOpen={(p) => void showFolder(p)} onPlay={onPlay} />}
+            {folder && <FolderView folder={folder} onOpen={(p) => void showFolder(p)} onPlay={onPlay} />}
+          </TabPanel>
+          <TabPanel header={t("vocabulary")} leftIcon="pi pi-bookmark me-2">
+            <VocabularyView />
+          </TabPanel>
+        </TabView>
       </div>
 
-      <Dialog
-        header={t("settings")}
-        visible={settingsOpen}
-        onHide={() => setSettingsOpen(false)}
-        className="w-[min(28rem,92vw)]"
-        dismissableMask
-        draggable={false}
-      >
-        <div className="flex flex-col gap-5 pt-1">
-          <label className="flex items-center justify-between gap-4">
-            <span>{t("uiLanguage")}</span>
-            <Dropdown
-              value={lang}
-              options={[
-                { label: "English", value: "en" },
-                { label: "فارسی", value: "fa" },
-              ]}
-              onChange={(e) => onLanguage(e.value as Lang)}
-              className="w-40"
-            />
-          </label>
-          <label className="flex items-center justify-between gap-4">
-            <span>{t("autoplayNext")}</span>
-            <InputSwitch checked={autoplay} onChange={(e) => onAutoplay(!!e.value)} />
-          </label>
-        </div>
-      </Dialog>
     </main>
   );
 }
