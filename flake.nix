@@ -10,6 +10,8 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        # Pinned to a major version: pnpm's store format changes between majors.
+        pnpm = pkgs.pnpm_11;
 
         # Native libraries Tauri (GTK3 + WebKitGTK) and libmpv link against.
         libs = with pkgs; [
@@ -28,8 +30,76 @@
           libGL
           libepoxy
         ];
+
+        beyt = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+          pname = "beyt";
+          version = "0.1.0";
+          # Flakes only see files tracked by git, so samples/, data/ and
+          # build output stay out of the build.
+          src = ./.;
+
+          cargoRoot = "src-tauri";
+          buildAndTestSubdir = "src-tauri";
+          cargoLock.lockFile = ./src-tauri/Cargo.lock;
+
+          pnpmDeps = pkgs.fetchPnpmDeps {
+            inherit (finalAttrs) pname version src;
+            inherit pnpm;
+            fetcherVersion = 4;
+            hash = "sha256-93puEZ+yIf2K0CZFfVtrusl2GWmzUV6lNzJ61p+UnJk=";
+          };
+
+          nativeBuildInputs = with pkgs; [
+            nodejs
+            pnpm
+            pnpmConfigHook
+            pkg-config
+            wrapGAppsHook3
+            makeWrapper
+          ];
+          buildInputs = libs;
+
+          # tauri-build embeds ../dist, so the frontend is built first.
+          preBuild = ''
+            pnpm build
+          '';
+
+          # Only the player itself; the dictionary builder is a dev tool.
+          cargoBuildFlags = [ "--bin" "beyt" ];
+          # Tests need mpv and a display; they run in the dev shell instead.
+          doCheck = false;
+
+          postInstall = ''
+            install -Dm644 packaging/beyt.desktop $out/share/applications/beyt.desktop
+            install -Dm644 src-tauri/icons/icon.png $out/share/icons/hicolor/512x512/apps/beyt.png
+          '';
+
+          # ffmpeg/ffprobe extract embedded subtitles and cut audio clips;
+          # libEGL is loaded at runtime for mpv's OpenGL rendering.
+          preFixup = ''
+            gappsWrapperArgs+=(
+              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.ffmpeg ]}
+              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.libGL ]}
+            )
+          '';
+
+          meta = {
+            description = "Video player for language learning with two subtitles at once";
+            license = pkgs.lib.licenses.gpl3Plus;
+            mainProgram = "beyt";
+            platforms = pkgs.lib.platforms.linux;
+          };
+        });
       in
       {
+        packages.default = beyt;
+        packages.beyt = beyt;
+
+        apps.default = {
+          type = "app";
+          program = "${beyt}/bin/beyt";
+        };
+
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -43,6 +113,7 @@
             ffmpeg
             nodejs
             typescript
+            pnpm
           ];
           buildInputs = libs;
 

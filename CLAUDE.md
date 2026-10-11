@@ -33,10 +33,10 @@ error states. Design for both English (LTR) and Persian (RTL) from the start.
 
 ```sh
 nix develop                                   # toolchain
-npm install
+pnpm install
 ./scripts/make-sample.sh                      # sample videos and subtitles
 ./scripts/build-dictionary.sh                 # offline dictionary into the app data folder
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"
 cd src-tauri && cargo test && cargo clippy    # Rust checks
-npx tsc --noEmit                              # TypeScript check
+pnpm typecheck                                # TypeScript check
 ```

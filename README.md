@@ -10,7 +10,7 @@ Design doc: https://claude.ai/code/artifact/b8b79f1d-fec3-401d-ad8e-f2513ef35b14
 
 ```sh
 nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node
-npm install
+pnpm install
 ./scripts/make-sample.sh         # sample videos + EN/FA subtitles
 ./scripts/build-dictionary.sh    # offline EN↔FA dictionary (Wiktionary, CC BY-SA)
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"

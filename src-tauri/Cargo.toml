@@ -24,3 +24,9 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 tauri-plugin-dialog = "2"
 # Only talks to AnkiConnect on localhost, so no TLS.
 ureq = { version = "3.4.2", default-features = false, features = ["json"] }
+
+[features]
+# Release builds embed the built frontend; `cargo tauri dev` turns this off
+# and uses the Vite dev server instead.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
