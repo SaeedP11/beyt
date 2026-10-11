@@ -22,6 +22,8 @@ export const api = {
   openMedia: (path: string, options: { preferredLanguages: string[]; resume: boolean }) =>
     invoke<Media>("open_media", { path, options }),
   addSubtitle: (path: string) => invoke<Track>("add_subtitle", { path }),
+  /** Returns every remaining track's key, as removing one can renumber others. */
+  removeSubtitle: (id: number) => invoke<{ id: number; key: string }[]>("remove_subtitle", { id }),
   stop: () => invoke<void>("stop"),
   lookupWord: (word: string, lang: string) => invoke<Lookup>("lookup_word", { word, lang }),
 

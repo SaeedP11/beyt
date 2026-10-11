@@ -101,6 +101,23 @@ export class Player {
     this.changed();
   }
 
+  /** Removes a subtitle file the user added; it won't load next time either. */
+  async removeSubtitle(view: TrackView): Promise<void> {
+    const selected = this.selectedView();
+    const keys = await api.removeSubtitle(view.track.id);
+    view.remove();
+    this.views = this.views.filter((v) => v !== view);
+    // Tracks after it may have moved up a key; keep their styles with them.
+    for (const { id, key } of keys) {
+      const v = this.views.find((v) => v.track.id === id);
+      if (v) v.track = { ...v.track, key };
+    }
+    const stillSelected = selected && selected !== view ? this.textViews().indexOf(selected) : -1;
+    this.selected = Math.max(0, stillSelected);
+    this.save();
+    this.changed();
+  }
+
   /**
    * Changes a track's style. Switching a track on or off counts as a change
    * to the track list; other changes only restyle it.

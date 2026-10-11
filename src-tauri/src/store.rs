@@ -1,5 +1,5 @@
-//! Local SQLite storage: watch positions, per-series subtitle settings and
-//! app settings.
+//! Local SQLite storage: watch positions, subtitle files added by hand,
+//! per-series subtitle settings and app settings.
 
 use std::{
     path::Path,
@@ -38,6 +38,11 @@ const SCHEMA: &str = "
         position   REAL NOT NULL,
         duration   REAL NOT NULL,
         updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS added_subtitles (
+        video TEXT NOT NULL,
+        path  TEXT NOT NULL,
+        PRIMARY KEY (video, path)
     );
     CREATE TABLE IF NOT EXISTS series (
         folder   TEXT PRIMARY KEY,
@@ -138,6 +143,30 @@ impl Store {
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Subtitle files the user added to `video`, in the order they were added.
+    pub fn added_subtitles(&self, video: &str) -> Result<Vec<String>> {
+        let db = self.db();
+        let mut stmt = db.prepare("SELECT path FROM added_subtitles WHERE video = ?1 ORDER BY rowid")?;
+        let rows = stmt.query_map([video], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn add_subtitle(&self, video: &str, path: &str) -> Result<()> {
+        self.db().execute(
+            "INSERT OR IGNORE INTO added_subtitles (video, path) VALUES (?1, ?2)",
+            params![video, path],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_subtitle(&self, video: &str, path: &str) -> Result<()> {
+        self.db().execute(
+            "DELETE FROM added_subtitles WHERE video = ?1 AND path = ?2",
+            params![video, path],
+        )?;
+        Ok(())
     }
 
     /// Per-series settings as JSON, owned by the frontend.
@@ -291,6 +320,20 @@ mod tests {
         let recent = store.recent(10).unwrap();
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].title, "a");
+    }
+
+    #[test]
+    fn added_subtitles_keep_their_order() {
+        let store = Store::in_memory().unwrap();
+        store.add_subtitle("/v.mkv", "/subs/b.srt").unwrap();
+        store.add_subtitle("/v.mkv", "/subs/a.srt").unwrap();
+        store.add_subtitle("/v.mkv", "/subs/b.srt").unwrap();
+        store.add_subtitle("/w.mkv", "/subs/c.srt").unwrap();
+        assert_eq!(store.added_subtitles("/v.mkv").unwrap(), ["/subs/b.srt", "/subs/a.srt"]);
+        assert!(store.added_subtitles("/x.mkv").unwrap().is_empty());
+        store.remove_subtitle("/v.mkv", "/subs/b.srt").unwrap();
+        assert_eq!(store.added_subtitles("/v.mkv").unwrap(), ["/subs/a.srt"]);
+        assert_eq!(store.added_subtitles("/w.mkv").unwrap(), ["/subs/c.srt"]);
     }
 
     #[test]

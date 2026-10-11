@@ -74,6 +74,8 @@ pub struct Track {
     pub error: Option<String>,
     /// Shown when the series has no saved choice.
     pub default_enabled: bool,
+    /// A file the user added by hand, so it can be removed again.
+    pub added: bool,
     pub cues: Vec<Cue>,
 }
 
@@ -101,6 +103,7 @@ pub fn file_track(path: &Path, video_stem: Option<&str>) -> Track {
         status: TrackStatus::Ready,
         error: None,
         default_enabled: false,
+        added: false,
         cues: Vec::new(),
     };
     match subs::load_file(path) {
@@ -189,38 +192,45 @@ pub fn embedded_tracks(video: &Path) -> Result<Vec<Track>> {
                 status: if is_text { TrackStatus::Loading } else { TrackStatus::Image },
                 error: None,
                 default_enabled: false,
+                added: false,
                 cues: Vec::new(),
             }
         })
         .collect())
 }
 
-/// All subtitle tracks for a video: sidecar files first, then embedded ones.
-/// Ids and keys are assigned, and one track per preferred language is picked
-/// to show by default.
-pub fn tracks_for(video: &Path, preferred: &[String]) -> Vec<Track> {
+/// All subtitle tracks for a video: sidecar files first, then files the user
+/// added earlier (those still on disk), then embedded ones. Ids and keys are
+/// assigned, and one track per preferred language is picked to show by default.
+pub fn tracks_for(video: &Path, added: &[PathBuf], preferred: &[String]) -> Vec<Track> {
     let stem = video.file_stem().and_then(|s| s.to_str());
-    let mut tracks: Vec<Track> =
-        subs::find_sidecars(video).iter().map(|p| file_track(p, stem)).collect();
+    let sidecars = subs::find_sidecars(video);
+    let mut tracks: Vec<Track> = sidecars.iter().map(|p| file_track(p, stem)).collect();
+    for path in added {
+        if path.is_file() && !sidecars.contains(path) {
+            tracks.push(Track { added: true, ..file_track(path, stem) });
+        }
+    }
     match embedded_tracks(video) {
         Ok(embedded) => tracks.extend(embedded),
         Err(err) => eprintln!("beyt: no embedded subtitles for {}: {err:#}", video.display()),
     }
-    number_tracks(&mut tracks, 0);
+    for (i, track) in tracks.iter_mut().enumerate() {
+        track.id = i;
+    }
+    assign_keys(&mut tracks);
     pick_defaults(&mut tracks, preferred);
     tracks
 }
 
-/// Gives tracks from `first` on their ids and keys, counting keys across all tracks.
-pub fn number_tracks(tracks: &mut [Track], first: usize) {
+/// Gives every track its key, counting tracks of the same language and kind
+/// in order. Appending a track leaves the keys before it unchanged.
+pub fn assign_keys(tracks: &mut [Track]) {
     let mut seen: HashMap<String, usize> = HashMap::new();
-    for (i, track) in tracks.iter_mut().enumerate() {
+    for track in tracks {
         let base = format!("{}:{}", track.lang, track.kind());
         let n = seen.entry(base.clone()).or_default();
-        if i >= first {
-            track.id = i;
-            track.key = format!("{base}:{n}");
-        }
+        track.key = format!("{base}:{n}");
         *n += 1;
     }
 }
@@ -413,6 +423,7 @@ mod tests {
             status,
             error: None,
             default_enabled: false,
+            added: false,
             cues: Vec::new(),
         }
     }
@@ -435,10 +446,9 @@ mod tests {
             track("en", embedded(true, false), TrackStatus::Loading),
             track("fa", TrackSource::File { path: "a".into() }, TrackStatus::Ready),
         ];
-        number_tracks(&mut tracks, 0);
+        assign_keys(&mut tracks);
         let keys: Vec<_> = tracks.iter().map(|t| t.key.as_str()).collect();
         assert_eq!(keys, ["en:embedded:0", "en:embedded:1", "fa:file:0"]);
-        assert_eq!(tracks[2].id, 2);
     }
 
     #[test]

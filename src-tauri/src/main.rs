@@ -127,7 +127,9 @@ async fn open_media(
     app.mpv.set_property("pause", false).map_err(|e| format!("{e:?}"))?;
     player::load(app.mpv, &path).map_err(err)?;
 
-    let tracks = media::tracks_for(&video, &options.preferred_languages);
+    let added: Vec<PathBuf> =
+        app.store.added_subtitles(&path).map_err(err)?.into_iter().map(PathBuf::from).collect();
+    let tracks = media::tracks_for(&video, &added, &options.preferred_languages);
     *app.current() = Some(Current { path: video.clone(), tracks: tracks.clone() });
     spawn_extraction(&handle, &video, &tracks);
 
@@ -168,7 +170,7 @@ fn spawn_extraction(handle: &AppHandle, video: &Path, tracks: &[Track]) {
             return; // Another file was opened meanwhile.
         };
         for (id, stream) in pending {
-            let Some(track) = cur.tracks.get_mut(id) else { continue };
+            let Some(track) = cur.tracks.iter_mut().find(|t| t.id == id) else { continue };
             match results.as_ref().map(|r| r.get(&stream)) {
                 Ok(Some(Ok(loaded))) => {
                     track.status = TrackStatus::Ready;
@@ -195,15 +197,42 @@ fn spawn_extraction(handle: &AppHandle, video: &Path, tracks: &[Track]) {
 async fn add_subtitle(app: State<'_, App>, path: String) -> Result<Track, String> {
     let mut current = app.current();
     let cur = current.as_mut().ok_or("no video is open")?;
+    if cur.tracks.iter().any(|t| matches!(&t.source, TrackSource::File { path: p } if *p == path)) {
+        return Err("This subtitle file is already loaded.".into());
+    }
     let stem = cur.path.file_stem().and_then(|s| s.to_str()).map(str::to_owned);
     let track = media::file_track(Path::new(&path), stem.as_deref());
     if track.status == TrackStatus::Failed {
         return Err(track.error.unwrap_or_default());
     }
-    cur.tracks.push(track);
-    let first = cur.tracks.len() - 1;
-    media::number_tracks(&mut cur.tracks, first);
-    Ok(cur.tracks[first].clone())
+    // Remembered so the file loads again the next time this video is opened.
+    app.store.add_subtitle(&cur.path.to_string_lossy(), &path).map_err(err)?;
+    // Ids are never reused, since removing a track leaves a gap.
+    let id = cur.tracks.iter().map(|t| t.id + 1).max().unwrap_or(0);
+    cur.tracks.push(Track { id, added: true, ..track });
+    media::assign_keys(&mut cur.tracks);
+    Ok(cur.tracks.last().cloned().expect("just pushed"))
+}
+
+#[derive(Serialize)]
+struct TrackKey {
+    id: usize,
+    key: String,
+}
+
+/// Removes a subtitle file the user added, and forgets it for this video.
+/// Returns every track's key, since tracks after it may have moved up.
+#[tauri::command]
+fn remove_subtitle(app: State<App>, id: usize) -> Result<Vec<TrackKey>, String> {
+    let mut current = app.current();
+    let cur = current.as_mut().ok_or("no video is open")?;
+    let index = cur.tracks.iter().position(|t| t.id == id && t.added).ok_or("not an added subtitle")?;
+    if let TrackSource::File { path } = &cur.tracks[index].source {
+        app.store.remove_subtitle(&cur.path.to_string_lossy(), path).map_err(err)?;
+    }
+    cur.tracks.remove(index);
+    media::assign_keys(&mut cur.tracks);
+    Ok(cur.tracks.iter().map(|t| TrackKey { id: t.id, key: t.key.clone() }).collect())
 }
 
 #[tauri::command]
@@ -470,6 +499,7 @@ fn main() {
             initial_file,
             open_media,
             add_subtitle,
+            remove_subtitle,
             lookup_word,
             save_vocab,
             list_vocab,

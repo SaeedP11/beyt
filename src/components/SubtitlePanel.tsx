@@ -56,6 +56,7 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
             key={view.track.id}
             view={view}
             onChange={(patch) => player.updateStyle(view, patch)}
+            onRemove={() => player.removeSubtitle(view).catch((e) => toast(String(e), 5000))}
           />
         ))}
         <Button
@@ -70,7 +71,13 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
   );
 }
 
-function TrackCard({ view, onChange }: { view: TrackView; onChange: (patch: Partial<TrackStyle>) => void }) {
+interface TrackCardProps {
+  view: TrackView;
+  onChange: (patch: Partial<TrackStyle>) => void;
+  onRemove: () => void;
+}
+
+function TrackCard({ view, onChange, onRemove }: TrackCardProps) {
   const { track, style } = view;
   const editable = style.enabled && view.isText;
 
@@ -80,26 +87,41 @@ function TrackCard({ view, onChange }: { view: TrackView; onChange: (patch: Part
         style.enabled ? "border-accent/40 bg-ink-850" : "border-ink-700 bg-ink-900/60"
       }`}
     >
-      <label className="flex cursor-pointer items-start gap-3" title={track.error ?? undefined}>
-        <InputSwitch
-          checked={style.enabled}
-          disabled={track.status === "failed"}
-          onChange={(e) => onChange({ enabled: !!e.value })}
-          className="mt-0.5 shrink-0"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold" dir="auto">
-            {trackLabel(track)}
+      <div className="flex items-start gap-1">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3" title={track.error ?? undefined}>
+          <InputSwitch
+            checked={style.enabled}
+            disabled={track.status === "failed"}
+            onChange={(e) => onChange({ enabled: !!e.value })}
+            className="mt-0.5 shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold" dir="auto">
+              {trackLabel(track)}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {track.source.kind === "embedded" && <Tag value={t("embedded")} severity="secondary" />}
+              {track.source.kind === "embedded" && track.source.forced && <Tag value={t("forced")} severity="warning" />}
+              {track.status === "loading" && <Tag value={t("loading")} severity="info" icon="pi pi-spin pi-spinner" />}
+              {track.status === "image" && <Tag value={t("imageTrack")} severity="secondary" />}
+              {track.status === "failed" && <Tag value={t("failed")} severity="danger" />}
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {track.source.kind === "embedded" && <Tag value={t("embedded")} severity="secondary" />}
-            {track.source.kind === "embedded" && track.source.forced && <Tag value={t("forced")} severity="warning" />}
-            {track.status === "loading" && <Tag value={t("loading")} severity="info" icon="pi pi-spin pi-spinner" />}
-            {track.status === "image" && <Tag value={t("imageTrack")} severity="secondary" />}
-            {track.status === "failed" && <Tag value={t("failed")} severity="danger" />}
-          </div>
-        </div>
-      </label>
+        </label>
+        {track.added && (
+          <Button
+            icon="pi pi-trash"
+            rounded
+            text
+            severity="danger"
+            aria-label={t("removeSubtitle")}
+            tooltip={t("removeSubtitle")}
+            tooltipOptions={{ position: "bottom" }}
+            className="-me-2 -mt-2 shrink-0"
+            onClick={onRemove}
+          />
+        )}
+      </div>
 
       {editable && (
         <div className="mt-4 grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-3 text-sm">

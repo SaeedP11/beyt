@@ -27,6 +27,8 @@ export interface Track {
   status: TrackStatus;
   error: string | null;
   defaultEnabled: boolean;
+  /** A file the user added by hand, so it can be removed again. */
+  added: boolean;
   /** Sorted by start. */
   cues: Cue[];
 }
