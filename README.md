@@ -6,10 +6,44 @@ lines read as a pair.
 
 Design doc: https://claude.ai/code/artifact/b8b79f1d-fec3-401d-ad8e-f2513ef35b14
 
-## Run
+## Install
+
+Beyt is packaged as a Nix flake. Installing it puts `beyt` on your PATH and
+adds a **Beyt** entry (with icon) to your app launcher, which also accepts
+video files from "Open with".
 
 ```sh
-nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node
+cd ~/Projects/video-player
+nix profile install .#beyt       # release build: takes a few minutes the first time
+./scripts/build-dictionary.sh    # once, for word lookups (needs `nix develop` for cargo)
+```
+
+Then start it from the launcher, or from a terminal:
+
+```sh
+beyt                             # opens the library
+beyt movie.mkv                   # plays a file directly
+```
+
+**Update** after pulling or changing code: `nix profile upgrade beyt` rebuilds
+from the repo and replaces the installed version.
+
+**Uninstall:** `nix profile remove beyt`. Your library, vocabulary and settings
+stay in `~/.local/share/app.beyt.player/` until you delete that folder.
+
+**Try it without installing:** `nix run .` runs the release build once.
+
+On NixOS you can also add it declaratively: add this repo as a flake input and
+put `inputs.beyt.packages.${pkgs.system}.default` in
+`environment.systemPackages` or Home Manager's `home.packages`.
+
+The installed app and the development build share the same data folder, so
+watch history, vocabulary, settings and the dictionary are the same in both.
+
+## Develop
+
+```sh
+nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node, pnpm
 pnpm install
 ./scripts/make-sample.sh         # sample videos + EN/FA subtitles
 ./scripts/build-dictionary.sh    # offline EN↔FA dictionary (Wiktionary, CC BY-SA)
