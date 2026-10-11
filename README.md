@@ -102,3 +102,8 @@ compositors (tested on niri) without positioning a separate overlay window.
   punctuation are fixed.
 - Debug build uses about 45% of one core. Follow-up: pass the Wayland display
   to mpv for zero-copy `vaapi` instead of `vaapi-copy`, and measure a release build.
+
+## License
+
+GPL-3.0-or-later; see [LICENSE](LICENSE). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
