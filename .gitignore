@@ -5,3 +5,6 @@ src-tauri/gen/
 samples/
 data/
 result
+# Added by code-review-graph
+.code-review-graph/
+.claude/settings.local.json
