@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Beyt</title>
+  </head>
+  <body>
+    <!-- mpv draws the video underneath this transparent page. -->
+    <div id="subs-top" class="sub-stack top"></div>
+    <div id="subs-bottom" class="sub-stack bottom"></div>
+
+    <div id="hud" hidden>
+      <div id="hud-time"></div>
+      <div id="hud-tracks"></div>
+      <div class="hud-keys">
+        Space pause · ←/→ seek 5s · A/D prev/next line · S replay line · Tab select track ·
+        [ ] offset ±100ms · B show/blur/hide · T top/bottom · F fullscreen · I info · Q quit
+      </div>
+    </div>
+
+    <div id="toast" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

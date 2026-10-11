@@ -1,0 +1,102 @@
+:root {
+  --sub-font-latin: "Inter", "Noto Sans", sans-serif;
+  --sub-font-persian: "Vazirmatn", "Noto Naskh Arabic", "Noto Sans Arabic", sans-serif;
+  --sub-outline: 0 0 2px #000, 0 0 2px #000, 0 0 3px #000, 0 0 4px #000;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  /* Transparent so the mpv video underneath shows through. */
+  background: transparent;
+  color: #fff;
+  font-family: var(--sub-font-latin);
+  user-select: none;
+  cursor: default;
+}
+
+.sub-stack {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  pointer-events: none;
+}
+.sub-stack.bottom {
+  bottom: 6%;
+  flex-direction: column-reverse;
+}
+.sub-stack.top {
+  top: 5%;
+  flex-direction: column;
+}
+
+.track {
+  text-align: center;
+  line-height: 1.35;
+  text-shadow: var(--sub-outline);
+  transition: filter 120ms ease;
+  pointer-events: auto;
+}
+.track:empty {
+  display: none;
+}
+.track .line {
+  display: block;
+  unicode-bidi: plaintext;
+}
+.track .line span {
+  padding: 0 0.04em;
+  border-radius: 3px;
+}
+.track .line span:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.track.rtl {
+  font-family: var(--sub-font-persian);
+}
+.track.blur {
+  filter: blur(7px);
+}
+.track.blur:hover {
+  filter: none;
+}
+.track.boxed .line {
+  display: table;
+  margin: 0 auto;
+  padding: 0.05em 0.4em;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 6px;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  max-width: 60%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  font: 13px/1.5 ui-monospace, "JetBrains Mono", monospace;
+}
+.hud-keys {
+  margin-top: 6px;
+  opacity: 0.7;
+}
+#hud-tracks .selected {
+  color: #ffd75e;
+}
+
+#toast {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 14px;
+}
