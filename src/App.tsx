@@ -167,6 +167,8 @@ export function App() {
       // them). The mask is still there while a dialog closes, so the Escape
       // that closed it stops here too.
       if (helpOpen || settingsOpen || infoOpen || menuOpen || document.querySelector(".p-dialog-mask")) return;
+      // Escape closes the word popup; it mustn't also leave the video.
+      if (e.key === "Escape" && document.querySelector(".p-overlaypanel")) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
       const key = eventKey(e);

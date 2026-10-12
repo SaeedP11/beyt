@@ -96,9 +96,19 @@ struct OpenOptions {
 
 // ---------- commands: opening media ----------
 
+/// The file to open at startup. After the page reloads (to recover from an
+/// error) this is the video that was playing, so it picks up where it was.
 #[tauri::command]
 fn initial_file(app: State<App>) -> Option<String> {
-    app.initial_file.as_ref().map(|p| p.to_string_lossy().into_owned())
+    let current = app.current().as_ref().map(|c| c.path.clone());
+    current.or_else(|| app.initial_file.clone()).map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Writes an error from the page to the log, since the page's own console is
+/// gone once the app closes.
+#[tauri::command]
+fn log_error(message: String) {
+    eprintln!("beyt: [page] {message}");
 }
 
 #[tauri::command]
@@ -238,7 +248,7 @@ fn remove_subtitle(app: State<App>, id: usize) -> Result<Vec<TrackKey>, String> 
 }
 
 #[tauri::command]
-fn stop(app: State<App>) -> Result<(), String> {
+async fn stop(app: State<'_, App>) -> Result<(), String> {
     app.save_position();
     *app.current() = None;
     app.mpv.command("stop", &[]).map_err(|e| format!("{e:?}"))
@@ -324,7 +334,7 @@ async fn test_anki(anki: vocab::AnkiConfig) -> Result<i64, String> {
 const MPV_OPTIONS: &[&str] = &["hwdec", "speed", "volume"];
 
 #[tauri::command]
-fn set_mpv_option(app: State<App>, name: String, value: String) -> Result<(), String> {
+async fn set_mpv_option(app: State<'_, App>, name: String, value: String) -> Result<(), String> {
     if !MPV_OPTIONS.contains(&name.as_str()) {
         return Err(format!("not a settable option: {name}"));
     }
@@ -333,7 +343,7 @@ fn set_mpv_option(app: State<App>, name: String, value: String) -> Result<(), St
 
 /// Adds `delta` to volume (0–130) or speed (0.25–4); returns the new value.
 #[tauri::command]
-fn adjust_property(app: State<App>, name: String, delta: f64) -> Result<f64, String> {
+async fn adjust_property(app: State<'_, App>, name: String, delta: f64) -> Result<f64, String> {
     let (min, max) = match name.as_str() {
         "volume" => (0.0, 130.0),
         "speed" => (0.25, 4.0),
@@ -347,7 +357,7 @@ fn adjust_property(app: State<App>, name: String, delta: f64) -> Result<f64, Str
 }
 
 #[tauri::command]
-fn toggle_mute(app: State<App>) -> Result<bool, String> {
+async fn toggle_mute(app: State<'_, App>) -> Result<bool, String> {
     app.mpv.command("cycle", &["mute"]).map_err(|e| format!("{e:?}"))?;
     app.mpv.get_property("mute").map_err(|e| format!("{e:?}"))
 }
@@ -459,8 +469,13 @@ fn set_app_setting(app: State<App>, key: String, value: serde_json::Value) -> Re
 
 // ---------- commands: playback ----------
 
+// Commands that call mpv are async so they run on a worker thread. Plain
+// commands run on the GTK main thread, which also renders mpv's video, and
+// mpv's render API forbids blocking calls there: the core can be waiting on
+// the renderer, so playback stalls (see mpv/render.h, "Threading").
+
 #[tauri::command]
-fn toggle_pause(app: State<App>, handle: AppHandle) -> Result<(), String> {
+async fn toggle_pause(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
     app.mpv.command("cycle", &["pause"]).map_err(|e| format!("{e:?}"))?;
     // Tell the overlay now rather than on the next clock tick.
     let _ = handle.emit("playback", player::playback(app.mpv));
@@ -468,14 +483,14 @@ fn toggle_pause(app: State<App>, handle: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn set_pause(app: State<App>, handle: AppHandle, paused: bool) -> Result<(), String> {
+async fn set_pause(app: State<'_, App>, handle: AppHandle, paused: bool) -> Result<(), String> {
     app.mpv.set_property("pause", paused).map_err(|e| format!("{e:?}"))?;
     let _ = handle.emit("playback", player::playback(app.mpv));
     Ok(())
 }
 
 #[tauri::command]
-fn seek_absolute(app: State<App>, time: f64) -> Result<(), String> {
+async fn seek_absolute(app: State<'_, App>, time: f64) -> Result<(), String> {
     app.mpv
         .command("seek", &[&time.to_string(), "absolute+exact"])
         .map_err(|e| format!("{e:?}"))
@@ -483,7 +498,7 @@ fn seek_absolute(app: State<App>, time: f64) -> Result<(), String> {
 
 /// Shows a picture-based subtitle track drawn by mpv itself, or none.
 #[tauri::command]
-fn set_mpv_subtitle(app: State<App>, sid: Option<i64>) -> Result<(), String> {
+async fn set_mpv_subtitle(app: State<'_, App>, sid: Option<i64>) -> Result<(), String> {
     let value = sid.map_or_else(|| "no".to_string(), |s| s.to_string());
     app.mpv.set_property("sid", value.as_str()).map_err(|e| format!("{e:?}"))
 }
@@ -515,6 +530,40 @@ fn spawn_clock(handle: AppHandle) {
             std::thread::sleep(Duration::from_millis(50));
         }
     });
+}
+
+/// Sends stderr to `beyt.log` in the data folder when Beyt was started from
+/// the desktop rather than a terminal, so a freeze or crash leaves a trace.
+/// The previous run's log is kept as `beyt.log.old`.
+fn log_to_file(data_dir: &Path) {
+    use std::os::fd::AsRawFd;
+    if unsafe { libc::isatty(libc::STDERR_FILENO) } == 1 {
+        return;
+    }
+    let path = data_dir.join("beyt.log");
+    let _ = std::fs::create_dir_all(data_dir);
+    let _ = std::fs::rename(&path, data_dir.join("beyt.log.old"));
+    match std::fs::File::create(&path) {
+        // The file stays open for the life of the process as fd 2.
+        Ok(file) => unsafe {
+            libc::dup2(file.as_raw_fd(), libc::STDERR_FILENO);
+        },
+        Err(e) => eprintln!("beyt: opening {}: {e}", path.display()),
+    }
+    eprintln!("beyt {} started", env!("CARGO_PKG_VERSION"));
+}
+
+/// Reloads the page if WebKit's page process crashes or is killed, which
+/// otherwise leaves the window blank and unresponsive. `initial_file` then
+/// reopens the video that was playing.
+fn reload_if_page_dies(window: &WebviewWindow) -> tauri::Result<()> {
+    window.with_webview(|webview| {
+        use webkit2gtk::WebViewExt;
+        webview.inner().connect_web_process_terminated(|view, reason| {
+            eprintln!("beyt: the page process ended ({reason:?}); reloading");
+            view.reload();
+        });
+    })
 }
 
 fn main() {
@@ -561,9 +610,11 @@ fn main() {
             set_mpv_subtitle,
             toggle_fullscreen,
             quit,
+            log_error,
         ])
         .setup(move |app| {
             let paths = app.path();
+            log_to_file(&paths.app_data_dir()?);
             let store = Store::open(&paths.app_data_dir()?.join("beyt.db"))?;
             let cache_dir = paths.app_cache_dir()?.join("subtitles");
             let dictionary = dict::Dictionary::open(&paths.app_data_dir()?.join("dictionary.db"))
@@ -581,6 +632,7 @@ fn main() {
 
             let window = app.get_webview_window("main").expect("main window");
             player::attach_video(&window, mpv)?;
+            reload_if_page_dies(&window)?;
             spawn_clock(app.handle().clone());
             Ok(())
         })

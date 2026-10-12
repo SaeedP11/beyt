@@ -3,6 +3,26 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.4.1 (2026-10-12)
+
+### Fixed
+
+- An error while drawing the interface no longer leaves a frozen window that
+  ignores every key and click. Beyt shows what went wrong with a Reload
+  button, and reloading reopens the video where it was.
+- If WebKit's page process crashes or is killed, Beyt reloads the page instead
+  of leaving the window blank.
+- Pressing Escape to close a word's dictionary popup no longer also stops the
+  video and goes back to the library.
+- Playback commands (pause, seek, speed, volume, subtitle track) no longer run
+  mpv on the thread that draws the video, which mpv warns can stall playback.
+
+### Added
+
+- When started from the desktop, Beyt writes errors to
+  `~/.local/share/app.beyt.player/beyt.log` (the previous run's log is kept as
+  `beyt.log.old`), including errors from the interface.
+
 ## 0.4.0 (2026-10-12)
 
 ### Added

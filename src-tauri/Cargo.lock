@@ -102,12 +102,13 @@ checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "beyt"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "chardetng",
  "encoding_rs",
  "gtk",
+ "libc",
  "libloading 0.8.9",
  "libmpv2",
  "rusqlite",
@@ -117,6 +118,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "ureq",
+ "webkit2gtk",
 ]
 
 [[package]]

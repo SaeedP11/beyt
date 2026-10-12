@@ -63,6 +63,7 @@ export const api = {
   clearWatchHistory: () => invoke<void>("clear_watch_history"),
   clearSubtitleCache: () => invoke<void>("clear_subtitle_cache"),
   dataInfo: () => invoke<{ dataDir: string; dictionaryEntries: number | null }>("data_info"),
+  logError: (message: string) => invoke<void>("log_error", { message }),
 };
 
 export interface AnkiConfig {
