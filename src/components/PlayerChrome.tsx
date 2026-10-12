@@ -12,7 +12,7 @@ interface Props {
   visible: boolean;
   onBack: () => void;
   onToggleSubtitles: () => void;
-  onToggleInfo: () => void;
+  onInfo: () => void;
   onToggleTranscript: () => void;
   onHelp: () => void;
   onSettings: () => void;
@@ -23,7 +23,7 @@ export function PlayerChrome({
   visible,
   onBack,
   onToggleSubtitles,
-  onToggleInfo,
+  onInfo,
   onToggleTranscript,
   onHelp,
   onSettings,
@@ -123,10 +123,10 @@ export function PlayerChrome({
             icon="pi pi-info-circle"
             rounded
             text
-            aria-label={t("info")}
-            tooltip={`${t("info")} (I)`}
+            aria-label={t("fileInfo")}
+            tooltip={`${t("fileInfo")} (I)`}
             tooltipOptions={{ position: "top" }}
-            onClick={onToggleInfo}
+            onClick={onInfo}
             className="text-white"
           />
           <Button

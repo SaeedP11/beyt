@@ -1,10 +1,12 @@
 // Beyt: a dual-subtitle video player for language learning.
 
 mod dict;
+mod info;
 mod media;
 mod player;
 mod store;
 mod subs;
+mod sync;
 mod vocab;
 
 use std::{
@@ -378,6 +380,36 @@ fn data_info(app: State<App>, handle: AppHandle) -> Result<DataInfo, String> {
     })
 }
 
+/// Streams, frame rate, release name and hash of a video, to find subtitles that fit it.
+#[tauri::command]
+async fn file_info(path: String) -> Result<info::FileInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || info::file_info(Path::new(&path)))
+        .await
+        .map_err(err)?
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// Ranks subtitle files by how well they fit the video's soundtrack, best
+/// first, sending `match-progress` (0–1) while the audio is read.
+#[tauri::command]
+async fn match_subtitles(
+    app: State<'_, App>,
+    handle: AppHandle,
+    path: String,
+    files: Vec<String>,
+) -> Result<Vec<sync::Candidate>, String> {
+    let cache_dir = app.cache_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let files: Vec<PathBuf> = files.into_iter().map(PathBuf::from).collect();
+        sync::rank(Path::new(&path), &files, &cache_dir, |p| {
+            let _ = handle.emit("match-progress", p);
+        })
+    })
+    .await
+    .map_err(err)?
+    .map_err(|e| format!("{e:#}"))
+}
+
 // ---------- commands: library ----------
 
 #[tauri::command]
@@ -500,6 +532,8 @@ fn main() {
             open_media,
             add_subtitle,
             remove_subtitle,
+            file_info,
+            match_subtitles,
             lookup_word,
             save_vocab,
             list_vocab,

@@ -8,6 +8,7 @@ import { SelectButton } from "primereact/selectbutton";
 import { Sidebar } from "primereact/sidebar";
 import { Slider } from "primereact/slider";
 import { Tag } from "primereact/tag";
+import { useState } from "react";
 
 import { usePlayer } from "../hooks";
 import { t } from "../i18n";
@@ -15,6 +16,7 @@ import type { TrackView } from "../overlay";
 import { trackLabel } from "../player";
 import type { Mode, Position, TrackStyle } from "../types";
 import { toast } from "../ui";
+import { MatchDialog } from "./MatchDialog";
 
 interface Props {
   visible: boolean;
@@ -24,6 +26,18 @@ interface Props {
 
 export function SubtitlePanel({ visible, rtl, onHide }: Props) {
   const player = usePlayer();
+  const [matching, setMatching] = useState<string[]>([]);
+
+  // Several files: rank them against the soundtrack.
+  const findMatch = async () => {
+    const picked = await open({
+      multiple: true,
+      directory: false,
+      defaultPath: player.media?.folder,
+      filters: [{ name: t("tracks"), extensions: ["srt", "vtt"] }],
+    });
+    if (Array.isArray(picked) && picked.length) setMatching(picked);
+  };
 
   const addFile = async () => {
     const path = await open({
@@ -41,33 +55,43 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
   };
 
   return (
-    <Sidebar
-      visible={visible}
-      onHide={onHide}
-      position={rtl ? "left" : "right"}
-      modal={false}
-      className="panel w-[min(24rem,92vw)]"
-      header={<h2 className="text-lg font-semibold">{t("tracks")}</h2>}
-    >
-      <div className="flex flex-col gap-3">
-        {player.views.length === 0 && <p className="py-6 text-center text-zinc-400">{t("noTracks")}</p>}
-        {player.views.map((view) => (
-          <TrackCard
-            key={view.track.id}
-            view={view}
-            onChange={(patch) => player.updateStyle(view, patch)}
-            onRemove={() => player.removeSubtitle(view).catch((e) => toast(String(e), 5000))}
+    <>
+      <Sidebar
+        visible={visible}
+        onHide={onHide}
+        position={rtl ? "left" : "right"}
+        modal={false}
+        className="panel w-[min(24rem,92vw)]"
+        header={<h2 className="text-lg font-semibold">{t("tracks")}</h2>}
+      >
+        <div className="flex flex-col gap-3">
+          {player.views.length === 0 && <p className="py-6 text-center text-zinc-400">{t("noTracks")}</p>}
+          {player.views.map((view) => (
+            <TrackCard
+              key={view.track.id}
+              view={view}
+              onChange={(patch) => player.updateStyle(view, patch)}
+              onRemove={() => player.removeSubtitle(view).catch((e) => toast(String(e), 5000))}
+            />
+          ))}
+          <Button
+            icon="pi pi-plus"
+            label={t("addSubtitle")}
+            outlined
+            className="mt-2 w-full"
+            onClick={() => void addFile()}
           />
-        ))}
-        <Button
-          icon="pi pi-plus"
-          label={t("addSubtitle")}
-          outlined
-          className="mt-2 w-full"
-          onClick={() => void addFile()}
-        />
-      </div>
-    </Sidebar>
+          <Button
+            icon="pi pi-sort-amount-down"
+            label={t("findBestMatch")}
+            text
+            className="w-full"
+            onClick={() => void findMatch()}
+          />
+        </div>
+      </Sidebar>
+      <MatchDialog files={matching} onHide={() => setMatching([])} />
+    </>
   );
 }
 

@@ -150,3 +150,81 @@ export interface AnkiResult {
   added: number[];
   skipped: number;
 }
+
+/** A video's headers and name, for finding subtitles that fit it (see info.rs). */
+export interface FileInfo {
+  name: string;
+  folder: string;
+  size: number;
+  container: string | null;
+  duration: number | null;
+  bitrate: number | null;
+  titleTag: string | null;
+  release: Release;
+  /** OpenSubtitles "moviehash". */
+  hash: string | null;
+  video: VideoStream[];
+  audio: AudioStream[];
+  subtitles: SubtitleStream[];
+}
+
+export interface Release {
+  title: string | null;
+  year: number | null;
+  season: number | null;
+  episode: number | null;
+  resolution: string | null;
+  source: string | null;
+  group: string | null;
+}
+
+export interface VideoStream {
+  codec: string;
+  profile: string | null;
+  width: number;
+  height: number;
+  fps: number | null;
+  bitDepth: number | null;
+  hdr: boolean;
+}
+
+export interface AudioStream {
+  lang: string;
+  codec: string;
+  channels: number | null;
+  sampleRate: number | null;
+  title: string | null;
+  default: boolean;
+}
+
+export interface SubtitleStream {
+  lang: string;
+  codec: string;
+  title: string | null;
+  forced: boolean;
+}
+
+/** A subtitle file judged against the video's soundtrack (see sync.rs). */
+export interface Candidate {
+  path: string;
+  name: string;
+  lang: string;
+  cues: number;
+  /** 0–100. */
+  score: number;
+  /** Seconds; apply as the track's offset. */
+  offset: number;
+  /** Audio samples that agree on `offset`, out of `samples`. */
+  agree: number;
+  samples: number;
+  verdict: "inSync" | "shifted" | "drifts" | "noMatch" | "unreadable";
+  reasons: MatchReason[];
+}
+
+export type MatchReason =
+  | { kind: "sameRelease"; group: string }
+  | { kind: "otherEpisode"; subtitle: string; video: string }
+  | { kind: "frameRate"; subtitle: number; video: number }
+  | { kind: "endsAfter"; seconds: number }
+  | { kind: "partial"; percent: number }
+  | { kind: "error"; message: string };

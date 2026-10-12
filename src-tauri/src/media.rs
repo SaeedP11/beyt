@@ -271,7 +271,7 @@ fn pick_defaults(tracks: &mut [Track], preferred: &[String]) {
 // ---------- embedded extraction ----------
 
 /// Cache folder for one video's extracted subtitles, keyed by path, size and mtime.
-fn cache_dir(cache_root: &Path, video: &Path) -> PathBuf {
+pub fn cache_dir(cache_root: &Path, video: &Path) -> PathBuf {
     let meta = fs::metadata(video).ok();
     let size = meta.as_ref().map_or(0, |m| m.len());
     let mtime = meta

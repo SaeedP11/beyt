@@ -5,6 +5,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
   AnkiResult,
+  Candidate,
+  FileInfo,
   Folder,
   Lookup,
   Media,
@@ -24,6 +26,9 @@ export const api = {
   addSubtitle: (path: string) => invoke<Track>("add_subtitle", { path }),
   /** Returns every remaining track's key, as removing one can renumber others. */
   removeSubtitle: (id: number) => invoke<{ id: number; key: string }[]>("remove_subtitle", { id }),
+  fileInfo: (path: string) => invoke<FileInfo>("file_info", { path }),
+  /** Best fit first. Sends `matchProgress` while the audio is sampled. */
+  matchSubtitles: (path: string, files: string[]) => invoke<Candidate[]>("match_subtitles", { path, files }),
   stop: () => invoke<void>("stop"),
   lookupWord: (word: string, lang: string) => invoke<Lookup>("lookup_word", { word, lang }),
 
@@ -70,4 +75,6 @@ export const events = {
     listen<Playback>("playback", (e) => cb(e.payload)),
   trackUpdated: (cb: (u: TrackUpdate) => void): Promise<UnlistenFn> =>
     listen<TrackUpdate>("track-updated", (e) => cb(e.payload)),
+  matchProgress: (cb: (fraction: number) => void): Promise<UnlistenFn> =>
+    listen<number>("match-progress", (e) => cb(e.payload)),
 };

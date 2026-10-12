@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, events } from "./api";
 import * as clock from "./clock";
-import { Hud } from "./components/Hud";
+import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
 import { PlayerChrome } from "./components/PlayerChrome";
 import { type Section, SettingsDialog } from "./components/SettingsDialog";
@@ -28,7 +28,7 @@ export function App() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [lastFolder, setLastFolder] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [hudOpen, setHudOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -117,8 +117,9 @@ export function App() {
   useEffect(() => {
     const table = bindingTable(keymap);
     const onKey = (e: KeyboardEvent) => {
-      // Dialogs handle their own keys (Escape closes them).
-      if (helpOpen || settingsOpen) return;
+      // Dialogs handle their own keys (Escape closes them). The mask is still
+      // there while one closes, so the Escape that closed it stops here too.
+      if (helpOpen || settingsOpen || infoOpen || document.querySelector(".p-dialog-mask")) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
       const key = eventKey(e);
@@ -155,7 +156,7 @@ export function App() {
           setTranscriptOpen((o) => !o);
           break;
         case "info":
-          setHudOpen((o) => !o);
+          setInfoOpen(true);
           break;
         default:
           if (!player.runAction(action)) return;
@@ -165,7 +166,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [keymap, screen, panelOpen, transcriptOpen, helpOpen, settingsOpen, backToLibrary, openSettings, wake]);
+  }, [keymap, screen, panelOpen, transcriptOpen, helpOpen, settingsOpen, infoOpen, backToLibrary, openSettings, wake]);
 
   /** A click on a subtitle word opens its dictionary popup. */
   const pickWord = (e: React.MouseEvent) => {
@@ -188,13 +189,12 @@ export function App() {
           visible={showControls}
           onBack={() => void backToLibrary()}
           onToggleSubtitles={() => setPanelOpen((o) => !o)}
-          onToggleInfo={() => setHudOpen((o) => !o)}
+          onInfo={() => setInfoOpen(true)}
           onToggleTranscript={() => setTranscriptOpen((o) => !o)}
           onHelp={() => setHelpOpen(true)}
           onSettings={() => openSettings()}
         />
       )}
-      {screen === "player" && hudOpen && <Hud />}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
       <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={() => setTranscriptOpen(false)} />
       <UpNextCard />
@@ -209,6 +209,11 @@ export function App() {
         />
       )}
 
+      <FileInfoDialog
+        visible={infoOpen && screen === "player"}
+        path={player.media?.path ?? null}
+        onHide={() => setInfoOpen(false)}
+      />
       <ShortcutsDialog visible={helpOpen} onHide={() => setHelpOpen(false)} onCustomise={() => openSettings("shortcuts")} />
       <SettingsDialog
         visible={settingsOpen}

@@ -101,6 +101,14 @@ export class Player {
     this.changed();
   }
 
+  /** Shows a subtitle file at `offset`, adding it first unless it is loaded already. */
+  async useSubtitle(path: string, offset: number): Promise<void> {
+    const loaded = () => this.views.find((v) => v.track.source.kind === "file" && v.track.source.path === path);
+    if (!loaded()) await this.addSubtitle(path);
+    const view = loaded();
+    if (view) this.updateStyle(view, { enabled: true, offset });
+  }
+
   /** Removes a subtitle file the user added; it won't load next time either. */
   async removeSubtitle(view: TrackView): Promise<void> {
     const selected = this.selectedView();
