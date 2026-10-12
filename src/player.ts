@@ -10,6 +10,12 @@ import { debounce, fmtTime, toast } from "./ui";
 
 const MODES: Mode[] = ["show", "blur", "hide"];
 
+/** One line of one subtitle track. */
+export interface PickedLine {
+  view: TrackView;
+  cue: Cue;
+}
+
 export function trackLabel(track: Track): string {
   const parts = [languageName(track.lang)];
   if (track.detail) parts.push(track.detail);
@@ -254,14 +260,20 @@ export class Player {
     return views[this.selected % Math.max(views.length, 1)];
   }
 
-  /** A clicked word element (inside a TrackView line) with its line and translation. */
-  wordContext(wordEl: HTMLElement): PickedWord | null {
-    const trackId = wordEl.closest<HTMLElement>(".track")?.dataset.track;
-    const cueIndex = Number(wordEl.closest<HTMLElement>(".line")?.dataset.cue);
+  /** The subtitle line an element belongs to (a word or the line itself). */
+  lineAt(el: HTMLElement): PickedLine | null {
+    const trackId = el.closest<HTMLElement>(".track")?.dataset.track;
+    const cueIndex = Number(el.closest<HTMLElement>(".line")?.dataset.cue);
     const view = this.views.find((v) => String(v.track.id) === trackId);
     const cue = view?.track.cues[cueIndex];
-    if (!view || !cue) return null;
-    return { word: wordEl.textContent ?? "", ...this.lineContext(view, cue) };
+    return view && cue ? { view, cue } : null;
+  }
+
+  /** A clicked word element (inside a TrackView line) with its line and translation. */
+  wordContext(wordEl: HTMLElement): PickedWord | null {
+    const line = this.lineAt(wordEl);
+    if (!line) return null;
+    return { word: wordEl.textContent ?? "", ...this.lineContext(line.view, line.cue) };
   }
 
   /** A line in video time, with the other language's line shown alongside it. */
@@ -277,16 +289,26 @@ export class Player {
   /** Saves the selected track's current line (W) to the vocabulary. */
   async saveCurrentLine(): Promise<void> {
     const v = this.selectedView();
-    if (!v || !this.media) return;
+    if (!v) return;
     const cue = v.track.cues[cueIndexAt(v.track.cues, v.trackTime(clock.now()))];
-    if (!cue) return;
-    const { rtl: _rtl, ...line } = this.lineContext(v, cue);
+    if (cue) await this.saveLine({ view: v, cue });
+  }
+
+  /** Saves a line to the vocabulary, with the other language's line as its translation. */
+  async saveLine({ view, cue }: PickedLine): Promise<void> {
+    if (!this.media) return;
+    const { rtl: _rtl, ...line } = this.lineContext(view, cue);
     try {
       await api.saveVocab({ ...line, word: null, meaning: null, video: this.media.path }, captureOptions());
       toast(t("lineSaved"));
     } catch (e) {
       toast(String(e), 5000);
     }
+  }
+
+  /** Plays a line from its start. */
+  playLine({ view, cue }: PickedLine): void {
+    this.seekTo(cue.start + view.style.offset);
   }
 
   seekTo(time: number): void {

@@ -13,7 +13,8 @@ import type { Lookup, PickedWord } from "../types";
 import { toast } from "../ui";
 
 export interface WordPopupHandle {
-  open: (event: React.MouseEvent, target: HTMLElement, picked: PickedWord) => void;
+  /** `event` may be a native one: the right-click menu opens the popup too. */
+  open: (event: React.MouseEvent | MouseEvent, target: HTMLElement, picked: PickedWord) => void;
 }
 
 type State =
@@ -48,7 +49,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
       setPicked(word);
       setState({ kind: "loading" });
       setSaved(false);
-      panel.current?.show(event, el);
+      panel.current?.show(event as unknown as React.SyntheticEvent, el);
       api.lookupWord(word.word, word.lang).then(
         (lookup) => setState({ kind: "done", lookup }),
         (e) => setState({ kind: "error", message: String(e) }),

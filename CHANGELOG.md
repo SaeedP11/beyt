@@ -3,6 +3,20 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.4.0 (2026-10-12)
+
+### Added
+
+- A right-click menu of Beyt's own replaces the webview's browser menu (Back,
+  Reload, Inspect Element). On the video it offers play or pause, replay line,
+  auto-pause, a speed submenu, the panels, fullscreen, shortcuts, settings and
+  back to the library, each with its keyboard shortcut. Right-click a subtitle
+  line to play it from the start, copy it or save it to your vocabulary, and
+  a word to look it up. In the library it offers shortcuts, settings,
+  fullscreen and quit.
+- Text fields keep the usual cut, copy and paste menu. In development builds,
+  Shift+right-click still opens the webview's menu for Inspect Element.
+
 ## 0.3.0 (2026-10-12)
 
 ### Added

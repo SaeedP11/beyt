@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, events } from "./api";
 import * as clock from "./clock";
+import { AppContextMenu } from "./components/AppContextMenu";
 import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
 import { PlayerChrome } from "./components/PlayerChrome";
@@ -34,6 +35,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<Section>("general");
   const [controls, setControls] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const toastRef = useRef<Toast>(null);
   const wordPopup = useRef<WordPopupHandle>(null);
   const idleTimer = useRef<number | undefined>(undefined);
@@ -106,28 +108,19 @@ export function App() {
     }, getSettings().controlsHideDelay * 1000);
   }, []);
 
-  const showControls = screen === "player" && (controls || panelOpen || transcriptOpen);
+  const showControls = screen === "player" && (controls || panelOpen || transcriptOpen || menuOpen);
   useEffect(() => {
     document.documentElement.style.setProperty("--controls-offset", showControls ? "84px" : "0px");
     document.body.classList.toggle("idle", screen === "player" && !showControls);
   }, [showControls, screen]);
 
-  // ---------- keyboard ----------
+  // ---------- actions (keyboard and right-click menu) ----------
 
-  useEffect(() => {
-    const table = bindingTable(keymap);
-    const onKey = (e: KeyboardEvent) => {
-      // Dialogs handle their own keys (Escape closes them). The mask is still
-      // there while one closes, so the Escape that closed it stops here too.
-      if (helpOpen || settingsOpen || infoOpen || document.querySelector(".p-dialog-mask")) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
-      const key = eventKey(e);
-      const action = key ? table.get(key) : undefined;
-      if (!action) return;
+  /** Runs an action; returns false if it doesn't apply here. */
+  const runAction = useCallback(
+    (action: Action): boolean => {
       const playing = screen === "player";
-      if (!playing && !GLOBAL_ACTIONS.has(action)) return;
-
+      if (!playing && !GLOBAL_ACTIONS.has(action)) return false;
       switch (action) {
         case "back":
           if (panelOpen || transcriptOpen) {
@@ -159,22 +152,38 @@ export function App() {
           setInfoOpen(true);
           break;
         default:
-          if (!player.runAction(action)) return;
+          if (!player.runAction(action)) return false;
       }
-      e.preventDefault();
       if (playing) wake();
+      return true;
+    },
+    [screen, panelOpen, transcriptOpen, backToLibrary, openSettings, wake],
+  );
+
+  useEffect(() => {
+    const table = bindingTable(keymap);
+    const onKey = (e: KeyboardEvent) => {
+      // Dialogs and the right-click menu handle their own keys (Escape closes
+      // them). The mask is still there while a dialog closes, so the Escape
+      // that closed it stops here too.
+      if (helpOpen || settingsOpen || infoOpen || menuOpen || document.querySelector(".p-dialog-mask")) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
+      const key = eventKey(e);
+      const action = key ? table.get(key) : undefined;
+      if (action && runAction(action)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [keymap, screen, panelOpen, transcriptOpen, helpOpen, settingsOpen, infoOpen, backToLibrary, openSettings, wake]);
+  }, [keymap, helpOpen, settingsOpen, infoOpen, menuOpen, runAction]);
 
-  /** A click on a subtitle word opens its dictionary popup. */
-  const pickWord = (e: React.MouseEvent) => {
-    const el = e.target as HTMLElement;
+  /** Opens the dictionary popup for a subtitle word element. */
+  const lookUp = (e: React.MouseEvent | MouseEvent, el: HTMLElement) => {
     if (el.tagName !== "SPAN" || el.classList.contains("line")) return;
     const picked = player.wordContext(el);
     if (picked && picked.word.trim()) wordPopup.current?.open(e, el, picked);
   };
+  const pickWord = (e: React.MouseEvent) => lookUp(e, e.target as HTMLElement);
 
   const rtl = lang === "fa";
 
@@ -220,6 +229,13 @@ export function App() {
         section={settingsSection}
         onSection={setSettingsSection}
         onHide={() => setSettingsOpen(false)}
+      />
+      <AppContextMenu
+        screen={screen}
+        runAction={runAction}
+        onLookUp={lookUp}
+        onBack={() => void backToLibrary()}
+        onVisibleChange={setMenuOpen}
       />
       <Toast ref={toastRef} position={rtl ? "top-left" : "top-right"} />
     </div>
