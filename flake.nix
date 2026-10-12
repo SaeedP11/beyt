@@ -70,7 +70,11 @@
           doCheck = false;
 
           postInstall = ''
+            # Launchers don't always have the profile's bin/ on PATH, so the
+            # entry points at the binary by absolute path.
             install -Dm644 packaging/beyt.desktop $out/share/applications/beyt.desktop
+            substituteInPlace $out/share/applications/beyt.desktop \
+              --replace-fail "Exec=beyt " "Exec=$out/bin/beyt "
             install -Dm644 src-tauri/icons/icon.png $out/share/icons/hicolor/512x512/apps/beyt.png
           '';
 
