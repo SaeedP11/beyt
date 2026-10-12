@@ -29,6 +29,15 @@ error states. Design for both English (LTR) and Persian (RTL) from the start.
   cloud APIs only and stay off until the user adds their own key.
 - Linux desktop first, tested on Wayland (niri) with an AMD integrated GPU.
 
+## Versioning
+
+- Bump the version to match each change, following semver while on 0.x:
+  new features raise the minor version (0.2.0 → 0.3.0); fixes and small
+  changes raise the patch version (0.2.0 → 0.2.1).
+- Update every copy together: `package.json`, `src-tauri/tauri.conf.json`,
+  `src-tauri/Cargo.toml` (and `Cargo.lock`) and `flake.nix`.
+- Add an entry to `CHANGELOG.md` for the new version.
+
 ## Commands
 
 ```sh

@@ -3,6 +3,24 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.3.0 (2026-10-12)
+
+### Added
+
+- File details (I, or the info button) replaces the old info overlay: video
+  codec, profile, resolution, frame rate, bit depth and HDR; every audio
+  track; embedded subtitles; and the release name, exact duration, size and
+  OpenSubtitles hash for finding subtitles by hand
+- "Find the best match" in the Subtitles panel ranks several subtitle files
+  against the video's audio, reporting each as in sync, fitting with an
+  offset (applied when used), drifting from a different frame rate, or not
+  matching; results are cached
+
+### Fixed
+
+- Keys pressed inside a dialog no longer reach the player, so Escape closes
+  a dialog without also leaving the video
+
 ## 0.2.0 (2026-10-11)
 
 First tagged release: milestones 0–2 of the design doc.
