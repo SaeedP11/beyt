@@ -30,3 +30,11 @@ ureq = { version = "3.4.2", default-features = false, features = ["json"] }
 # and uses the Vite dev server instead.
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Smaller release binary: whole-program optimisation and one codegen unit
+# let the linker drop more unused code from Tauri, GTK and SQLite.
+[profile.release]
+lto = true
+codegen-units = 1
+# Nix only strips debug info; this also drops the symbol table.
+strip = true
