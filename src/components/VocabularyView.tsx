@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
 import { t } from "../i18n";
+import { popupMotions } from "../motion";
 import { getSettings } from "../settings";
 import type { VocabItem } from "../types";
 import { toast } from "../ui";
@@ -55,6 +56,7 @@ export function VocabularyView({ onCount }: { onCount?: (n: number) => void }) {
 
   const remove = (event: React.MouseEvent<HTMLButtonElement>, item: VocabItem) =>
     confirmPopup({
+      transitionOptions: popupMotions.connected,
       target: event.currentTarget,
       message: `${t("delete")}?`,
       icon: "pi pi-trash",

@@ -7,6 +7,7 @@ import * as clock from "../clock";
 import { player } from "../hooks";
 import { t } from "../i18n";
 import { type Action, type Keymap, keyParts, keysFor } from "../keymap";
+import { popupMotions } from "../motion";
 import { getSettings } from "../settings";
 import { toast } from "../ui";
 
@@ -80,6 +81,7 @@ export function AppContextMenu(props: Props) {
 
   return (
     <ContextMenu
+      transitionOptions={popupMotions.contextMenu}
       ref={menu}
       model={model}
       className="min-w-60"

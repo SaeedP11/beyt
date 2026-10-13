@@ -15,6 +15,7 @@ import { UpNextCard } from "./components/UpNextCard";
 import { WordPopup, type WordPopupHandle } from "./components/WordPopup";
 import { player, useLang } from "./hooks";
 import { type Action, bindingTable, eventKey } from "./keymap";
+import { popupMotions } from "./motion";
 import { getSettings, loadSettings, useSettings } from "./settings";
 import { setToastHandler, toast } from "./ui";
 
@@ -239,7 +240,7 @@ export function App() {
         onBack={() => void backToLibrary()}
         onVisibleChange={setMenuOpen}
       />
-      <Toast ref={toastRef} position={rtl ? "top-left" : "top-right"} />
+      <Toast ref={toastRef} position={rtl ? "top-left" : "top-right"} transitionOptions={popupMotions.toast} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { type StringKey, t } from "../i18n";
 import { ACTIONS, GROUPS, keysFor } from "../keymap";
+import { useDialogMotion } from "../motion";
 import { useSettings } from "../settings";
 import { KeyCaps } from "./KeyCaps";
 
@@ -18,6 +19,7 @@ interface Props {
 
 /** Every keyboard shortcut, grouped and searchable (? or F1). */
 export function ShortcutsDialog({ visible, onHide, onCustomise }: Props) {
+  const motion = useDialogMotion();
   const { keymap } = useSettings();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -39,6 +41,7 @@ export function ShortcutsDialog({ visible, onHide, onCustomise }: Props) {
       contentClassName="pb-2"
       dismissableMask
       draggable={false}
+      {...motion}
       footer={
         <div className="flex items-center justify-between gap-3">
           <span className="text-start text-sm text-zinc-400">{t("helpTip")}</span>

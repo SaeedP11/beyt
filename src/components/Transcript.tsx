@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { cueIndexAt } from "../cues";
 import { usePlayback, usePlayer } from "../hooks";
 import { t } from "../i18n";
+import { usePanelMotion } from "../motion";
 import { trackLabel } from "../player";
 import type { Cue } from "../types";
 import { fmtTime } from "../ui";
@@ -44,6 +45,7 @@ interface Props {
 
 /** Both languages line by line; follows playback, click a line to jump. */
 export function Transcript({ visible, rtl, onHide }: Props) {
+  const motion = usePanelMotion();
   const player = usePlayer();
   const p = usePlayback(4);
   const listRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,7 @@ export function Transcript({ visible, rtl, onHide }: Props) {
       onHide={onHide}
       position={rtl ? "right" : "left"}
       modal={false}
+      {...motion}
       className="panel w-[min(26rem,92vw)]"
       header={
         <div>

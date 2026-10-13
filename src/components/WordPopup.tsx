@@ -5,6 +5,7 @@ import { type Ref, useCallback, useImperativeHandle, useRef, useState } from "re
 
 import { api } from "../api";
 import * as clock from "../clock";
+import { popupMotions } from "../motion";
 import { captureOptions } from "../player";
 import { getSettings } from "../settings";
 import { player } from "../hooks";
@@ -146,7 +147,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   };
 
   return (
-    <OverlayPanel ref={panel} onHide={onHide} className="w-[min(22rem,90vw)]" pt={{ content: { className: "p-0" } }}>
+    <OverlayPanel ref={panel} transitionOptions={popupMotions.overlayPanel} onHide={onHide} className="w-[min(22rem,90vw)]" pt={{ content: { className: "p-0" } }}>
       {picked && (
         <div ref={watchSize} className="flex flex-col">
           <div className="border-b border-ink-700 px-4 py-3">

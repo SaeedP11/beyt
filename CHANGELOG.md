@@ -3,6 +3,25 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.4.3 (2026-10-13)
+
+### Fixed
+
+- Dialogs (Settings, Keyboard shortcuts, File details, Match subtitles), the
+  Subtitles and Transcript side panels, popups (dropdowns, color pickers,
+  confirmations, the word popup and the right-click menu) and toasts no
+  longer flicker as they open and close. WebKitGTK 2.54 drew a stale frame
+  where a CSS transition ended: the page without the overlay right after it
+  opened, or the whole overlay right after it closed.
+
+### Changed
+
+- Dialogs now fade and rise in smoothly, and fade out together with the dim
+  behind them. Side panels slide in and out, popups unfold and fade, and
+  toasts rise in and fold away as the ones below move up, all on the same
+  smooth timing. The motion is skipped when the system asks for reduced
+  motion.
+
 ## 0.4.2 (2026-10-13)
 
 ### Fixed

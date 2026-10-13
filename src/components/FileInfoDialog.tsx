@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { api } from "../api";
 import { languageName, t } from "../i18n";
+import { useDialogMotion } from "../motion";
 import type { AudioStream, FileInfo, Release, VideoStream } from "../types";
 import { toast } from "../ui";
 
@@ -18,6 +19,7 @@ interface Props {
 
 /** What the open video is (I): its codecs, resolution, frame rate and release name. */
 export function FileInfoDialog({ visible, path, onHide }: Props) {
+  const motion = useDialogMotion();
   const [info, setInfo] = useState<FileInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadedPath, setLoadedPath] = useState<string | null>(null);
@@ -42,6 +44,7 @@ export function FileInfoDialog({ visible, path, onHide }: Props) {
       className="w-[min(42rem,95vw)]"
       dismissableMask
       draggable={false}
+      {...motion}
     >
       {error ? (
         <div className="flex flex-col items-center gap-3 py-8 text-center">

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { api, events } from "../api";
 import { usePlayer } from "../hooks";
 import { languageName, t } from "../i18n";
+import { useDialogMotion } from "../motion";
 import type { Candidate, MatchReason } from "../types";
 import { toast } from "../ui";
 
@@ -23,6 +24,7 @@ type State =
 
 /** Ranks subtitle files by how well they fit the video's soundtrack. */
 export function MatchDialog({ files, onHide }: Props) {
+  const motion = useDialogMotion();
   const player = usePlayer();
   const [state, setState] = useState<State>({ phase: "checking", progress: 0 });
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export function MatchDialog({ files, onHide }: Props) {
       className="w-[min(44rem,95vw)]"
       dismissableMask
       draggable={false}
+      {...motion}
       footer={state.phase === "done" ? <p className="text-start text-sm text-zinc-400">{t("matchFooter")}</p> : undefined}
     >
       {state.phase === "checking" && (

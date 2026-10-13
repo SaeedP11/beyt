@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { usePlayer } from "../hooks";
 import { t } from "../i18n";
+import { popupMotions, usePanelMotion } from "../motion";
 import type { TrackView } from "../overlay";
 import { trackLabel } from "../player";
 import type { Mode, Position, TrackStyle } from "../types";
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function SubtitlePanel({ visible, rtl, onHide }: Props) {
+  const motion = usePanelMotion();
   const player = usePlayer();
   const [matching, setMatching] = useState<string[]>([]);
 
@@ -61,6 +63,7 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
         onHide={onHide}
         position={rtl ? "left" : "right"}
         modal={false}
+        {...motion}
         className="panel w-[min(24rem,92vw)]"
         header={<h2 className="text-lg font-semibold">{t("tracks")}</h2>}
       >
@@ -182,6 +185,7 @@ function TrackCard({ view, onChange, onRemove }: TrackCardProps) {
           <span className="text-zinc-400">{t("color")}</span>
           <div className="flex items-center gap-4">
             <ColorPicker
+              transitionOptions={popupMotions.connected}
               value={style.color.replace("#", "")}
               onChange={(e) => typeof e.value === "string" && onChange({ color: `#${e.value}` })}
             />

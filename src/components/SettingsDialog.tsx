@@ -16,6 +16,7 @@ import { api } from "../api";
 import { type StringKey, languageName, t } from "../i18n";
 import { ACTIONS, type Action, DEFAULT_KEYS, GROUPS, eventKey, keysFor } from "../keymap";
 import { type Settings, type SubtitleDefault, resetSettings, updateSettings, useSettings } from "../settings";
+import { popupMotions, useDialogMotion } from "../motion";
 import type { Position } from "../types";
 import { toast } from "../ui";
 import { KeyCaps } from "./KeyCaps";
@@ -45,6 +46,7 @@ interface Props {
 }
 
 export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
+  const motion = useDialogMotion();
   return (
     <Dialog
       header={t("settings")}
@@ -54,6 +56,7 @@ export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
       contentClassName="p-0"
       dismissableMask
       draggable={false}
+      {...motion}
     >
       <ConfirmPopup />
       <div className="flex h-[min(38rem,75vh)] min-h-0">
@@ -160,6 +163,7 @@ function General() {
     <>
       <Row label={t("uiLanguage")} hint={t("uiLanguageHint")}>
         <Dropdown
+          transitionOptions={popupMotions.connected}
           value={s.uiLanguage ?? "system"}
           options={[
             { label: t("systemLanguage"), value: "system" },
@@ -198,6 +202,7 @@ function Playback() {
       </Row>
       <Row label={t("defaultSpeed")}>
         <Dropdown
+          transitionOptions={popupMotions.connected}
           value={s.defaultSpeed}
           options={SPEEDS.map((v) => ({ label: `${v}×`, value: v }))}
           onChange={(e) => updateSettings({ defaultSpeed: e.value })}
@@ -258,7 +263,7 @@ function StyleCard({ title, value, onChange }: { title: string; value: SubtitleD
         </div>
         <span className="text-zinc-400">{t("color")}</span>
         <div className="flex items-center gap-3">
-          <ColorPicker value={value.color.replace("#", "")} onChange={(e) => typeof e.value === "string" && set({ color: `#${e.value}` })} />
+          <ColorPicker value={value.color.replace("#", "")} onChange={(e) => typeof e.value === "string" && set({ color: `#${e.value}` })} transitionOptions={popupMotions.connected} />
           <label className="flex cursor-pointer items-center gap-2 text-xs">
             <Checkbox checked={value.boxed} onChange={(e) => set({ boxed: !!e.checked })} />
             {t("boxed")}
@@ -278,6 +283,7 @@ function Subtitles() {
       <Preview />
       <Row label={t("preferredLanguages")} hint={t("preferredHint")}>
         <MultiSelect
+          transitionOptions={popupMotions.connected}
           value={s.preferredLanguages}
           options={LANGUAGES.map((code) => ({ label: languageName(code), value: code }))}
           onChange={(e) => updateSettings({ preferredLanguages: e.value })}
@@ -286,10 +292,10 @@ function Subtitles() {
         />
       </Row>
       <Row label={t("fontPersian")} hint={t("fontHint")}>
-        <Dropdown value={s.fontPersian} options={PERSIAN_FONTS} editable onChange={(e) => updateSettings({ fontPersian: e.value })} className="w-56" />
+        <Dropdown value={s.fontPersian} options={PERSIAN_FONTS} editable onChange={(e) => updateSettings({ fontPersian: e.value })} className="w-56" transitionOptions={popupMotions.connected} />
       </Row>
       <Row label={t("fontLatin")}>
-        <Dropdown value={s.fontLatin} options={LATIN_FONTS} editable onChange={(e) => updateSettings({ fontLatin: e.value })} className="w-56" />
+        <Dropdown value={s.fontLatin} options={LATIN_FONTS} editable onChange={(e) => updateSettings({ fontLatin: e.value })} className="w-56" transitionOptions={popupMotions.connected} />
       </Row>
       <Row label={t("outline")}>
         <SliderValue value={s.outline} min={0} max={4} step={0.5} format={(v) => `${v}px`} onChange={(v) => updateSettings({ outline: v })} />
@@ -481,6 +487,7 @@ function Data() {
 
   const confirm = (event: React.MouseEvent<HTMLButtonElement>, run: () => Promise<void> | void) =>
     confirmPopup({
+      transitionOptions: popupMotions.connected,
       target: event.currentTarget,
       message: t("confirmAction"),
       icon: "pi pi-exclamation-triangle",

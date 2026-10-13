@@ -132,3 +132,46 @@ body.idle {
 .beyt-tabs .p-tabview-panels {
   padding: 1.5rem 0 0;
 }
+
+
+/* ---------- dialog, side panel and popup motion ----------
+   Dialogs, side panels and popups animate from JavaScript (motion.ts), so
+   PrimeReact's own transitions and mask fade are off. Only the overlay's
+   layer changes while it moves, which WebKitGTK draws on time; repaints and
+   CSS animations can show up a frame late over the video. That's also why
+   the dim behind a dialog is a wide shadow on the dialog itself: it fades
+   with the dialog's opacity. */
+.p-dialog {
+  transition: none;
+  will-change: transform, opacity;
+  box-shadow:
+    0 24px 38px 3px rgb(0 0 0 / 0.14),
+    0 9px 46px 8px rgb(0 0 0 / 0.12),
+    0 0 0 100vmax var(--maskbg);
+}
+.p-dialog-mask.p-component-overlay {
+  background-color: transparent;
+  animation: none;
+}
+.p-sidebar {
+  transition: none;
+  will-change: transform;
+}
+.p-connected-overlay-enter-active,
+.p-connected-overlay-exit-active,
+.p-overlaypanel-enter-active,
+.p-overlaypanel-exit-active,
+.p-contextmenu-enter-active,
+.p-toast-message-enter-active,
+.p-toast-message-exit-active {
+  transition: none;
+}
+.p-dropdown-panel,
+.p-multiselect-panel,
+.p-colorpicker-panel,
+.p-confirm-popup,
+.p-overlaypanel,
+.p-contextmenu,
+.p-toast-message {
+  will-change: transform, opacity;
+}
