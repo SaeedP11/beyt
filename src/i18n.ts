@@ -68,6 +68,25 @@ const en = {
   pos_verb: "verb",
   pos_adj: "adjective",
   pos_adv: "adverb",
+  pos_intj: "interjection",
+  pos_suffix: "suffix",
+  pos_prefix: "prefix",
+  pos_interfix: "interfix",
+  pos_prep: "preposition",
+  pos_prep_phrase: "prepositional phrase",
+  pos_phrase: "phrase",
+  pos_proverb: "proverb",
+  pos_num: "number",
+  pos_pron: "pronoun",
+  pos_conj: "conjunction",
+  pos_character: "letter",
+  pos_particle: "particle",
+  pos_det: "determiner",
+  pos_classifier: "classifier",
+  pos_contraction: "contraction",
+  pos_punct: "punctuation",
+  pos_symbol: "symbol",
+  pos_abbrev: "abbreviation",
   saveWord: "Save word",
   saved: "Saved",
   lineSaved: "Line saved to your vocabulary",
@@ -307,6 +326,25 @@ const fa: Strings = {
   pos_verb: "فعل",
   pos_adj: "صفت",
   pos_adv: "قید",
+  pos_intj: "صوت",
+  pos_suffix: "پسوند",
+  pos_prefix: "پیشوند",
+  pos_interfix: "میانوند",
+  pos_prep: "حرف اضافه",
+  pos_prep_phrase: "گروه حرف اضافه‌ای",
+  pos_phrase: "عبارت",
+  pos_proverb: "ضرب‌المثل",
+  pos_num: "عدد",
+  pos_pron: "ضمیر",
+  pos_conj: "حرف ربط",
+  pos_character: "حرف الفبا",
+  pos_particle: "ادات",
+  pos_det: "وابسته",
+  pos_classifier: "واحد شمارش",
+  pos_contraction: "شکل کوتاه‌شده",
+  pos_punct: "نشانهٔ نگارشی",
+  pos_symbol: "نماد",
+  pos_abbrev: "کوته‌نوشت",
   saveWord: "ذخیرهٔ واژه",
   saved: "ذخیره شد",
   lineSaved: "خط در واژگان شما ذخیره شد",
@@ -506,9 +544,14 @@ export function defaultLang(): Lang {
 
 export type StringKey = keyof Strings;
 
-/** Translated text, with `{name}` placeholders filled from `vars`. */
+/**
+ * Translated text, with `{name}` placeholders filled from `vars`. An unknown
+ * key (one built at runtime, such as `pos_${pos}`) falls back to English, then
+ * to the key itself.
+ */
 export function t(key: StringKey, vars: Record<string, string | number> = {}): string {
-  return STRINGS[current][key].replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? `{${k}}`));
+  const text: string = STRINGS[current][key] ?? STRINGS.en[key] ?? key;
+  return text.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? `{${k}}`));
 }
 
 /** A language code's name in the UI language ("fa" → "Persian" / "فارسی"). */

@@ -1,7 +1,7 @@
 import { Button } from "primereact/button";
 import { OverlayPanel } from "primereact/overlaypanel";
 import { Tag } from "primereact/tag";
-import { type Ref, useImperativeHandle, useRef, useState } from "react";
+import { type Ref, useCallback, useImperativeHandle, useRef, useState } from "react";
 
 import { api } from "../api";
 import * as clock from "../clock";
@@ -22,6 +22,40 @@ type State =
   | { kind: "done"; lookup: Lookup }
   | { kind: "error"; message: string };
 
+/** Space between the word and the popup (room for the arrow), and from the window edges. */
+const GAP = 10;
+const EDGE = 8;
+
+/**
+ * Puts the popup above `word`, or below it when there's more room there, kept
+ * inside the window. PrimeReact only positions the panel when it opens, so a
+ * popup opened while still loading grows off the bottom of the screen; this
+ * runs again whenever the panel changes size.
+ */
+function place(panel: HTMLElement, word: HTMLElement) {
+  const w = word.getBoundingClientRect();
+  // offset sizes ignore the opening animation's scale transform.
+  const width = panel.offsetWidth;
+  const height = panel.offsetHeight;
+  const above = w.top - GAP - height >= EDGE || w.top > window.innerHeight - w.bottom;
+  const top = above
+    ? Math.max(EDGE, w.top - GAP - height)
+    : Math.min(w.bottom + GAP, window.innerHeight - height - EDGE);
+  const center = w.left + w.width / 2;
+  const left = Math.min(Math.max(center - width / 2, EDGE), window.innerWidth - width - EDGE);
+
+  Object.assign(panel.style, {
+    top: `${top + window.scrollY}px`,
+    left: `${left + window.scrollX}px`,
+    margin: "0",
+    transformOrigin: above ? "bottom" : "top",
+  });
+  // The arrow sits 1.25rem (20px) past this offset; point it at the word.
+  panel.style.setProperty("--overlayArrowLeft", `${Math.min(Math.max(center - left - 20, 0), width - 40)}px`);
+  panel.classList.toggle("p-overlaypanel-flipped", above);
+  panel.setAttribute("data-p-overlaypanel-flipped", String(above));
+}
+
 function posLabel(pos: string): string {
   const key = `pos_${pos}` as StringKey;
   const label = t(key);
@@ -37,6 +71,25 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [saved, setSaved] = useState(false);
 
+  const reposition = useCallback(() => {
+    const el = panel.current?.getElement();
+    if (el && target.current) place(el, target.current);
+  }, []);
+
+  // Re-place whenever the content changes size (loading → results) or the window resizes.
+  const watchSize = useCallback((content: HTMLDivElement | null) => {
+    if (!content) return;
+    const observer = new ResizeObserver(reposition);
+    observer.observe(content);
+    // PrimeReact re-aligns on resize too; run after it.
+    const onResize = () => requestAnimationFrame(reposition);
+    window.addEventListener("resize", onResize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", onResize);
+    };
+  }, [reposition]);
+
   useImperativeHandle(ref, () => ({
     open(event, el, word) {
       target.current?.classList.remove("picked");
@@ -50,6 +103,8 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
       setState({ kind: "loading" });
       setSaved(false);
       panel.current?.show(event as unknown as React.SyntheticEvent, el);
+      // Already open on another word: PrimeReact just re-aligned it below.
+      reposition();
       api.lookupWord(word.word, word.lang).then(
         (lookup) => setState({ kind: "done", lookup }),
         (e) => setState({ kind: "error", message: String(e) }),
@@ -93,7 +148,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   return (
     <OverlayPanel ref={panel} onHide={onHide} className="w-[min(22rem,90vw)]" pt={{ content: { className: "p-0" } }}>
       {picked && (
-        <div className="flex flex-col">
+        <div ref={watchSize} className="flex flex-col">
           <div className="border-b border-ink-700 px-4 py-3">
             <div className="text-xl font-semibold" dir="auto">
               {lookup?.word ?? picked.word}

@@ -3,6 +3,19 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.4.2 (2026-10-13)
+
+### Fixed
+
+- Clicking a subtitle word whose part of speech has no translation (an
+  abbreviation, for example) no longer fails with an error.
+- The word popup opens above the clicked word and stays inside the window.
+  It used to open below the subtitle and grow off the bottom of the screen
+  once the dictionary results loaded.
+- The word popup now names every part of speech the offline dictionary uses
+  (pronoun, preposition, interjection, suffix and so on) in English and
+  Persian, not just nouns, verbs, adjectives and adverbs.
+
 ## 0.4.1 (2026-10-12)
 
 ### Fixed
