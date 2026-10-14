@@ -1,6 +1,6 @@
 [package]
 name = "beyt"
-version = "0.9.0"
+version = "0.10.0"
 description = "A dual-subtitle video player for language learning"
 license = "GPL-3.0-or-later"
 edition = "2024"
@@ -25,8 +25,10 @@ chardetng = "1"
 encoding_rs = "0.8"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 tauri-plugin-dialog = "2"
-# Only talks to AnkiConnect on localhost, so no TLS.
-ureq = { version = "3.4.2", default-features = false, features = ["json"] }
+# AnkiConnect on localhost, and the dictionary download (TLS via rustls).
+# Gzip is decoded by hand so download progress counts compressed bytes.
+ureq = { version = "3.4.2", default-features = false, features = ["json", "rustls"] }
+flate2 = "1"
 
 # The desktop player: mpv drawn into GTK under WebKitGTK. Android's target_os
 # is "android", so none of these reach its build.

@@ -1,7 +1,6 @@
 import { Button } from "primereact/button";
 import { Menu } from "primereact/menu";
 import type { MenuItem } from "primereact/menuitem";
-import { Slider } from "primereact/slider";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
@@ -10,6 +9,7 @@ import { player, useMediaQuery, usePlayback, usePlayer } from "../hooks";
 import { getLang, t } from "../i18n";
 import { popupMotions } from "../motion";
 import { fmtTime } from "../ui";
+import { SeekBar } from "./SeekBar";
 
 /** Below this width the less used buttons move into the ⋯ menu. */
 const NARROW = "(max-width: 767px)";
@@ -81,19 +81,7 @@ export function PlayerChrome({
 
       <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-3 pb-3 pt-12 sm:px-5 ${fade}`}>
         <div dir="ltr" className="px-1">
-          <Slider
-            value={time}
-            min={0}
-            max={duration}
-            step={0.1}
-            onChange={(e) => setDragging(e.value as number)}
-            onSlideEnd={(e) => {
-              setDragging(null);
-              seek(e.value as number);
-            }}
-            className="w-full"
-            aria-label="Seek"
-          />
+          <SeekBar time={time} duration={duration} onScrub={setDragging} onSeek={seek} />
         </div>
         <div className="mt-3 flex items-center gap-0.5 sm:gap-1">
           <Button

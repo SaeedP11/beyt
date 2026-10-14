@@ -30,7 +30,10 @@ export const api = {
   /** Best fit first. Sends `matchProgress` while the audio is sampled. */
   matchSubtitles: (path: string, files: string[]) => invoke<Candidate[]>("match_subtitles", { path, files }),
   stop: () => invoke<void>("stop"),
+  /** Fails with "dictionary-missing" until the dictionary is installed. */
   lookupWord: (word: string, lang: string) => invoke<Lookup>("lookup_word", { word, lang }),
+  /** Downloads and builds the dictionary; returns its entry count. Sends `dictionaryProgress`. */
+  installDictionary: () => invoke<number>("install_dictionary"),
 
   saveVocab: (item: NewVocab, capture: { padding: number; screenshot: boolean }) =>
     invoke<VocabItem>("save_vocab", { item, capture }),
@@ -96,4 +99,7 @@ export const events = {
     listen<TrackUpdate>("track-updated", (e) => cb(e.payload)),
   matchProgress: (cb: (fraction: number) => void): Promise<UnlistenFn> =>
     listen<number>("match-progress", (e) => cb(e.payload)),
+  /** Fraction downloaded, or null when the size isn't known. */
+  dictionaryProgress: (cb: (fraction: number | null) => void): Promise<UnlistenFn> =>
+    listen<number | null>("dictionary-progress", (e) => cb(e.payload)),
 };

@@ -1,10 +1,11 @@
 import { Button } from "primereact/button";
 import { OverlayPanel } from "primereact/overlaypanel";
 import { Tag } from "primereact/tag";
-import { type Ref, useCallback, useImperativeHandle, useRef, useState } from "react";
+import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { api } from "../api";
 import * as clock from "../clock";
+import { markDictionaryMissing, useDictionary } from "../dictionary";
 import { popupMotions } from "../motion";
 import { captureOptions } from "../player";
 import { getSettings } from "../settings";
@@ -12,6 +13,7 @@ import { player } from "../hooks";
 import { type StringKey, t } from "../i18n";
 import type { Lookup, PickedWord } from "../types";
 import { toast } from "../ui";
+import { DictionaryInstallCard } from "./DictionaryInstall";
 
 export interface WordPopupHandle {
   /** `event` may be a native one: the right-click menu opens the popup too. */
@@ -21,7 +23,9 @@ export interface WordPopupHandle {
 type State =
   | { kind: "loading" }
   | { kind: "done"; lookup: Lookup }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  /** No dictionary installed yet. */
+  | { kind: "missing" };
 
 /** Space between the word and the popup (room for the arrow), and from the window edges. */
 const GAP = 10;
@@ -71,6 +75,8 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   const [picked, setPicked] = useState<PickedWord | null>(null);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [saved, setSaved] = useState(false);
+  /** The word being shown, so a late lookup for an earlier one is dropped. */
+  const current = useRef<PickedWord | null>(null);
 
   const reposition = useCallback(() => {
     const el = panel.current?.getElement();
@@ -100,18 +106,44 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
         resumeOnClose.current = true;
         void api.setPause(true);
       }
+      current.current = word;
       setPicked(word);
       setState({ kind: "loading" });
       setSaved(false);
       panel.current?.show(event as unknown as React.SyntheticEvent, el);
       // Already open on another word: PrimeReact just re-aligned it below.
       reposition();
-      api.lookupWord(word.word, word.lang).then(
-        (lookup) => setState({ kind: "done", lookup }),
-        (e) => setState({ kind: "error", message: String(e) }),
-      );
+      lookUp(word);
     },
   }));
+
+  const lookUp = (word: PickedWord) => {
+    api.lookupWord(word.word, word.lang).then(
+      (lookup) => {
+        // A late answer for a word the popup has moved on from.
+        if (current.current === word) setState({ kind: "done", lookup });
+      },
+      (e) => {
+        if (current.current !== word) return;
+        if (String(e) === "dictionary-missing") {
+          markDictionaryMissing();
+          setState({ kind: "missing" });
+        } else {
+          setState({ kind: "error", message: String(e) });
+        }
+      },
+    );
+  };
+
+  // Installed from the popup (or Settings) while it shows the install card:
+  // look the word up now.
+  const dictionary = useDictionary();
+  useEffect(() => {
+    if (dictionary.kind === "ready" && state.kind === "missing" && picked) {
+      setState({ kind: "loading" });
+      lookUp(picked);
+    }
+  }, [dictionary.kind]);
 
   const onHide = () => {
     target.current?.classList.remove("picked");
@@ -164,6 +196,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
           <div className="max-h-72 overflow-y-auto px-4 py-3">
             {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
             {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
+            {state.kind === "missing" && <DictionaryInstallCard />}
             {lookup && lookup.entries.length === 0 && <p className="text-sm text-zinc-400">{t("noMatch")}</p>}
             {lookup && lookup.entries.length > 0 && (
               <ul className="flex flex-col gap-3">

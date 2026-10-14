@@ -20,6 +20,7 @@ import { type Settings, type SubtitleDefault, resetSettings, updateSettings, use
 import { popupMotions, useDialogMotion } from "../motion";
 import type { Position } from "../types";
 import { toast } from "../ui";
+import { DictionaryStatus } from "./DictionaryInstall";
 import { KeyCaps } from "./KeyCaps";
 
 export type Section = "general" | "playback" | "subtitles" | "learning" | "anki" | "shortcuts" | "data";
@@ -345,8 +346,6 @@ function Subtitles() {
 
 function Learning() {
   const s = useSettings();
-  const [entries, setEntries] = useState<number | null | undefined>(undefined);
-  useEffect(() => void api.dataInfo().then((d) => setEntries(d.dictionaryEntries)), []);
   return (
     <>
       <Row label={t("autoPauseDefault")}>
@@ -375,17 +374,8 @@ function Learning() {
       <Row label={t("saveScreenshots")}>
         <Switch name="saveScreenshots" />
       </Row>
-      <Row label={t("dictionary")}>
-        {entries === undefined ? (
-          <i className="pi pi-spin pi-spinner text-zinc-400" />
-        ) : entries === null ? (
-          <span className="text-sm text-amber-300">{t("dictionaryMissing")}</span>
-        ) : (
-          <span className="flex items-center gap-2 text-sm text-emerald-300">
-            <i className="pi pi-check-circle" />
-            {t("dictionaryEntries", { n: entries.toLocaleString() })}
-          </span>
-        )}
+      <Row label={t("dictionary")} hint={t("dictionarySettingsHint")}>
+        <DictionaryStatus />
       </Row>
     </>
   );
