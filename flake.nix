@@ -33,7 +33,7 @@
 
         beyt = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "beyt";
-          version = "0.7.2";
+          version = "0.8.0";
           # Flakes only see files tracked by git, so samples/, data/ and
           # build output stay out of the build.
           src = ./.;
@@ -115,6 +115,9 @@
             rust-analyzer
             cargo-tauri
             ffmpeg
+            # scripts/build-dictionary.sh. The system curl breaks here: LD_LIBRARY_PATH
+            # pulls in this nixpkgs' glibc libraries, which it wasn't built against.
+            curl
             nodejs
             typescript
             pnpm

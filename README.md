@@ -15,8 +15,11 @@ video files from "Open with".
 ```sh
 cd ~/Projects/video-player
 nix profile install .#beyt       # release build: takes a few minutes the first time
-./scripts/build-dictionary.sh    # once, for word lookups (needs `nix develop` for cargo)
 ```
+
+The first time you click a subtitle word, Beyt offers to download its offline
+English ↔ Persian dictionary (Wiktionary, about 13 MB). You can also install or
+update it from Settings → Learning.
 
 Then start it from the launcher, or from a terminal:
 
@@ -46,7 +49,7 @@ watch history, vocabulary, settings and the dictionary are the same in both.
 nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node, pnpm
 pnpm install
 ./scripts/make-sample.sh         # sample videos + EN/FA subtitles
-./scripts/build-dictionary.sh    # offline EN↔FA dictionary (Wiktionary, CC BY-SA)
+./scripts/build-dictionary.sh    # optional: the dictionary, without going through the app
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"
 ```
 

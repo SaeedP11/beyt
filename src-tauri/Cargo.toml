@@ -1,6 +1,6 @@
 [package]
 name = "beyt"
-version = "0.7.2"
+version = "0.8.0"
 description = "A dual-subtitle video player for language learning"
 license = "GPL-3.0-or-later"
 edition = "2024"
@@ -27,8 +27,10 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 tauri-plugin-dialog = "2"
 # Asks logind to set the laptop backlight (already linked by Tauri's deps).
 dbus = "0.9"
-# Only talks to AnkiConnect on localhost, so no TLS.
-ureq = { version = "3.4.2", default-features = false, features = ["json"] }
+# AnkiConnect on localhost, and the dictionary download (TLS via rustls).
+# Gzip is decoded by hand so download progress counts compressed bytes.
+ureq = { version = "3.4.2", default-features = false, features = ["json", "rustls"] }
+flate2 = "1"
 
 [features]
 # Release builds embed the built frontend; `cargo tauri dev` turns this off

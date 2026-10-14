@@ -2,14 +2,21 @@
 //! entries (kaikki.org extract, CC BY-SA). Each Persian word has English
 //! glosses; the build step turns the glosses into English lookup keys.
 
-use std::path::Path;
+use std::{
+    fs,
+    io::{BufRead, BufReader, Read},
+    path::Path,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OpenFlags, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[allow(dead_code)] // Used by the build_dictionary binary.
-pub const SCHEMA: &str = "
+/// Wiktionary's Persian entries. Served gzip-compressed, about 13 MB.
+pub const SOURCE_URL: &str = "https://kaikki.org/dictionary/Persian/kaikki.org-dictionary-Persian.jsonl";
+
+const SCHEMA: &str = "
     CREATE TABLE entries (
         id      INTEGER PRIMARY KEY,
         fa      TEXT NOT NULL,
@@ -46,7 +53,6 @@ pub struct Lookup {
 }
 
 /// Glosses that only point at another word ("plural of X") make poor keys.
-#[allow(dead_code)] // Used by the build_dictionary binary.
 fn is_reference_gloss(gloss: &str) -> bool {
     let g = gloss.to_ascii_lowercase();
     [
@@ -59,7 +65,6 @@ fn is_reference_gloss(gloss: &str) -> bool {
 }
 
 /// English lookup keys from one gloss: "to go; to leave (somewhere)" → ["go", "leave"].
-#[allow(dead_code)] // Used by the build_dictionary binary.
 pub fn index_keys(gloss: &str) -> Vec<String> {
     if is_reference_gloss(gloss) {
         return Vec::new();
@@ -172,6 +177,159 @@ pub fn clean_word(raw: &str) -> String {
         .to_string()
 }
 
+// ---------- building ----------
+
+/// One line of the kaikki.org extract (only the fields Beyt uses).
+#[derive(Deserialize)]
+struct Source {
+    word: String,
+    pos: String,
+    #[serde(default)]
+    forms: Vec<SourceForm>,
+    #[serde(default)]
+    senses: Vec<SourceSense>,
+}
+
+#[derive(Deserialize)]
+struct SourceForm {
+    form: String,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct SourceSense {
+    #[serde(default)]
+    glosses: Vec<String>,
+    #[serde(default)]
+    form_of: Vec<serde_json::Value>,
+}
+
+fn is_persian(word: &str) -> bool {
+    word.chars().any(|c| ('\u{0600}'..='\u{06FF}').contains(&c))
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Built {
+    pub entries: usize,
+    pub keys: usize,
+}
+
+/// Builds a dictionary database at `output` (replacing any file there) from
+/// the kaikki.org JSONL extract.
+pub fn build(input: impl BufRead, output: &Path) -> Result<Built> {
+    let _ = fs::remove_file(output);
+    let mut db = Connection::open(output).with_context(|| format!("creating {}", output.display()))?;
+    db.execute_batch(SCHEMA)?;
+    let tx = db.transaction()?;
+    let mut built = Built { entries: 0, keys: 0 };
+    {
+        let mut add_entry = tx.prepare("INSERT INTO entries (id, fa, pos, roman, glosses) VALUES (?1, ?2, ?3, ?4, ?5)")?;
+        let mut add_key = tx.prepare("INSERT INTO en_index (key, entry_id, rank) VALUES (?1, ?2, ?3)")?;
+        for line in input.lines() {
+            let Ok(entry) = serde_json::from_str::<Source>(&line?) else { continue };
+            if !is_persian(&entry.word) || entry.pos == "name" {
+                continue;
+            }
+            let glosses: Vec<&str> = entry
+                .senses
+                .iter()
+                .filter(|s| s.form_of.is_empty())
+                .flat_map(|s| s.glosses.iter().map(String::as_str))
+                .collect();
+            if glosses.is_empty() {
+                continue;
+            }
+            let roman = entry.forms.iter().find(|f| f.tags.iter().any(|t| t == "romanization")).map(|f| &f.form);
+            let fa = entry.word.replace(['ي', 'ى'], "ی").replace('ك', "ک");
+
+            built.entries += 1;
+            let id = built.entries as i64;
+            add_entry.execute(params![id, fa, entry.pos, roman, serde_json::to_string(&glosses)?])?;
+            for (rank, gloss) in glosses.iter().enumerate() {
+                for key in index_keys(gloss) {
+                    add_key.execute(params![key, id, rank as i64])?;
+                    built.keys += 1;
+                }
+            }
+        }
+    }
+    tx.commit()?;
+    db.execute_batch("VACUUM; ANALYZE;")?;
+    Ok(built)
+}
+
+/// Counts the bytes read through it and reports the fraction of `total` done.
+struct Progress<R, F> {
+    inner: R,
+    read: u64,
+    total: Option<u64>,
+    reported: f64,
+    report: F,
+}
+
+impl<R: Read, F: FnMut(Option<f64>)> Read for Progress<R, F> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.read += n as u64;
+        match self.total {
+            Some(total) if total > 0 => {
+                let fraction = (self.read as f64 / total as f64).min(1.0);
+                // About a hundred updates over the whole download.
+                if fraction - self.reported >= 0.01 || (n == 0 && fraction > self.reported) {
+                    self.reported = fraction;
+                    (self.report)(Some(fraction));
+                }
+            }
+            _ if self.reported == 0.0 => {
+                self.reported = -1.0;
+                (self.report)(None);
+            }
+            _ => {}
+        }
+        Ok(n)
+    }
+}
+
+/// Downloads the Wiktionary extract and builds the dictionary at `dest`,
+/// reporting the fraction downloaded (`None` when the size isn't known).
+/// The build reads the download as it arrives, and the old dictionary stays
+/// in place until the new one is complete.
+pub fn install(dest: &Path, progress: impl FnMut(Option<f64>)) -> Result<Built> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_connect(Some(Duration::from_secs(20)))
+        .timeout_recv_response(Some(Duration::from_secs(30)))
+        .build()
+        .into();
+    let response = agent
+        .get(SOURCE_URL)
+        .header("Accept-Encoding", "gzip")
+        .call()
+        .context("couldn't reach kaikki.org")?;
+    let header = |name: &str| response.headers().get(name).and_then(|v| v.to_str().ok()).map(str::to_owned);
+    let total = header("content-length").and_then(|v| v.parse().ok());
+    let gzip = header("content-encoding").is_some_and(|v| v.eq_ignore_ascii_case("gzip"));
+
+    let raw = Progress { inner: response.into_body().into_reader(), read: 0, total, reported: 0.0, report: progress };
+    let body: Box<dyn Read> = if gzip { Box::new(flate2::read::MultiGzDecoder::new(raw)) } else { Box::new(raw) };
+
+    if let Some(dir) = dest.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let part = dest.with_extension("db.part");
+    let built = build(BufReader::with_capacity(1 << 16, body), &part).inspect_err(|_| {
+        let _ = fs::remove_file(&part);
+    })?;
+    if built.entries == 0 {
+        let _ = fs::remove_file(&part);
+        anyhow::bail!("the download had no dictionary entries");
+    }
+    fs::rename(&part, dest).with_context(|| format!("saving {}", dest.display()))?;
+    Ok(built)
+}
+
+// ---------- lookups ----------
+
 pub struct Dictionary {
     db: std::sync::Mutex<Connection>,
 }
@@ -258,6 +416,46 @@ mod tests {
         assert!(has("don't", "do"));
         assert!(has("bigger", "big"));
         assert_eq!(lemma_candidates("Book")[0], "book");
+    }
+
+    #[test]
+    fn builds_and_looks_up() {
+        let extract = r#"{"word": "كتاب", "pos": "noun", "forms": [{"form": "ketâb", "tags": ["romanization"]}], "senses": [{"glosses": ["book"]}]}
+{"word": "رفتن", "pos": "verb", "senses": [{"glosses": ["to go; to leave"]}]}
+{"word": "Tehran", "pos": "noun", "senses": [{"glosses": ["not Persian script"]}]}
+{"word": "کتب", "pos": "noun", "senses": [{"glosses": ["plural of کتاب"], "form_of": [{"word": "کتاب"}]}]}
+not json
+"#;
+        let dir = std::env::temp_dir().join(format!("beyt-dict-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("dictionary.db");
+        let built = build(extract.as_bytes(), &path).unwrap();
+        assert_eq!(built.entries, 2);
+
+        let dict = Dictionary::open(&path).unwrap();
+        let book = dict.lookup_english("Books,").unwrap();
+        assert_eq!(book.matched.as_deref(), Some("book"));
+        assert_eq!(book.entries[0].fa, "کتاب"); // Arabic kaf normalised
+        assert_eq!(book.entries[0].roman.as_deref(), Some("ketâb"));
+        assert_eq!(dict.lookup_english("went").unwrap().entries[0].fa, "رفتن");
+        assert_eq!(dict.lookup_persian("كتاب").unwrap().entries[0].glosses, ["book"]);
+        assert_eq!(dict.entry_count().unwrap(), 2);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Downloads the real extract: `cargo test -- --ignored installs_from_kaikki`.
+    #[test]
+    #[ignore = "downloads about 13 MB"]
+    fn installs_from_kaikki() {
+        let dir = std::env::temp_dir().join(format!("beyt-dict-install-{}", std::process::id()));
+        let path = dir.join("dictionary.db");
+        let mut updates = Vec::new();
+        let built = install(&path, |p| updates.push(p)).unwrap();
+        assert!(built.entries > 10_000, "{built:?}");
+        assert_eq!(updates.last(), Some(&Some(1.0)));
+        assert!(!dir.join("dictionary.db.part").exists());
+        assert!(!Dictionary::open(&path).unwrap().lookup_english("water").unwrap().entries.is_empty());
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

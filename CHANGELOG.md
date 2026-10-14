@@ -3,6 +3,23 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.8.0 (2026-10-15)
+
+### Added
+
+- Install the offline dictionary from inside Beyt. Clicking a subtitle word
+  before it's installed shows an **Install dictionary** button in the word
+  popup instead of an error; the popup shows the download's progress and
+  looks the word up as soon as it's ready, with no restart. Settings →
+  Learning has the same button, and **Update** to fetch the latest
+  Wiktionary entries later. The download is about 13 MB, and the dictionary
+  in use stays in place until the new one is complete.
+
+### Fixed
+
+- `scripts/build-dictionary.sh` failed inside `nix develop` with a glibc
+  error from curl. The dev shell now has its own curl.
+
 ## 0.7.2 (2026-10-14)
 
 ### Fixed

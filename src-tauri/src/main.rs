@@ -14,7 +14,10 @@ mod vocab;
 use std::{
     fmt::Display,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{
+        Mutex, RwLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -39,8 +42,11 @@ struct App {
     current: Mutex<Option<Current>>,
     /// Screenshots and audio clips of saved vocabulary.
     vocab_media: PathBuf,
-    /// Offline dictionary; `None` until scripts/build-dictionary.sh has run.
-    dictionary: Option<dict::Dictionary>,
+    /// Offline dictionary; `None` until it has been installed.
+    dictionary: RwLock<Option<dict::Dictionary>>,
+    dictionary_path: PathBuf,
+    /// Set while `install_dictionary` runs, so two installs can't overlap.
+    installing_dictionary: AtomicBool,
 }
 
 struct Current {
@@ -263,11 +269,36 @@ async fn stop(app: State<'_, App>) -> Result<(), String> {
 /// Looks up a subtitle word: English words in Persian, Persian words in English.
 #[tauri::command]
 async fn lookup_word(app: State<'_, App>, word: String, lang: String) -> Result<dict::Lookup, String> {
-    let dictionary = app
-        .dictionary
-        .as_ref()
-        .ok_or("The offline dictionary is not installed. Run scripts/build-dictionary.sh.")?;
+    let guard = app.dictionary.read().unwrap_or_else(|e| e.into_inner());
+    let dictionary = guard.as_ref().ok_or("dictionary-missing")?;
     if lang == "fa" { dictionary.lookup_persian(&word) } else { dictionary.lookup_english(&word) }.map_err(err)
+}
+
+/// Downloads Wiktionary's Persian entries and builds the offline dictionary,
+/// replacing the installed one. Sends `dictionary-progress` with the fraction
+/// downloaded (null when the size isn't known). Returns the entry count.
+#[tauri::command]
+async fn install_dictionary(app: State<'_, App>, handle: AppHandle) -> Result<i64, String> {
+    if app.installing_dictionary.swap(true, Ordering::SeqCst) {
+        return Err("already-installing".into());
+    }
+    let path = app.dictionary_path.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let built = dict::install(&path, |p| {
+            let _ = handle.emit("dictionary-progress", p);
+        })?;
+        eprintln!("beyt: dictionary installed ({} entries, {} English keys)", built.entries, built.keys);
+        dict::Dictionary::open(&path)
+    })
+    .await;
+    app.installing_dictionary.store(false, Ordering::SeqCst);
+    let dictionary = result.map_err(err)?.map_err(|e| {
+        eprintln!("beyt: dictionary install failed: {e:#}");
+        format!("{e:#}")
+    })?;
+    let entries = dictionary.entry_count().map_err(err)?;
+    *app.dictionary.write().unwrap_or_else(|e| e.into_inner()) = Some(dictionary);
+    Ok(entries)
 }
 
 // ---------- commands: vocabulary ----------
@@ -401,7 +432,12 @@ struct DataInfo {
 fn data_info(app: State<App>, handle: AppHandle) -> Result<DataInfo, String> {
     Ok(DataInfo {
         data_dir: handle.path().app_data_dir().map_err(err)?.to_string_lossy().into_owned(),
-        dictionary_entries: app.dictionary.as_ref().and_then(|d| d.entry_count().ok()),
+        dictionary_entries: app
+            .dictionary
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .and_then(|d| d.entry_count().ok()),
     })
 }
 
@@ -666,6 +702,7 @@ fn main() {
             file_info,
             match_subtitles,
             lookup_word,
+            install_dictionary,
             save_vocab,
             list_vocab,
             delete_vocab,
@@ -708,8 +745,9 @@ fn main() {
             let store = Store::open(&paths.app_data_dir()?.join("beyt.db"))?;
             let cache_dir = paths.app_cache_dir()?.join("subtitles");
             let thumb_dir = paths.app_cache_dir()?.join("thumbnails");
-            let dictionary = dict::Dictionary::open(&paths.app_data_dir()?.join("dictionary.db"))
-                .inspect_err(|e| eprintln!("beyt: no offline dictionary ({e:#}); run scripts/build-dictionary.sh"))
+            let dictionary_path = paths.app_data_dir()?.join("dictionary.db");
+            let dictionary = dict::Dictionary::open(&dictionary_path)
+                .inspect_err(|e| eprintln!("beyt: no offline dictionary yet ({e:#})"))
                 .ok();
             app.manage(App {
                 mpv,
@@ -719,7 +757,9 @@ fn main() {
                 vocab_media: paths.app_data_dir()?.join("vocab-media"),
                 initial_file: cli_file,
                 current: Mutex::new(None),
-                dictionary,
+                dictionary: RwLock::new(dictionary),
+                dictionary_path,
+                installing_dictionary: AtomicBool::new(false),
             });
 
             let window = app.get_webview_window("main").expect("main window");
