@@ -24,7 +24,8 @@ type Screen = "loading" | "library" | "player";
 
 /** Actions that work on the library screen too. */
 const GLOBAL_ACTIONS = new Set<Action>(["help", "settings", "fullscreen", "quit", "back"]);
-/** Width of the strip at the start edge where scrolling sets the brightness. */
+/** Width of the strips at the edges where scrolling sets the brightness
+ *  (start edge) and the volume (end edge). */
 const EDGE = 0.2;
 /** Wheel distance for one brightness step (about one mouse wheel notch). */
 const WHEEL_STEP = 50;
@@ -45,6 +46,8 @@ export function App() {
   const toastRef = useRef<Toast>(null);
   const wordPopup = useRef<WordPopupHandle>(null);
   const idleTimer = useRef<number | undefined>(undefined);
+
+  const closeTranscript = useCallback(() => setTranscriptOpen(false), []);
 
   const openSettings = useCallback((section?: Section) => {
     if (section) setSettingsSection(section);
@@ -152,6 +155,8 @@ export function App() {
           setPanelOpen((o) => !o);
           break;
         case "transcript":
+          // Only a text subtitle has a transcript.
+          if (!transcriptOpen && !player.selectedView()) return false;
           setTranscriptOpen((o) => !o);
           break;
         case "info":
@@ -195,19 +200,24 @@ export function App() {
 
   const rtl = lang === "fa";
 
-  /** Scrolling over the start edge of the video changes the brightness. */
-  const wheelSum = useRef(0);
+  /** Scrolling over the start edge of the video changes the brightness,
+   *  over the end edge the volume. */
+  const wheelSum = useRef({ edge: "", sum: 0 });
   const onWheel = (e: React.WheelEvent) => {
     // Only over the bare video, not the controls, panels or subtitles.
     if (e.target !== e.currentTarget) return;
     const fromStart = rtl ? window.innerWidth - e.clientX : e.clientX;
-    if (fromStart > window.innerWidth * EDGE) return;
-    wheelSum.current += e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 40 : e.deltaY;
+    const strip = window.innerWidth * EDGE;
+    const edge = fromStart <= strip ? "brightness" : fromStart >= window.innerWidth - strip ? "volume" : null;
+    if (!edge) return;
+    if (wheelSum.current.edge !== edge) wheelSum.current = { edge, sum: 0 };
+    wheelSum.current.sum += e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 40 : e.deltaY;
     // A wheel notch is a step; touchpads add up small deltas to one.
-    const steps = Math.trunc(wheelSum.current / WHEEL_STEP);
+    const steps = Math.trunc(wheelSum.current.sum / WHEEL_STEP);
     if (!steps) return;
-    wheelSum.current -= steps * WHEEL_STEP;
-    player.adjustBrightness(-steps * 5);
+    wheelSum.current.sum -= steps * WHEEL_STEP;
+    if (edge === "brightness") player.adjustBrightness(-steps * 5);
+    else player.adjustVolume(-steps * 5);
   };
 
   return (
@@ -232,7 +242,7 @@ export function App() {
         />
       )}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
-      <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={() => setTranscriptOpen(false)} />
+      <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={closeTranscript} />
       {screen === "player" && <LevelIndicator />}
       <UpNextCard />
       <WordPopup ref={wordPopup} />

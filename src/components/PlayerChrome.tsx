@@ -99,16 +99,18 @@ export function PlayerChrome({
             onClick={() => player.toggleAutoPause()}
             className={player.autoPause ? "" : "text-white"}
           />
-          <Button
-            icon="pi pi-align-left"
-            rounded
-            text
-            aria-label={t("transcript")}
-            tooltip={`${t("transcript")} (R)`}
-            tooltipOptions={{ position: "top" }}
-            onClick={onToggleTranscript}
-            className="text-white"
-          />
+          {player.selectedView() && (
+            <Button
+              icon="pi pi-align-left"
+              rounded
+              text
+              aria-label={t("transcript")}
+              tooltip={`${t("transcript")} (R)`}
+              tooltipOptions={{ position: "top" }}
+              onClick={onToggleTranscript}
+              className="text-white"
+            />
+          )}
           <Button
             icon="pi pi-comments"
             rounded

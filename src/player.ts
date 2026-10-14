@@ -70,6 +70,11 @@ export class Player {
     this.changed();
   }
 
+  /** Changes the volume by `delta` percent and shows the indicator. */
+  adjustVolume(delta: number): void {
+    void api.adjustProperty("volume", delta).then((n) => this.showVolume({ level: Math.round(n) }));
+  }
+
   /** Changes the brightness by `delta` percent and shows the indicator. */
   adjustBrightness(delta: number): void {
     const prev = this.brightnessTarget;
@@ -409,9 +414,7 @@ export class Player {
         break;
       case "volumeUp":
       case "volumeDown":
-        void api
-          .adjustProperty("volume", action === "volumeUp" ? 5 : -5)
-          .then((n) => this.showVolume({ level: Math.round(n) }));
+        this.adjustVolume(action === "volumeUp" ? 5 : -5);
         break;
       case "mute":
         void api.toggleMute().then((muted) => this.showVolume({ muted }));

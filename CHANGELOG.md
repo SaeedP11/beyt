@@ -3,6 +3,20 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.6.0 (2026-10-14)
+
+### Added
+
+- Scroll over the right edge of the video to change the volume (the left
+  edge in Persian), the way the opposite edge already sets the brightness.
+  It shows the same level indicator as the volume keys.
+
+### Changed
+
+- The Transcript button, its right-click menu entry and its shortcut (R)
+  only appear when a text subtitle is on. Turning off or removing the last
+  one closes the transcript instead of leaving an empty drawer.
+
 ## 0.5.0 (2026-10-14)
 
 ### Added

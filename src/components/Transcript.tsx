@@ -60,6 +60,11 @@ export function Transcript({ visible, rtl, onHide }: Props) {
   );
   const current = primary ? cueIndexAt(primary.track.cues, primary.trackTime(p.time)) : -1;
 
+  // Nothing to show once the last text subtitle is turned off or removed.
+  useEffect(() => {
+    if (visible && !primary) onHide();
+  }, [visible, primary, onHide]);
+
   useEffect(() => {
     if (!visible || current < 0 || Date.now() - manualScrollAt.current < MANUAL_SCROLL_MS) return;
     listRef.current
@@ -69,7 +74,7 @@ export function Transcript({ visible, rtl, onHide }: Props) {
 
   return (
     <Sidebar
-      visible={visible}
+      visible={visible && !!primary}
       onHide={onHide}
       position={rtl ? "right" : "left"}
       modal={false}
@@ -87,9 +92,7 @@ export function Transcript({ visible, rtl, onHide }: Props) {
         </div>
       }
     >
-      {!primary ? (
-        <p className="py-6 text-center text-zinc-400">{t("noTranscript")}</p>
-      ) : (
+      {primary && (
         <div
           ref={listRef}
           className="flex flex-col gap-1"

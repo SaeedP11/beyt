@@ -150,7 +150,7 @@ function playerItems(
     ),
     { separator: true },
     actionRow("subtitles", t("tracks"), "pi pi-comments", keymap, run),
-    actionRow("transcript", t("transcript"), "pi pi-align-left", keymap, run),
+    ...(player.selectedView() ? [actionRow("transcript", t("transcript"), "pi pi-align-left", keymap, run)] : []),
     actionRow("info", t("fileInfo"), "pi pi-info-circle", keymap, run),
     { separator: true },
     actionRow("fullscreen", t("fullscreen"), "pi pi-window-maximize", keymap, run),
