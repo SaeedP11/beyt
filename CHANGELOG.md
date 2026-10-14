@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.7.2 (2026-10-14)
+
+### Fixed
+
+- Clicking the timeline seeks on the first click. Before, a click was
+  sometimes ignored after dragging the handle and letting go off the bar.
+  The timeline now has a taller hit area, can be dragged from anywhere on it
+  and shows the time under the pointer.
+
 ## 0.7.1 (2026-10-14)
 
 ### Changed
