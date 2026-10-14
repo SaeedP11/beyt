@@ -79,8 +79,26 @@ Every key can be changed in Settings → Keyboard shortcuts; press `?` in the ap
 | , | Settings |
 | Ctrl+Q | Quit |
 
+## Android (in progress)
+
+```sh
+nix develop .#android            # Android SDK + NDK, JDK 17, Rust with Android targets
+pnpm install
+./scripts/build-android.sh       # release APK for arm64 phones
+./scripts/build-android.sh --aab # App Bundle for Google Play
+cargo tauri android dev          # run on a connected phone with live reload
+```
+
+The first run generates the Android Studio project in `src-tauri/gen/android`,
+which is kept in git. Release packages must be signed before a phone will
+install them; see Tauri's [Android signing guide](https://v2.tauri.app/distribute/sign/android/).
+
+Videos don't play on Android yet: `src-tauri/src/player_android.rs` stands in
+for the desktop player until Android has a video surface of its own.
+
 ## Layout
 
+- `src-tauri/src/lib.rs`: the app and its commands; `main.rs` starts it on the desktop
 - `src-tauri/src/player.rs`: mpv, and its OpenGL video surface under the webview
 - `src-tauri/src/subs.rs`: sidecar discovery, encoding detection, SRT/VTT parsing, Persian fixes
 - `src/`: the TypeScript overlay (clock, cue lookup, track rendering, keys)

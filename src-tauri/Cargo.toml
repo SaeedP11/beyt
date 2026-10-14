@@ -1,10 +1,16 @@
 [package]
 name = "beyt"
-version = "0.8.0"
+version = "0.9.0"
 description = "A dual-subtitle video player for language learning"
 license = "GPL-3.0-or-later"
 edition = "2024"
 default-run = "beyt"
+
+# The app is a library so Android can load it as `libbeyt_lib.so`; the
+# desktop binary in main.rs only calls `run()`.
+[lib]
+name = "beyt_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -14,21 +20,25 @@ tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
+libc = "0.2"
+chardetng = "1"
+encoding_rs = "0.8"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+tauri-plugin-dialog = "2"
+# Only talks to AnkiConnect on localhost, so no TLS.
+ureq = { version = "3.4.2", default-features = false, features = ["json"] }
+
+# The desktop player: mpv drawn into GTK under WebKitGTK. Android's target_os
+# is "android", so none of these reach its build.
+[target.'cfg(target_os = "linux")'.dependencies]
 libmpv2 = "6"
 # Must match the GTK version Tauri's Linux backend uses.
 gtk = "0.18"
 # Same webkit2gtk as wry, for recovering when the page process dies.
 webkit2gtk = "2.0"
-libc = "0.2"
 libloading = "0.8"
-chardetng = "1"
-encoding_rs = "0.8"
-rusqlite = { version = "0.40.2", features = ["bundled"] }
-tauri-plugin-dialog = "2"
 # Asks logind to set the laptop backlight (already linked by Tauri's deps).
 dbus = "0.9"
-# Only talks to AnkiConnect on localhost, so no TLS.
-ureq = { version = "3.4.2", default-features = false, features = ["json"] }
 
 [features]
 # Release builds embed the built frontend; `cargo tauri dev` turns this off
@@ -43,3 +53,5 @@ lto = true
 codegen-units = 1
 # Nix only strips debug info; this also drops the symbol table.
 strip = true
+# scripts/build-android.sh also sets opt-level "s" through the environment,
+# since `cargo tauri android build` has no option to pick a profile.

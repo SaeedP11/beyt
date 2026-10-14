@@ -3,10 +3,11 @@
 
 use std::fs;
 use std::path::PathBuf;
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use libmpv2::Mpv;
+use crate::player::Mpv;
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
@@ -65,6 +66,7 @@ fn read_u32(path: &std::path::Path) -> Option<u32> {
 
 /// Asks logind to set the backlight, which needs no root for the active
 /// session; falls back to writing sysfs (works if a udev rule allows it).
+#[cfg(target_os = "linux")]
 fn set_backlight(b: &Backlight, value: u32) -> Result<()> {
     let via_logind = || -> Result<(), dbus::Error> {
         let conn = dbus::blocking::Connection::new_system()?;
@@ -80,6 +82,12 @@ fn set_backlight(b: &Backlight, value: u32) -> Result<()> {
         Err(logind) => fs::write(b.dir.join("brightness"), value.to_string())
             .with_context(|| format!("could not set the brightness ({})", logind.message().unwrap_or("logind"))),
     }
+}
+
+/// Android has no logind; sysfs is all there is (usually closed to apps).
+#[cfg(not(target_os = "linux"))]
+fn set_backlight(b: &Backlight, value: u32) -> Result<()> {
+    fs::write(b.dir.join("brightness"), value.to_string()).context("could not set the brightness")
 }
 
 pub fn get(mpv: &Mpv) -> Result<Brightness> {

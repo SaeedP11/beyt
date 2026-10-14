@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use libmpv2::Mpv;
+use crate::player::Mpv;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 

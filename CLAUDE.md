@@ -48,7 +48,13 @@ pnpm install
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"
 cd src-tauri && cargo test && cargo clippy    # Rust checks
 pnpm typecheck                                # TypeScript check
+nix develop .#android                         # Android SDK/NDK toolchain
+./scripts/build-android.sh                    # Android release APK (--aab for Play)
 ```
+
+Code that needs GTK, WebKitGTK, mpv or D-Bus goes behind
+`#[cfg(target_os = "linux")]` (Android's target_os is `"android"`), with an
+Android fallback so the app still builds there.
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph

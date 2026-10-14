@@ -3,6 +3,27 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.9.0 (2026-10-15)
+
+### Added
+
+- Groundwork for an Android version. `nix develop .#android` provides the
+  Android SDK, NDK, Java and Rust for Android, and
+  `scripts/build-android.sh` builds a release APK (or an App Bundle with
+  `--aab`). It builds for arm64 only, since every extra ABI adds another
+  copy of the native library, and optimises the Rust code for size.
+- On Android the library, subtitles, dictionary and vocabulary work, but
+  videos don't play yet: the desktop player draws mpv into GTK, and Android
+  needs a video surface of its own. Moving to the Trash, showing a file in
+  its folder and the ffmpeg-based features (embedded subtitles, thumbnails,
+  subtitle matching, audio clips) aren't available there either.
+
+### Changed
+
+- The app is now built as a library (`beyt_lib`) with a small desktop
+  launcher, as Android loads apps as shared libraries. GTK, WebKitGTK, mpv
+  and D-Bus are only linked on Linux desktops.
+
 ## 0.8.0 (2026-10-14)
 
 ### Added
