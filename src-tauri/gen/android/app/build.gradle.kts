@@ -13,8 +13,32 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Beyt's release key, from gen/android/keystore.properties (kept out of git):
+//   storeFile=/absolute/path/to/beyt-release.jks
+//   storePassword=...
+//   keyAlias=beyt
+//   keyPassword=...
+// Without it, release builds are signed with the local debug key so they can
+// still be installed for testing; Google Play needs the real key.
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
+    signingConfigs {
+        if (keystoreProperties.containsKey("storeFile")) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
     namespace = "app.beyt.player"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
@@ -37,7 +61,10 @@ android {
             }
         }
         getByName("release") {
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
+            // Drops resources nothing references once R8 has removed code.
+            isShrinkResources = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))

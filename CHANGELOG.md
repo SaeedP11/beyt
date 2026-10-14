@@ -12,6 +12,9 @@ and the data in `~/.local/share/app.beyt.player/` may change between versions.
   `scripts/build-android.sh` builds a release APK (or an App Bundle with
   `--aab`). It builds for arm64 only, since every extra ABI adds another
   copy of the native library, and optimises the Rust code for size.
+  Release builds shrink unused code and resources (about 13 MB) and are
+  signed with the key in `gen/android/keystore.properties`, or with the
+  local debug key when there is none, so they can be installed for testing.
 - On Android the library, subtitles, dictionary and vocabulary work, but
   videos don't play yet: the desktop player draws mpv into GTK, and Android
   needs a video surface of its own. Moving to the Trash, showing a file in

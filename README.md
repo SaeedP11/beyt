@@ -93,8 +93,25 @@ cargo tauri android dev          # run on a connected phone with live reload
 ```
 
 The first run generates the Android Studio project in `src-tauri/gen/android`,
-which is kept in git. Release packages must be signed before a phone will
-install them; see Tauri's [Android signing guide](https://v2.tauri.app/distribute/sign/android/).
+which is kept in git. The APK lands in
+`src-tauri/gen/android/app/build/outputs/apk/universal/release/`; install it
+with `adb install -r <apk>`.
+
+Release builds are signed with the local debug key, which is fine for your
+own phone. For Google Play, create a release key once (keep it and its
+passwords safe: every later update must be signed with it) and describe it in
+`src-tauri/gen/android/keystore.properties`, which git ignores:
+
+```sh
+keytool -genkey -v -keystore ~/beyt-release.jks -keyalg RSA -keysize 4096 -validity 10000 -alias beyt
+```
+
+```properties
+storeFile=/home/you/beyt-release.jks
+storePassword=...
+keyAlias=beyt
+keyPassword=...
+```
 
 Videos don't play on Android yet: `src-tauri/src/player_android.rs` stands in
 for the desktop player until Android has a video surface of its own.
