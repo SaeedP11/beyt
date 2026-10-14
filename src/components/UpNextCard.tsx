@@ -12,7 +12,7 @@ export function UpNextCard() {
   if (!next) return null;
 
   return (
-    <div className="absolute bottom-28 end-6 w-80 rounded-2xl border border-ink-600 bg-ink-900/95 p-4 shadow-2xl backdrop-blur">
+    <div className="absolute bottom-28 end-3 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl sm:end-6 border border-ink-600 bg-ink-900/95 p-4 shadow-2xl backdrop-blur">
       <div className="text-xs font-semibold uppercase tracking-wider text-accent">{t("upNext")}</div>
       <div className="mt-1 truncate text-base font-semibold" dir="auto">
         {next.name}

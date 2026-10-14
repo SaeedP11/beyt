@@ -3,6 +3,28 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.8.0 (2026-10-14)
+
+### Added
+
+- Beyt fits any window size, from a narrow tiled window to fullscreen on a
+  4K screen.
+- Subtitles scale with the window, the way mpv scales them with the video.
+  The sizes in settings are for a 1280×720 window. At 1080p fullscreen,
+  subtitles are 1.5 times that size; in a small window they shrink, but
+  never below 0.6 times.
+- On narrow windows, File info, Shortcuts and Settings move from the
+  control bar into a ⋯ menu.
+- On narrow windows, the Settings sections become a scrolling row of tabs
+  above the page.
+
+### Changed
+
+- On narrow windows the library, player bars, Up next card and File info
+  use smaller margins. On very wide screens the library uses more of the
+  width.
+- The window can't be made smaller than 480×320.
+
 ## 0.7.1 (2026-10-14)
 
 ### Changed

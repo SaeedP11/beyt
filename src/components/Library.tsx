@@ -357,10 +357,10 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
 
   return (
     <main className="absolute inset-0 overflow-y-auto bg-ink-950">
-      <div className="mx-auto max-w-6xl px-6 pb-16 pt-8 md:px-10">
-        <header className="mb-10 flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-baseline gap-4">
-            <span className="font-sans text-5xl font-bold text-accent" lang="fa">
+      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 md:px-10 2xl:max-w-[100rem]">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 sm:mb-10">
+          <div className="flex min-w-0 items-baseline gap-3 sm:gap-4">
+            <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
               بیت
             </span>
             <span className="text-zinc-400">{t("appTagline")}</span>

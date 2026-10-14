@@ -60,14 +60,15 @@ export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
       {...motion}
     >
       <ConfirmPopup />
-      <div className="flex h-[min(38rem,75vh)] min-h-0">
-        <nav className="w-52 shrink-0 border-e border-ink-700 p-2">
+      {/* On narrow windows the section list becomes a scrolling strip on top. */}
+      <div className="flex h-[min(38rem,80vh)] min-h-0 flex-col md:h-[min(38rem,75vh)] md:flex-row">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-ink-700 p-2 md:block md:w-52 md:border-e md:border-b-0">
           {SECTIONS.map((s) => (
             <button
               type="button"
               key={s.id}
               onClick={() => onSection(s.id)}
-              className={`mb-0.5 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start text-sm transition ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-start text-sm transition md:mb-0.5 md:w-full md:gap-3 ${
                 section === s.id ? "bg-accent/15 font-semibold text-accent" : "text-zinc-300 hover:bg-ink-800"
               }`}
             >
@@ -76,7 +77,7 @@ export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
             </button>
           ))}
         </nav>
-        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           <h2 className="mb-2 text-lg font-semibold">{t(SECTIONS.find((s) => s.id === section)!.label)}</h2>
           {section === "general" && <General />}
           {section === "playback" && <Playback />}
@@ -126,7 +127,7 @@ function SliderValue({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex w-64 items-center gap-3" dir="ltr">
+    <div className="flex w-56 items-center gap-3 sm:w-64" dir="ltr">
       <Slider value={value} min={min} max={max} step={step} onChange={(e) => onChange(e.value as number)} className="flex-1" />
       <span className="w-14 text-end text-sm tabular-nums text-zinc-300">{format(value)}</span>
     </div>

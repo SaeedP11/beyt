@@ -31,6 +31,15 @@ const EDGE = 0.2;
 /** Wheel distance for one brightness step (about one mouse wheel notch). */
 const WHEEL_STEP = 50;
 
+/** Scales subtitles with the window, the way mpv scales them with the video:
+ *  the sizes in settings are for 1280×720. The narrower side wins, so lines
+ *  in a tall narrow window still fit across. */
+function updateSubScale() {
+  const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+  const clamped = Math.min(Math.max(scale, 0.6), 3);
+  document.documentElement.style.setProperty("--sub-scale", clamped.toFixed(3));
+}
+
 export function App() {
   const lang = useLang();
   const { keymap } = useSettings();
@@ -84,6 +93,8 @@ export function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    updateSubScale();
+    window.addEventListener("resize", updateSubScale);
     setToastHandler((msg, ms, action) => {
       if (!action) {
         toastRef.current?.show({ severity: "secondary", detail: msg, life: ms });
@@ -262,6 +273,7 @@ export function App() {
           onToggleTranscript={() => setTranscriptOpen((o) => !o)}
           onHelp={() => setHelpOpen(true)}
           onSettings={() => openSettings()}
+          onMenuVisibleChange={setMenuOpen}
         />
       )}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
