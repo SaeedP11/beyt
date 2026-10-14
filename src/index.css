@@ -116,6 +116,54 @@ body.idle {
 .p-toast {
   max-width: min(26rem, 90vw);
 }
+/* Popup and right-click menus on Beyt's own surfaces rather than the
+   theme's grey. */
+.p-menu,
+.p-contextmenu,
+.p-contextmenu .p-submenu-list {
+  padding: 6px;
+  background: var(--color-ink-800);
+  border: 1px solid var(--color-ink-600);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
+}
+.p-menu .p-menuitem-content,
+.p-contextmenu .p-menuitem-content {
+  border-radius: 6px;
+}
+.p-menu .p-menuitem-link,
+.p-contextmenu .p-menuitem-link {
+  padding: 0.5rem 0.625rem;
+}
+.p-menu .p-menuitem-text,
+.p-contextmenu .p-menuitem-text {
+  color: #e4e4e7;
+}
+.p-menu .p-menuitem-icon,
+.p-contextmenu .p-menuitem-icon {
+  color: #a1a1aa;
+}
+.p-menu .p-menuitem-content:hover,
+.p-menu .p-menuitem.p-focus > .p-menuitem-content,
+.p-contextmenu .p-menuitem-content:hover,
+.p-contextmenu .p-menuitem.p-focus > .p-menuitem-content,
+.p-contextmenu .p-menuitem-active > .p-menuitem-content {
+  background: var(--color-ink-700);
+}
+.p-menu .p-menuitem-separator,
+.p-contextmenu .p-menuitem-separator {
+  margin: 4px 2px;
+  border-color: var(--color-ink-700);
+}
+/* Destructive entries, such as Move to Trash. */
+.p-menuitem.danger .p-menuitem-text,
+.p-menuitem.danger .p-menuitem-icon {
+  color: #f87171;
+}
+.p-menuitem.danger > .p-menuitem-content:hover,
+.p-menuitem.danger.p-focus > .p-menuitem-content {
+  background: rgb(248 113 113 / 0.12);
+}
 
 .track .line span.picked {
   background: rgb(96 165 250 / 0.45);
@@ -172,6 +220,7 @@ body.idle {
 .p-confirm-popup,
 .p-overlaypanel,
 .p-contextmenu,
+.p-menu,
 .p-toast-message {
   will-change: transform, opacity;
 }

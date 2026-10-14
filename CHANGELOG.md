@@ -3,6 +3,22 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.7.1 (2026-10-14)
+
+### Changed
+
+- The open folder's videos are cards with thumbnails, like Continue
+  watching, instead of a list. Its subfolders and Up sit above them as a
+  row of buttons.
+- Popup and right-click menus use Beyt's own dark colours, with padding,
+  rounded rows and a clear hover. Move to Trash is shown in red.
+
+### Fixed
+
+- The ⋯ menu on library videos lost its row padding and hover highlight.
+- Persian file names under a card lined up on the wrong side in the English
+  interface (and English names in the Persian one).
+
 ## 0.7.0 (2026-10-14)
 
 ### Added

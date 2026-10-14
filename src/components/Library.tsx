@@ -63,6 +63,11 @@ function baseName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+/** The name of the folder a file is in, usually the series. */
+function parentName(path: string): string {
+  return baseName(path.slice(0, path.lastIndexOf("/")));
+}
+
 /** "Movie.fa.mkv" → ["Movie.fa", ".mkv"]; a leading dot isn't an extension. */
 function splitName(name: string): [string, string] {
   const dot = name.lastIndexOf(".");
@@ -156,17 +161,23 @@ function menuRow(label: string, icon: string, keys: string | undefined, command:
   return {
     label,
     command,
-    template: (_item: MenuItem, o: MenuItemOptions) => (
-      <a className={`${o.className} gap-3 ${danger ? "text-red-400!" : ""}`}>
-        <span className={`${o.iconClassName} m-0! w-4 shrink-0 ${icon} ${danger ? "text-red-400!" : ""}`} />
-        <span className={`${o.labelClassName} flex-1 ${danger ? "text-red-400!" : ""}`}>{label}</span>
-        {keys && (
-          <span className="ps-6 text-xs text-zinc-500" dir="ltr">
-            {keys}
-          </span>
-        )}
-      </a>
-    ),
+    className: danger ? "danger" : undefined,
+    template: (_item: MenuItem, o: MenuItemOptions) => {
+      const link = (
+        <a className={`${o.className} gap-3`}>
+          <span className={`${o.iconClassName} m-0! w-4 shrink-0 ${icon}`} />
+          <span className={`${o.labelClassName} flex-1`}>{label}</span>
+          {keys && (
+            <span className="ps-6 text-xs text-zinc-500" dir="ltr">
+              {keys}
+            </span>
+          )}
+        </a>
+      );
+      // The popup Menu hands the template the whole item, the ContextMenu
+      // only the link inside it; the theme's padding and hover need the wrapper.
+      return "onMouseMove" in o ? <div className="p-menuitem-content">{link}</div> : link;
+    },
   };
 }
 
@@ -393,11 +404,11 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
             {shownRecent.length > 0 && (
               <section className="mb-12">
                 <SectionTitle>{t("recent")}</SectionTitle>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-5 gap-y-6">
+                <VideoGrid>
                   {shownRecent.map((r) => (
-                    <RecentCard key={r.path} video={fromRecent(r)} {...handlers} />
+                    <VideoCard key={r.path} video={fromRecent(r)} meta={parentName(r.path)} {...handlers} />
                   ))}
-                </div>
+                </VideoGrid>
               </section>
             )}
 
@@ -474,22 +485,31 @@ function MoreButton({ video, onMenu, className = "" }: { video: Video; onMenu: I
   );
 }
 
-function RecentCard({ video, ...h }: { video: Video } & ItemHandlers) {
+/** Continue watching and the open folder lay their videos out alike. */
+function VideoGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-5 gap-y-7">{children}</div>;
+}
+
+/** A video as a card: thumbnail, name, and a ⋯ button with its actions. */
+function VideoCard({ video, meta, ...h }: { video: Video; meta?: string } & ItemHandlers) {
   const label = progressLabel(video);
   const [stem] = splitName(video.name);
-  const folder = video.path.split("/").slice(-2, -1)[0] ?? "";
   const active = h.menuFor === video.path;
+  const editing = h.renaming === video.path;
+  const reveal = active ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+  // Names in either script line up with the page, not with their own direction.
+  const align = getLang() === "fa" ? "text-right" : "text-left";
 
   return (
     <article
       title={video.path}
-      className="group relative flex flex-col gap-3"
+      className="group relative flex min-w-0 flex-col gap-3"
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
         h.onMenu(video, e, true);
       }}
-      onKeyDown={(e) => h.renaming !== video.path && h.onKey(video, e)}
+      onKeyDown={(e) => !editing && h.onKey(video, e)}
     >
       <button
         type="button"
@@ -501,15 +521,13 @@ function RecentCard({ video, ...h }: { video: Video } & ItemHandlers) {
       >
         <div
           className={`overflow-hidden rounded-xl border transition ${
-            active ? "border-accent/60 shadow-lg shadow-black/40" : "border-ink-700 group-hover:border-accent/60 group-hover:shadow-lg group-hover:shadow-black/40"
+            active
+              ? "border-accent/60 shadow-lg shadow-black/40"
+              : "border-ink-700 group-hover:border-accent/60 group-hover:shadow-lg group-hover:shadow-black/40"
           }`}
         >
           <Thumbnail video={video}>
-            <div
-              className={`absolute inset-0 grid place-items-center bg-ink-950/35 transition ${
-                active ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-              }`}
-            >
+            <div className={`absolute inset-0 grid place-items-center bg-ink-950/35 transition ${reveal}`}>
               <span className="grid size-12 place-items-center rounded-full bg-accent text-ink-950">
                 <i className="pi pi-play ms-0.5" />
               </span>
@@ -523,23 +541,24 @@ function RecentCard({ video, ...h }: { video: Video } & ItemHandlers) {
         </div>
       </button>
 
-      {h.renaming === video.path ? (
+      {editing ? (
         <RenameField video={video} onSubmit={(s) => h.onRename(video, s)} onCancel={h.onCancelRename} />
       ) : (
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1">
           <button type="button" onClick={() => h.onPlay(video.path)} tabIndex={-1} className="min-w-0 flex-1 text-start">
-            <span className={`block truncate font-semibold ${video.fraction >= WATCHED ? "text-zinc-400" : ""}`} dir="auto">
+            <span
+              className={`line-clamp-2 font-semibold break-words ${align} ${video.fraction >= WATCHED ? "text-zinc-400" : ""}`}
+              dir="auto"
+            >
               {stem}
             </span>
-            <span className="block truncate text-sm text-zinc-400" dir="auto">
-              {folder}
-            </span>
+            {meta && (
+              <span className={`mt-0.5 block truncate text-sm text-zinc-400 ${align}`} dir="auto">
+                {meta}
+              </span>
+            )}
           </button>
-          <MoreButton
-            video={video}
-            onMenu={h.onMenu}
-            className={`-mt-1 -me-2 transition ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
-          />
+          <MoreButton video={video} onMenu={h.onMenu} className={`-mt-1.5 -me-2 transition ${reveal}`} />
         </div>
       )}
     </article>
@@ -553,131 +572,61 @@ interface FolderProps {
   handlers: ItemHandlers;
 }
 
+/** Subfolders as chips, then the folder's videos as cards. */
 function FolderView({ folder, hidden, onOpen, handlers }: FolderProps) {
-  const entries = folder.entries.filter((e) => !hidden.has(e.path));
+  const dirs = folder.entries.filter((e) => e.isDir);
+  const videos = folder.entries.filter((e) => !e.isDir && !hidden.has(e.path));
   return (
     <section>
-      <div className="mb-4 flex items-center gap-3">
-        <SectionTitle>{t("folder")}</SectionTitle>
-        <span className="mb-4 truncate text-xs text-zinc-500" dir="ltr">
+      <div className="mb-4 flex min-w-0 items-baseline gap-3">
+        <h2 className="m-0 shrink-0 text-sm font-semibold tracking-wide text-zinc-400">{t("folder")}</h2>
+        <span className="truncate text-xs text-zinc-500" dir="ltr">
           {folder.path}
         </span>
       </div>
-      <ul className="divide-y divide-ink-700 overflow-hidden rounded-xl border border-ink-700 bg-ink-850">
-        {folder.parent && (
-          <li>
-            <DirRow icon="pi pi-arrow-up" label={t("up")} muted onClick={() => onOpen(folder.parent!)} />
-          </li>
-        )}
-        {entries.map((e) => (
-          <li key={e.path}>
-            {e.isDir ? (
-              <DirRow icon="pi pi-folder" label={e.name} bold onClick={() => onOpen(e.path)} />
-            ) : (
-              <VideoRow video={fromEntry(e)} {...handlers} />
-            )}
-          </li>
-        ))}
-        {!entries.length && <li className="px-5 py-8 text-center text-zinc-500">{t("emptyFolder")}</li>}
-      </ul>
+
+      {(folder.parent || dirs.length > 0) && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {folder.parent && <FolderChip icon="pi pi-arrow-up" label={t("up")} muted onClick={() => onOpen(folder.parent!)} />}
+          {dirs.map((d) => (
+            <FolderChip key={d.path} icon="pi pi-folder" label={d.name} onClick={() => onOpen(d.path)} />
+          ))}
+        </div>
+      )}
+
+      {videos.length > 0 ? (
+        <VideoGrid>
+          {videos.map((e) => (
+            <VideoCard key={e.path} video={fromEntry(e)} {...handlers} />
+          ))}
+        </VideoGrid>
+      ) : (
+        !dirs.length && (
+          <p className="rounded-xl border border-dashed border-ink-600 px-5 py-10 text-center text-zinc-500">
+            {t("emptyFolder")}
+          </p>
+        )
+      )}
     </section>
   );
 }
 
-function VideoRow({ video, ...h }: { video: Video } & ItemHandlers) {
-  const label = progressLabel(video);
-  const watched = video.fraction >= WATCHED;
-  const active = h.menuFor === video.path;
-  const editing = h.renaming === video.path;
-  const reveal = active ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
-
-  return (
-    <div
-      className={`group flex items-center gap-2 pe-3 transition hover:bg-ink-800 focus-within:bg-ink-800 ${active || editing ? "bg-ink-800" : ""}`}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        h.onMenu(video, e, true);
-      }}
-      onKeyDown={(e) => !editing && h.onKey(video, e)}
-    >
-      {editing ? (
-        <div className="flex min-w-0 flex-1 items-center gap-4 px-5 py-2.5">
-          <Thumbnail video={video} small />
-          <div className="max-w-xl min-w-0 flex-1">
-            <RenameField video={video} onSubmit={(s) => h.onRename(video, s)} onCancel={h.onCancelRename} />
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => h.onPlay(video.path)}
-          className="flex min-w-0 flex-1 items-center gap-4 py-2.5 ps-5 text-start focus-visible:outline-none"
-        >
-          <Thumbnail video={video} small>
-            <div className={`absolute inset-0 grid place-items-center bg-ink-950/35 transition ${reveal}`}>
-              <span className="grid size-7 place-items-center rounded-full bg-accent text-ink-950">
-                <i className="pi pi-play ms-px text-xs" />
-              </span>
-            </div>
-          </Thumbnail>
-          <span className="min-w-0 flex-1">
-            <span className={`block truncate ${watched ? "text-zinc-400" : "font-medium"}`} dir="auto">
-              {video.name}
-            </span>
-            {label && <span className="block text-sm text-zinc-400">{label}</span>}
-          </span>
-        </button>
-      )}
-
-      {!editing && (
-        <div className={`flex shrink-0 items-center gap-0.5 transition ${reveal}`}>
-          <Button
-            icon="pi pi-pencil"
-            rounded
-            text
-            severity="secondary"
-            className="size-9!"
-            aria-label={t("rename")}
-            tooltip={`${t("rename")} (F2)`}
-            tooltipOptions={{ position: "top" }}
-            onClick={() => h.onAskRename(video)}
-          />
-          <Button
-            icon="pi pi-trash"
-            rounded
-            text
-            severity="secondary"
-            className="size-9!"
-            aria-label={t("moveToTrash")}
-            tooltip={`${t("trashConfirm")} (Del)`}
-            tooltipOptions={{ position: "top" }}
-            onClick={() => h.onAskTrash(video)}
-          />
-          <MoreButton video={video} onMenu={h.onMenu} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface DirRowProps {
+interface ChipProps {
   icon: string;
   label: string;
-  bold?: boolean;
   muted?: boolean;
   onClick: () => void;
 }
 
-function DirRow({ icon, label, bold, muted, onClick }: DirRowProps) {
+function FolderChip({ icon, label, muted, onClick }: ChipProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-4 px-5 py-3 text-start transition hover:bg-ink-800 focus-visible:bg-ink-800 focus-visible:outline-none"
+      className="flex h-10 max-w-72 items-center gap-2.5 rounded-lg border border-ink-700 bg-ink-850 px-3.5 text-start transition hover:border-ink-600 hover:bg-ink-800 focus-visible:outline-2 focus-visible:outline-accent"
     >
-      <i className={`${icon} ${muted ? "text-zinc-500" : "text-accent"}`} />
-      <span className={`flex-1 truncate ${bold ? "font-semibold" : ""} ${muted ? "text-zinc-400" : ""}`} dir="auto">
+      <i className={`${icon} text-sm ${muted ? "text-zinc-500" : "text-accent"}`} />
+      <span className={`truncate text-sm ${muted ? "text-zinc-400" : "font-medium"}`} dir="auto">
         {label}
       </span>
     </button>
