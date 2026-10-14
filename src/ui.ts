@@ -9,7 +9,13 @@ export function fmtTime(t: number): string {
   return `${sign}${hours ? `${hours}:` : ""}${mm}:${ss}`;
 }
 
-type ToastFn = (msg: string, ms: number) => void;
+/** A button on a toast, such as Undo. */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
+type ToastFn = (msg: string, ms: number, action?: ToastAction) => void;
 let showToast: ToastFn = (msg) => console.info(msg);
 
 /** Lets the React app route toasts to its PrimeReact `<Toast>`. */
@@ -17,8 +23,8 @@ export function setToastHandler(fn: ToastFn): void {
   showToast = fn;
 }
 
-export function toast(msg: string, ms = 1800): void {
-  showToast(msg, ms);
+export function toast(msg: string, ms = 1800, action?: ToastAction): void {
+  showToast(msg, ms, action);
 }
 
 /** Calls `fn` once things have been quiet for `ms`. */

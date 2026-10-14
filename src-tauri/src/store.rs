@@ -123,6 +123,27 @@ impl Store {
         Ok(())
     }
 
+    /// Drops one file's watch position, taking it off Continue watching.
+    pub fn forget_watch(&self, path: &str) -> Result<()> {
+        self.db().execute("DELETE FROM watch WHERE path = ?1", [path])?;
+        Ok(())
+    }
+
+    /// Points everything stored about renamed files at their new paths: the
+    /// watch position, added subtitles and saved vocabulary.
+    pub fn rename_paths(&self, moves: &[(String, String)]) -> Result<()> {
+        let mut db = self.db();
+        let tx = db.transaction()?;
+        for (from, to) in moves {
+            tx.execute("UPDATE OR REPLACE watch SET path = ?2 WHERE path = ?1", params![from, to])?;
+            tx.execute("UPDATE OR REPLACE added_subtitles SET video = ?2 WHERE video = ?1", params![from, to])?;
+            tx.execute("UPDATE OR REPLACE added_subtitles SET path = ?2 WHERE path = ?1", params![from, to])?;
+            tx.execute("UPDATE vocab SET video = ?2 WHERE video = ?1", params![from, to])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn recent(&self, limit: usize) -> Result<Vec<Recent>> {
         let db = self.db();
         let mut stmt = db.prepare(
@@ -320,6 +341,20 @@ mod tests {
         let recent = store.recent(10).unwrap();
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].title, "a");
+    }
+
+    #[test]
+    fn renaming_and_forgetting_files() {
+        let store = Store::in_memory().unwrap();
+        store.save_watch_state("/a.mkv", 10.0, 100.0).unwrap();
+        store.add_subtitle("/a.mkv", "/a.fa.srt").unwrap();
+        let moves = [("/a.mkv".to_string(), "/b.mkv".to_string()), ("/a.fa.srt".to_string(), "/b.fa.srt".to_string())];
+        store.rename_paths(&moves).unwrap();
+        assert!(store.watch_state("/a.mkv").unwrap().is_none());
+        assert_eq!(store.watch_state("/b.mkv").unwrap().unwrap().position, 10.0);
+        assert_eq!(store.added_subtitles("/b.mkv").unwrap(), ["/b.fa.srt"]);
+        store.forget_watch("/b.mkv").unwrap();
+        assert!(store.recent(10).unwrap().is_empty());
     }
 
     #[test]

@@ -3,6 +3,27 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.7.0 (2026-10-14)
+
+### Added
+
+- Thumbnails in the library. Continue watching cards show the frame where
+  you stopped, and folder rows show a small one, both with a progress bar
+  along the bottom edge. Thumbnails are made with ffmpeg in the background
+  and cached.
+- Actions on videos in the library, from the ⋯ button, a right-click or the
+  keyboard: Rename (F2), Show in folder, Remove from Continue watching and
+  Move to Trash (Delete). Folder rows also show rename and trash buttons on
+  hover.
+- Renaming edits the name in place and keeps the extension. Subtitle files
+  with the same name (`Movie.fa.srt` for `Movie.mkv`) are renamed with it,
+  and the watch position, added subtitles and saved words follow the new
+  name. Beyt won't overwrite a file that already has the new name.
+- Move to Trash asks first and can take the video's subtitle files along.
+  Files go to the desktop's Trash, not deleted. Removing a video from
+  Continue watching and moving it to the Trash both offer Undo for a few
+  seconds.
+
 ## 0.6.0 (2026-10-14)
 
 ### Added

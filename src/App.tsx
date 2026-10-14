@@ -1,4 +1,5 @@
-import { Toast } from "primereact/toast";
+import { Button } from "primereact/button";
+import { Toast, type ToastMessage } from "primereact/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, events } from "./api";
@@ -83,7 +84,29 @@ export function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    setToastHandler((msg, ms) => toastRef.current?.show({ severity: "secondary", detail: msg, life: ms }));
+    setToastHandler((msg, ms, action) => {
+      if (!action) {
+        toastRef.current?.show({ severity: "secondary", detail: msg, life: ms });
+        return;
+      }
+      const message: ToastMessage = { severity: "secondary", life: ms };
+      message.detail = (
+        <div className="flex items-center gap-4">
+          <span className="flex-1">{msg}</span>
+          <Button
+            label={action.label}
+            text
+            size="small"
+            className="-my-1 shrink-0"
+            onClick={() => {
+              action.run();
+              toastRef.current?.remove(message);
+            }}
+          />
+        </div>
+      );
+      toastRef.current?.show(message);
+    });
     void (async () => {
       const saved = await api.appSettings();
       loadSettings(saved);

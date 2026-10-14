@@ -3,6 +3,7 @@
 mod brightness;
 mod dict;
 mod info;
+mod library;
 mod media;
 mod player;
 mod store;
@@ -32,6 +33,8 @@ struct App {
     mpv: &'static Mpv,
     store: Store,
     cache_dir: PathBuf,
+    /// Cached video thumbnails for the library.
+    thumb_dir: PathBuf,
     initial_file: Option<PathBuf>,
     current: Mutex<Option<Current>>,
     /// Screenshots and audio clips of saved vocabulary.
@@ -459,6 +462,73 @@ fn recent_files(app: State<App>) -> Result<Vec<store::Recent>, String> {
     Ok(recent)
 }
 
+/// A cached frame of the video at `at` seconds (or 15% in), as a file path.
+#[tauri::command]
+async fn thumbnail(app: State<'_, App>, path: String, at: Option<f64>) -> Result<String, String> {
+    let cache = app.thumb_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || library::thumbnail(Path::new(&path), at, &cache))
+        .await
+        .map_err(err)?
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// Subtitle files that are renamed and trashed along with the video.
+#[tauri::command]
+fn video_sidecars(path: String) -> Vec<String> {
+    library::sidecars(Path::new(&path)).into_iter().map(|p| p.to_string_lossy().into_owned()).collect()
+}
+
+/// Renames a video and its subtitle files; returns the video's new path.
+/// Fails with `name-taken` when a file already has a new name.
+#[tauri::command]
+fn rename_video(app: State<App>, path: String, name: String) -> Result<String, String> {
+    if app.current().as_ref().is_some_and(|c| c.path == Path::new(&path)) {
+        return Err("This video is playing.".into());
+    }
+    let moves = library::rename(Path::new(&path), &name).map_err(|e| format!("{e:#}"))?;
+    let Some((_, to)) = moves.first() else { return Ok(path) };
+    let new_path = to.to_string_lossy().into_owned();
+    let moves: Vec<(String, String)> = moves
+        .iter()
+        .map(|(a, b)| (a.to_string_lossy().into_owned(), b.to_string_lossy().into_owned()))
+        .collect();
+    app.store.rename_paths(&moves).map_err(err)?;
+    Ok(new_path)
+}
+
+/// Moves a video, and its subtitle files if asked, to the Trash. Its watch
+/// position and saved words stay, in case it is restored.
+#[tauri::command]
+async fn trash_video(app: State<'_, App>, path: String, subtitles: bool) -> Result<(), String> {
+    let video = PathBuf::from(&path);
+    if app.current().as_ref().is_some_and(|c| c.path == video) {
+        return Err("This video is playing.".into());
+    }
+    let mut files = vec![video.clone()];
+    if subtitles {
+        files.extend(library::sidecars(&video));
+    }
+    tauri::async_runtime::spawn_blocking(move || library::trash(&files))
+        .await
+        .map_err(err)?
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// Takes a video off Continue watching, forgetting where it was stopped.
+#[tauri::command]
+fn forget_recent(app: State<App>, path: String) -> Result<(), String> {
+    app.store.forget_watch(&path).map_err(err)
+}
+
+#[tauri::command]
+async fn show_in_folder(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || library::show_in_folder(Path::new(&path)))
+        .await
+        .map_err(err)?
+        .map_err(|e| format!("{e:#}"))
+}
+
 #[tauri::command]
 fn next_video(path: String) -> Option<String> {
     media::next_video(Path::new(&path)).map(|p| p.to_string_lossy().into_owned())
@@ -614,6 +684,12 @@ fn main() {
             stop,
             list_folder,
             recent_files,
+            thumbnail,
+            video_sidecars,
+            rename_video,
+            trash_video,
+            forget_recent,
+            show_in_folder,
             next_video,
             save_series_settings,
             app_settings,
@@ -631,6 +707,7 @@ fn main() {
             log_to_file(&paths.app_data_dir()?);
             let store = Store::open(&paths.app_data_dir()?.join("beyt.db"))?;
             let cache_dir = paths.app_cache_dir()?.join("subtitles");
+            let thumb_dir = paths.app_cache_dir()?.join("thumbnails");
             let dictionary = dict::Dictionary::open(&paths.app_data_dir()?.join("dictionary.db"))
                 .inspect_err(|e| eprintln!("beyt: no offline dictionary ({e:#}); run scripts/build-dictionary.sh"))
                 .ok();
@@ -638,6 +715,7 @@ fn main() {
                 mpv,
                 store,
                 cache_dir,
+                thumb_dir,
                 vocab_media: paths.app_data_dir()?.join("vocab-media"),
                 initial_file: cli_file,
                 current: Mutex::new(None),

@@ -43,6 +43,15 @@ export const api = {
 
   listFolder: (path: string) => invoke<Folder>("list_folder", { path }),
   recentFiles: () => invoke<Recent[]>("recent_files"),
+  /** Path of a cached JPEG of the frame at `at` seconds (null: 15% in). */
+  thumbnail: (path: string, at: number | null) => invoke<string>("thumbnail", { path, at }),
+  /** Subtitle files that are renamed and trashed along with the video. */
+  videoSidecars: (path: string) => invoke<string[]>("video_sidecars", { path }),
+  /** Returns the new path. Fails with "name-taken" if the name is in use. */
+  renameVideo: (path: string, name: string) => invoke<string>("rename_video", { path, name }),
+  trashVideo: (path: string, subtitles: boolean) => invoke<void>("trash_video", { path, subtitles }),
+  forgetRecent: (path: string) => invoke<void>("forget_recent", { path }),
+  showInFolder: (path: string) => invoke<void>("show_in_folder", { path }),
   nextVideo: (path: string) => invoke<string | null>("next_video", { path }),
   saveSeriesSettings: (folder: string, settings: SeriesSettings) =>
     invoke<void>("save_series_settings", { folder, settings }),
