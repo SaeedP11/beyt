@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, type Brightness } from "./api";
 import * as clock from "./clock";
 import { activeCues, cueIndexAt, neighbourCue } from "./cues";
 import { languageName, t } from "./i18n";
@@ -9,6 +9,14 @@ import { getSettings } from "./settings";
 import { debounce, fmtTime, toast } from "./ui";
 
 const MODES: Mode[] = ["show", "blur", "hide"];
+
+/** A volume or brightness change, as the level indicator shows it. */
+export interface LevelChange {
+  kind: "volume" | "brightness";
+  level: number;
+  muted: boolean;
+  at: number;
+}
 
 /** One line of one subtitle track. */
 export interface PickedLine {
@@ -35,6 +43,9 @@ export class Player {
   private pendingLineEnd: number | null = null;
   /** The next episode, counting down to autoplay. */
   upNext: { path: string; name: string; seconds: number; total: number } | null = null;
+  /** The last volume or brightness change, for the level indicator. `at`
+      changes on every step, so the indicator stays up while a key is held. */
+  level: LevelChange | null = null;
   /** Bumped on every change the UI should show (tracks, styles, up next). */
   version = 0;
 
@@ -42,11 +53,59 @@ export class Player {
   private selected = 0;
   private eofHandled = false;
   private countdown: number | undefined;
+  private volume: { level: number; muted: boolean } | null = null;
+  /** Where the next brightness step should go, from the current level.
+      Steps made while one is being set are combined into the next. */
+  private brightnessTarget: ((now: number) => number) | null = null;
+  private brightnessBusy = false;
 
   subscribe = (fn: () => void): (() => void) => {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   };
+
+  private showVolume(change: { level?: number; muted?: boolean }): void {
+    this.volume = { level: getSettings().defaultVolume, muted: false, ...this.volume, ...change };
+    this.level = { kind: "volume", ...this.volume, at: performance.now() };
+    this.changed();
+  }
+
+  /** Changes the brightness by `delta` percent and shows the indicator. */
+  adjustBrightness(delta: number): void {
+    const prev = this.brightnessTarget;
+    this.brightnessTarget = (now) => (prev ? prev(now) : now) + delta;
+    void this.flushBrightness(true);
+  }
+
+  /** Sets the brightness to `level` percent; resolves to what was set. */
+  async setBrightness(level: number): Promise<Brightness | null> {
+    this.brightnessTarget = () => level;
+    return this.flushBrightness(false);
+  }
+
+  private async flushBrightness(show: boolean): Promise<Brightness | null> {
+    if (this.brightnessBusy) return null;
+    this.brightnessBusy = true;
+    let last: Brightness | null = null;
+    try {
+      while (this.brightnessTarget) {
+        const target = this.brightnessTarget;
+        this.brightnessTarget = null;
+        const now = await api.getBrightness();
+        last = await api.setBrightness(target(now.level));
+        if (show) {
+          this.level = { kind: "brightness", level: last.level, muted: false, at: performance.now() };
+          this.changed();
+        }
+      }
+    } catch (e) {
+      this.brightnessTarget = null;
+      toast(String(e), 5000);
+    } finally {
+      this.brightnessBusy = false;
+    }
+    return last;
+  }
 
   private changed(): void {
     this.version += 1;
@@ -352,10 +411,14 @@ export class Player {
       case "volumeDown":
         void api
           .adjustProperty("volume", action === "volumeUp" ? 5 : -5)
-          .then((n) => toast(t("volumeToast", { n: Math.round(n) })));
+          .then((n) => this.showVolume({ level: Math.round(n) }));
         break;
       case "mute":
-        void api.toggleMute().then((muted) => toast(muted ? t("muted") : t("unmuted")));
+        void api.toggleMute().then((muted) => this.showVolume({ muted }));
+        break;
+      case "brightnessUp":
+      case "brightnessDown":
+        this.adjustBrightness(action === "brightnessUp" ? 5 : -5);
         break;
       case "speedUp":
       case "speedDown":

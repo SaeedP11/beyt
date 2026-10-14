@@ -1,5 +1,6 @@
 // Beyt: a dual-subtitle video player for language learning.
 
+mod brightness;
 mod dict;
 mod info;
 mod media;
@@ -356,6 +357,17 @@ async fn adjust_property(app: State<'_, App>, name: String, delta: f64) -> Resul
     Ok(next)
 }
 
+/// The backlight level, or mpv's picture brightness without a backlight.
+#[tauri::command]
+async fn get_brightness(app: State<'_, App>) -> Result<brightness::Brightness, String> {
+    brightness::get(app.mpv).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+async fn set_brightness(app: State<'_, App>, level: f64) -> Result<brightness::Brightness, String> {
+    brightness::set(app.mpv, level).map_err(|e| format!("{e:#}"))
+}
+
 #[tauri::command]
 async fn toggle_mute(app: State<'_, App>) -> Result<bool, String> {
     app.mpv.command("cycle", &["mute"]).map_err(|e| format!("{e:?}"))?;
@@ -594,6 +606,8 @@ fn main() {
             set_mpv_option,
             adjust_property,
             toggle_mute,
+            get_brightness,
+            set_brightness,
             clear_watch_history,
             clear_subtitle_cache,
             data_info,

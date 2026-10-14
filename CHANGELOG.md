@@ -3,6 +3,24 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.5.0 (2026-10-14)
+
+### Added
+
+- Screen brightness control. On laptops it sets the screen's backlight
+  (through logind, so no root or extra setup is needed). On external
+  monitors, which have no backlight Beyt can reach, it changes the
+  picture's brightness instead, from 50% to 115%. Change it with
+  Shift+↑ / Shift+↓ (rebindable), by scrolling over the left edge of the
+  video (the right edge in Persian), or with the slider in Settings →
+  Playback. The backlight stays where you leave it after Beyt closes.
+
+### Changed
+
+- Volume and mute no longer stack up toasts while a key is held. A small
+  indicator under the title bar shows the level, updates in place, and
+  fades out shortly after the last press. Brightness uses it too.
+
 ## 0.4.3 (2026-10-13)
 
 ### Fixed

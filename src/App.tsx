@@ -12,6 +12,7 @@ import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SubtitlePanel } from "./components/SubtitlePanel";
 import { Transcript } from "./components/Transcript";
 import { UpNextCard } from "./components/UpNextCard";
+import { LevelIndicator } from "./components/LevelIndicator";
 import { WordPopup, type WordPopupHandle } from "./components/WordPopup";
 import { player, useLang } from "./hooks";
 import { type Action, bindingTable, eventKey } from "./keymap";
@@ -23,6 +24,10 @@ type Screen = "loading" | "library" | "player";
 
 /** Actions that work on the library screen too. */
 const GLOBAL_ACTIONS = new Set<Action>(["help", "settings", "fullscreen", "quit", "back"]);
+/** Width of the strip at the start edge where scrolling sets the brightness. */
+const EDGE = 0.2;
+/** Wheel distance for one brightness step (about one mouse wheel notch). */
+const WHEEL_STEP = 50;
 
 export function App() {
   const lang = useLang();
@@ -190,8 +195,27 @@ export function App() {
 
   const rtl = lang === "fa";
 
+  /** Scrolling over the start edge of the video changes the brightness. */
+  const wheelSum = useRef(0);
+  const onWheel = (e: React.WheelEvent) => {
+    // Only over the bare video, not the controls, panels or subtitles.
+    if (e.target !== e.currentTarget) return;
+    const fromStart = rtl ? window.innerWidth - e.clientX : e.clientX;
+    if (fromStart > window.innerWidth * EDGE) return;
+    wheelSum.current += e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 40 : e.deltaY;
+    // A wheel notch is a step; touchpads add up small deltas to one.
+    const steps = Math.trunc(wheelSum.current / WHEEL_STEP);
+    if (!steps) return;
+    wheelSum.current -= steps * WHEEL_STEP;
+    player.adjustBrightness(-steps * 5);
+  };
+
   return (
-    <div className="relative h-full text-zinc-100" onMouseMove={screen === "player" ? wake : undefined}>
+    <div
+      className="relative h-full text-zinc-100"
+      onMouseMove={screen === "player" ? wake : undefined}
+      onWheel={screen === "player" ? onWheel : undefined}
+    >
       {/* TrackView draws subtitle lines into these two stacks. */}
       <div id="subs-top" className="sub-stack top" onClick={pickWord} />
       <div id="subs-bottom" className="sub-stack bottom" onClick={pickWord} />
@@ -209,6 +233,7 @@ export function App() {
       )}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
       <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={() => setTranscriptOpen(false)} />
+      {screen === "player" && <LevelIndicator />}
       <UpNextCard />
       <WordPopup ref={wordPopup} />
 

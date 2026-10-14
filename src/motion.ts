@@ -142,3 +142,10 @@ export const popupMotions = {
   contextMenu: popupMotion("p-contextmenu"),
   toast: popupMotion("p-toast-message", drawToast, 250, 200),
 };
+
+/** Fades `el` in or out over `ms`, from wherever its opacity is now. */
+export function fade(el: HTMLElement, show: boolean, ms: number): void {
+  const from = parseFloat(el.style.opacity || "1");
+  const to = show ? 1 : 0;
+  animate(el, (e, shown) => (e.style.opacity = String(from + (to - from) * (show ? shown : 1 - shown))), !show, ms);
+}

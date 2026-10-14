@@ -12,7 +12,8 @@ import { SelectButton } from "primereact/selectbutton";
 import { Slider } from "primereact/slider";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { api } from "../api";
+import { type Brightness, api } from "../api";
+import { player } from "../hooks";
 import { type StringKey, languageName, t } from "../i18n";
 import { ACTIONS, type Action, DEFAULT_KEYS, GROUPS, eventKey, keysFor } from "../keymap";
 import { type Settings, type SubtitleDefault, resetSettings, updateSettings, useSettings } from "../settings";
@@ -212,7 +213,29 @@ function Playback() {
       <Row label={t("defaultVolume")}>
         <SliderValue value={s.defaultVolume} min={0} max={130} step={5} format={(v) => `${v}%`} onChange={(v) => updateSettings({ defaultVolume: v })} />
       </Row>
+      <BrightnessRow />
     </>
+  );
+}
+
+/** The screen's brightness right now (not a saved setting): the backlight,
+    or the picture where there is none. Hidden if neither can be read. */
+function BrightnessRow() {
+  const [b, setB] = useState<Brightness | null>(null);
+  useEffect(() => {
+    api.getBrightness().then(setB, () => setB(null));
+  }, []);
+  if (!b) return null;
+
+  const backlight = b.source === "backlight";
+  const change = (level: number) => {
+    setB({ ...b, level });
+    void player.setBrightness(level);
+  };
+  return (
+    <Row label={t("brightness")} hint={t(backlight ? "brightnessBacklightHint" : "brightnessVideoHint")}>
+      <SliderValue value={b.level} min={backlight ? 5 : 50} max={backlight ? 100 : 115} step={5} format={(v) => `${v}%`} onChange={change} />
+    </Row>
   );
 }
 

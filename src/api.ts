@@ -60,11 +60,20 @@ export const api = {
     invoke<void>("set_mpv_option", { name, value }),
   adjustProperty: (name: "volume" | "speed", delta: number) => invoke<number>("adjust_property", { name, delta }),
   toggleMute: () => invoke<boolean>("toggle_mute"),
+  /** The backlight, or mpv's picture brightness on screens without one. */
+  getBrightness: () => invoke<Brightness>("get_brightness"),
+  /** Clamped to what the source allows; returns the level actually set. */
+  setBrightness: (level: number) => invoke<Brightness>("set_brightness", { level }),
   clearWatchHistory: () => invoke<void>("clear_watch_history"),
   clearSubtitleCache: () => invoke<void>("clear_subtitle_cache"),
   dataInfo: () => invoke<{ dataDir: string; dictionaryEntries: number | null }>("data_info"),
   logError: (message: string) => invoke<void>("log_error", { message }),
 };
+
+export interface Brightness {
+  level: number;
+  source: "backlight" | "video";
+}
 
 export interface AnkiConfig {
   url: string;

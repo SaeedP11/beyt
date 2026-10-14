@@ -1,6 +1,6 @@
 [package]
 name = "beyt"
-version = "0.4.3"
+version = "0.5.0"
 description = "A dual-subtitle video player for language learning"
 license = "GPL-3.0-or-later"
 edition = "2024"
@@ -25,6 +25,8 @@ chardetng = "1"
 encoding_rs = "0.8"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 tauri-plugin-dialog = "2"
+# Asks logind to set the laptop backlight (already linked by Tauri's deps).
+dbus = "0.9"
 # Only talks to AnkiConnect on localhost, so no TLS.
 ureq = { version = "3.4.2", default-features = false, features = ["json"] }
 

@@ -11,6 +11,8 @@ export const ACTIONS = [
   { id: "volumeUp", group: "playback", keys: ["ArrowUp"] },
   { id: "volumeDown", group: "playback", keys: ["ArrowDown"] },
   { id: "mute", group: "playback", keys: ["m"] },
+  { id: "brightnessUp", group: "playback", keys: ["Shift+ArrowUp"] },
+  { id: "brightnessDown", group: "playback", keys: ["Shift+ArrowDown"] },
   { id: "speedDown", group: "playback", keys: ["-"] },
   { id: "speedUp", group: "playback", keys: ["="] },
   { id: "speedReset", group: "playback", keys: ["0"] },
