@@ -3,6 +3,16 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.11.2 (2026-10-15)
+
+### Changed
+
+- Beyt has its own icon: the بیت wordmark over two subtitle lines, on
+  Android (with adaptive and themed versions) and on the desktop. The old
+  desktop icon showed empty boxes, since it was drawn with a font that has
+  no Persian letters. `scripts/make-icons.sh` renders all of them from
+  `src-tauri/icons/design/`.
+
 ## 0.11.1 (2026-10-15)
 
 ### Fixed

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Android 13+ themed icon: foreground.svg in one colour; the launcher
+       tints it to match the wallpaper. -->
+  <g transform="translate(512 512) scale(0.76) translate(-512 -525)" fill="#ffffff">
+    <text x="512" y="483" font-family="Vazirmatn" font-weight="900" font-size="380"
+          text-anchor="middle" direction="rtl">بیت</text>
+    <rect x="242" y="640" width="540" height="46" rx="23"/>
+    <rect x="322" y="718" width="380" height="46" rx="23" opacity="0.7"/>
+  </g>
+</svg>

@@ -50,6 +50,7 @@ nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node, pnpm
 pnpm install
 ./scripts/make-sample.sh         # sample videos + EN/FA subtitles
 ./scripts/build-dictionary.sh    # optional: the dictionary, without going through the app
+./scripts/make-icons.sh          # after editing src-tauri/icons/design/*.svg
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"
 ```
 

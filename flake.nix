@@ -72,7 +72,7 @@
 
         beyt = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "beyt";
-          version = "0.11.1";
+          version = "0.11.2";
           # Flakes only see files tracked by git, so samples/, data/ and
           # build output stay out of the build.
           src = ./.;
@@ -160,6 +160,8 @@
             nodejs
             typescript
             pnpm
+            # scripts/make-icons.sh: renders the icon SVGs, Persian text included.
+            librsvg
           ];
           buildInputs = libs;
 
