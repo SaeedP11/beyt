@@ -3,7 +3,7 @@ import { OverlayPanel } from "primereact/overlaypanel";
 import { Tag } from "primereact/tag";
 import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { api } from "../api";
+import { api, isAndroid } from "../api";
 import * as clock from "../clock";
 import { markDictionaryMissing, useDictionary } from "../dictionary";
 import { popupMotions } from "../motion";
@@ -14,6 +14,7 @@ import { type StringKey, t } from "../i18n";
 import type { Lookup, PickedWord } from "../types";
 import { toast } from "../ui";
 import { DictionaryInstallCard } from "./DictionaryInstall";
+import { WordSheet } from "./WordSheet";
 
 export interface WordPopupHandle {
   /** `event` may be a native one: the right-click menu opens the popup too. */
@@ -67,11 +68,12 @@ function posLabel(pos: string): string {
   return label === key ? pos : label;
 }
 
-/** Dictionary popup for a clicked subtitle word. Pauses while open. */
+/** Dictionary popup for a clicked subtitle word (a sheet on phones). Pauses while open. */
 export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   const panel = useRef<OverlayPanel>(null);
   const target = useRef<HTMLElement | null>(null);
   const resumeOnClose = useRef(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [picked, setPicked] = useState<PickedWord | null>(null);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [saved, setSaved] = useState(false);
@@ -110,9 +112,14 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
       setPicked(word);
       setState({ kind: "loading" });
       setSaved(false);
-      panel.current?.show(event as unknown as React.SyntheticEvent, el);
-      // Already open on another word: PrimeReact just re-aligned it below.
-      reposition();
+      if (isAndroid) {
+        // Already open on another word: the sheet stays and shows this one.
+        setSheetOpen(true);
+      } else {
+        panel.current?.show(event as unknown as React.SyntheticEvent, el);
+        // Already open on another word: PrimeReact just re-aligned it below.
+        reposition();
+      }
       lookUp(word);
     },
   }));
@@ -154,6 +161,11 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
     }
   };
 
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    onHide();
+  }, []);
+
   const lookup = state.kind === "done" ? state.lookup : null;
   const showsPersian = picked?.lang !== "fa";
 
@@ -178,63 +190,94 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
     }
   };
 
+  const body = picked && (
+    <div ref={isAndroid ? undefined : watchSize} className="flex min-h-0 flex-1 flex-col">
+      {/* On a phone, the header is also where the sheet is dragged closed. */}
+      <div
+        className={`flex items-start gap-2 border-b border-ink-700 ${isAndroid ? "px-5 pt-1 pb-3" : "px-4 py-3"}`}
+        data-sheet-drag
+      >
+        <div className="min-w-0 flex-1">
+          <div className={`font-semibold break-words ${isAndroid ? "text-2xl" : "text-xl"}`} dir="auto">
+            {lookup?.word ?? picked.word}
+          </div>
+          {lookup?.matched && lookup.matched !== lookup.word.toLowerCase() && (
+            <div className="text-xs text-zinc-400" dir="ltr">
+              → {lookup.matched}
+            </div>
+          )}
+        </div>
+        {isAndroid && (
+          <Button
+            icon="pi pi-times"
+            rounded
+            text
+            severity="secondary"
+            aria-label={t("close")}
+            className="-me-2 h-10 w-10 shrink-0"
+            onClick={closeSheet}
+          />
+        )}
+      </div>
+
+      <div
+        className={`overflow-y-auto overscroll-contain ${isAndroid ? "min-h-0 flex-1 px-5 py-4" : "max-h-[min(18rem,calc(100dvh-12rem))] px-4 py-3"}`}
+      >
+        {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
+        {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
+        {state.kind === "missing" && <DictionaryInstallCard />}
+        {lookup && lookup.entries.length === 0 && <p className="text-sm text-zinc-400">{t("noMatch")}</p>}
+        {lookup && lookup.entries.length > 0 && (
+          <ul className={`flex flex-col ${isAndroid ? "gap-4" : "gap-3"}`}>
+            {lookup.entries.map((e, i) => (
+              <li key={i} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={showsPersian ? "text-2xl font-semibold text-accent" : "text-lg font-semibold"}
+                    dir={showsPersian ? "rtl" : "auto"}
+                    lang={showsPersian ? "fa" : undefined}
+                  >
+                    {showsPersian ? e.fa : e.glosses[0]}
+                  </span>
+                  <Tag value={posLabel(e.pos)} severity="secondary" className="text-[0.65rem]" />
+                </div>
+                <div className="text-sm text-zinc-400" dir="ltr">
+                  {e.roman && <span className="me-2 italic text-zinc-500">{e.roman}</span>}
+                  {(showsPersian ? e.glosses : e.glosses.slice(1)).slice(0, 3).join(" · ")}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className={`flex items-center gap-3 border-t border-ink-700 ${isAndroid ? "px-5 py-3" : "px-4 py-2"}`}>
+        <span className="flex-1 text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
+        <Button
+          icon={saved ? "pi pi-check" : "pi pi-bookmark"}
+          label={saved ? t("saved") : t("saveWord")}
+          size={isAndroid ? undefined : "small"}
+          severity={saved ? "success" : undefined}
+          disabled={saved || state.kind === "loading"}
+          onClick={() => void save()}
+        />
+      </div>
+    </div>
+  );
+
+  // A phone gets a sheet from the screen's edge instead: a popup next to a
+  // fingertip-sized word sits under the finger and leaves little room.
+  if (isAndroid) {
+    return (
+      <WordSheet open={sheetOpen} onClose={closeSheet}>
+        {body}
+      </WordSheet>
+    );
+  }
+
   return (
     <OverlayPanel ref={panel} transitionOptions={popupMotions.overlayPanel} onHide={onHide} className="w-[min(22rem,90vw)]" pt={{ content: { className: "p-0" } }}>
-      {picked && (
-        <div ref={watchSize} className="flex flex-col">
-          <div className="border-b border-ink-700 px-4 py-3">
-            <div className="text-xl font-semibold" dir="auto">
-              {lookup?.word ?? picked.word}
-            </div>
-            {lookup?.matched && lookup.matched !== lookup.word.toLowerCase() && (
-              <div className="text-xs text-zinc-400" dir="ltr">
-                → {lookup.matched}
-              </div>
-            )}
-          </div>
-
-          <div className="max-h-[min(18rem,calc(100dvh-12rem))] overflow-y-auto px-4 py-3">
-            {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
-            {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
-            {state.kind === "missing" && <DictionaryInstallCard />}
-            {lookup && lookup.entries.length === 0 && <p className="text-sm text-zinc-400">{t("noMatch")}</p>}
-            {lookup && lookup.entries.length > 0 && (
-              <ul className="flex flex-col gap-3">
-                {lookup.entries.map((e, i) => (
-                  <li key={i} className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={showsPersian ? "text-2xl font-semibold text-accent" : "text-lg font-semibold"}
-                        dir={showsPersian ? "rtl" : "auto"}
-                        lang={showsPersian ? "fa" : undefined}
-                      >
-                        {showsPersian ? e.fa : e.glosses[0]}
-                      </span>
-                      <Tag value={posLabel(e.pos)} severity="secondary" className="text-[0.65rem]" />
-                    </div>
-                    <div className="text-sm text-zinc-400" dir="ltr">
-                      {e.roman && <span className="me-2 italic text-zinc-500">{e.roman}</span>}
-                      {(showsPersian ? e.glosses : e.glosses.slice(1)).slice(0, 3).join(" · ")}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 border-t border-ink-700 px-4 py-2">
-            <span className="flex-1 text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
-            <Button
-              icon={saved ? "pi pi-check" : "pi pi-bookmark"}
-              label={saved ? t("saved") : t("saveWord")}
-              size="small"
-              severity={saved ? "success" : undefined}
-              disabled={saved || state.kind === "loading"}
-              onClick={() => void save()}
-            />
-          </div>
-        </div>
-      )}
+      {body}
     </OverlayPanel>
   );
 }

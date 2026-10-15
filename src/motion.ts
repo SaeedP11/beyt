@@ -143,6 +143,39 @@ export const popupMotions = {
   toast: popupMotion("p-toast-message", drawToast, 250, 200),
 };
 
+/** The window edge a sheet slides from. */
+export type SheetEdge = "bottom" | "left" | "right";
+
+/** How far `sheet` is pushed off its edge, from 0 (fully out) to 1 (hidden). */
+export function sheetOffset(sheet: HTMLElement, edge: SheetEdge): number {
+  const m = new DOMMatrixReadOnly(getComputedStyle(sheet).transform);
+  const size = edge === "bottom" ? sheet.offsetHeight : sheet.offsetWidth;
+  const moved = edge === "bottom" ? m.m42 : edge === "right" ? m.m41 : -m.m41;
+  return size ? Math.min(1, Math.max(0, moved / size)) : 1;
+}
+
+/** Puts `sheet` at `offset` (see `sheetOffset`) and dims `scrim` to match. */
+export function placeSheet(sheet: HTMLElement, scrim: HTMLElement | null, edge: SheetEdge, offset: number): void {
+  const axis = edge === "bottom" ? "Y" : "X";
+  const sign = edge === "left" ? -1 : 1;
+  sheet.style.transform = offset === 0 ? "" : `translate${axis}(${sign * offset * 100}%)`;
+  if (scrim) scrim.style.opacity = String(1 - offset);
+}
+
+/** Slides a sheet out from its window edge (`show`) or back into it, from
+    wherever it is now, so a sheet let go mid-drag carries on from the finger. */
+export function slideSheet(sheet: HTMLElement, scrim: HTMLElement | null, edge: SheetEdge, show: boolean): void {
+  const from = sheetOffset(sheet, edge);
+  const to = show ? 0 : 1;
+  const ms = (show ? 280 : 200) * Math.max(0.4, Math.abs(to - from));
+  animate(
+    sheet,
+    (el, shown, closing) => placeSheet(el, scrim, edge, from + (to - from) * (closing ? 1 - shown : shown)),
+    !show,
+    ms,
+  );
+}
+
 /** Fades `el` in or out over `ms`, from wherever its opacity is now. */
 export function fade(el: HTMLElement, show: boolean, ms: number): void {
   const from = parseFloat(el.style.opacity || "1");

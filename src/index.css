@@ -81,12 +81,64 @@ body.idle {
   display: block;
   unicode-bidi: plaintext;
 }
-.track .line span {
-  padding: 0 0.04em;
-  border-radius: 3px;
+/* A word you can look up. Hovering draws an underline that grows out from
+   its centre over a faint tint; clicking fills the underline up into an
+   accent pill, which drains back down when the popup closes. Only the
+   backgrounds change: they're repainted, never composited, so WebKitGTK
+   draws them on time over the video (see motion.ts). The padding reaches
+   past the word without moving the text, for a roomier pill and target. */
+.track .word {
+  --word-accent: 96 165 250;
+  padding: 0.06em 0.14em;
+  margin-inline: -0.1em;
+  border-radius: 0.32em;
+  cursor: pointer;
+  background-color: rgb(255 255 255 / 0);
+  background-image:
+    linear-gradient(rgb(var(--word-accent) / 0.5), rgb(var(--word-accent) / 0.5)),
+    linear-gradient(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.85));
+  background-repeat: no-repeat;
+  background-origin: border-box, content-box;
+  background-clip: border-box, content-box;
+  background-position: 50% 100%;
+  background-size: 100% 0, 0 0.07em;
+  /* Leaving: quick, so the highlight never trails the pointer. */
+  transition:
+    background-size 160ms cubic-bezier(0.4, 0, 1, 1),
+    background-color 160ms ease-out;
 }
-.track .line span:hover {
-  background: rgb(255 255 255 / 0.18);
+@media (hover: hover) {
+  .track .word:hover {
+    background-color: rgb(255 255 255 / 0.1);
+    background-size: 100% 0, 100% 0.07em;
+    transition:
+      background-size 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 120ms ease-out;
+  }
+}
+/* Pressed: answers the touch at once, before the popup opens. */
+.track .word:active {
+  background-color: rgb(255 255 255 / 0.22);
+  transition-duration: 0ms;
+}
+/* Looked up, while its popup is open. */
+.track .word.picked {
+  background-color: rgb(255 255 255 / 0);
+  background-size: 100% 100%, 0 0.07em;
+  transition:
+    background-size 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 300ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .track .word,
+  .track .word:hover,
+  .track .word.picked {
+    transition-duration: 0ms;
+  }
+}
+/* A blurred track stays clear while one of its words is looked up. */
+.track.blur:has(.picked) {
+  filter: none;
 }
 .track.rtl {
   font-family: var(--sub-font-persian);
@@ -203,13 +255,6 @@ body.idle {
 .p-menu {
   max-height: calc(100dvh - 1rem);
   overflow-y: auto;
-}
-
-.track .line span.picked {
-  background: rgb(96 165 250 / 0.45);
-}
-.track .line span:not(.line) {
-  cursor: pointer;
 }
 
 .beyt-tabs .p-tabview-nav,

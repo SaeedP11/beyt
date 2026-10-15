@@ -140,7 +140,7 @@ function playerItems(
   // A subtitle line under the pointer comes first: that's what was clicked.
   const line = target.closest(".track .line") ? player.lineAt(target) : null;
   if (line) {
-    const isWord = target.tagName === "SPAN" && !target.classList.contains("line");
+    const isWord = target.classList.contains("word");
     const word = isWord ? (target.textContent ?? "").trim() : "";
     if (word) {
       // After the menu's own click has finished, or the popup would see it as an outside click.
