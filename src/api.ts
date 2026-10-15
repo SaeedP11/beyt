@@ -55,6 +55,8 @@ export const api = {
   requestStorageAccess: () => invoke<void>("request_storage_access"),
   /** Android: sends Beyt to the background, as Back does in other apps. */
   moveToBackground: () => invoke<void>("move_to_background"),
+  /** A physical keyboard is attached (always true on the desktop). */
+  hardKeyboard: () => invoke<boolean>("hard_keyboard"),
   recentFiles: () => invoke<Recent[]>("recent_files"),
   /** Path of a cached JPEG of the frame at `at` seconds (null: 15% in). */
   thumbnail: (path: string, at: number | null) => invoke<string>("thumbnail", { path, at }),
@@ -113,4 +115,7 @@ export const events = {
   /** Fraction downloaded, or null when the size isn't known. */
   dictionaryProgress: (cb: (fraction: number | null) => void): Promise<UnlistenFn> =>
     listen<number | null>("dictionary-progress", (e) => cb(e.payload)),
+  /** Android: a physical keyboard was plugged in (true) or removed (false). */
+  hardKeyboard: (cb: (attached: boolean) => void): Promise<UnlistenFn> =>
+    listen<boolean>("hard-keyboard", (e) => cb(e.payload)),
 };

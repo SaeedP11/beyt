@@ -688,6 +688,16 @@ async fn move_to_background() -> Result<(), String> {
     Ok(())
 }
 
+/// Whether a physical keyboard is attached; the `hard-keyboard` event follows
+/// changes. Desktops are taken to always have one.
+#[tauri::command]
+fn hard_keyboard() -> bool {
+    #[cfg(target_os = "android")]
+    return player::hard_keyboard();
+    #[cfg(not(target_os = "android"))]
+    true
+}
+
 #[tauri::command]
 fn quit(app: State<App>, handle: AppHandle) {
     app.save_position();
@@ -809,6 +819,7 @@ pub fn run() {
             storage_access,
             request_storage_access,
             move_to_background,
+            hard_keyboard,
         ])
         .setup(move |app| {
             let paths = app.path();

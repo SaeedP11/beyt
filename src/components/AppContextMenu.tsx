@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
 import * as clock from "../clock";
-import { player } from "../hooks";
+import { hasHardKeyboard, player } from "../hooks";
 import { t } from "../i18n";
 import { type Action, type Keymap, keyParts, keysFor } from "../keymap";
 import { popupMotions } from "../motion";
@@ -96,9 +96,14 @@ function actionRow(action: Action, label: string, icon: string | null, keymap: K
   return row(label, icon, keysFor(action, keymap)[0], () => run(action));
 }
 
+/** Keyboard shortcuts, offered only when there is a keyboard to press them on. */
+function helpRow(keymap: Keymap, run: (a: Action) => void): MenuItem[] {
+  return hasHardKeyboard() ? [actionRow("help", t("shortcutsTitle"), "pi pi-question-circle", keymap, run)] : [];
+}
+
 function libraryItems(keymap: Keymap, run: (a: Action) => void): MenuItem[] {
   return [
-    actionRow("help", t("shortcutsTitle"), "pi pi-question-circle", keymap, run),
+    ...helpRow(keymap, run),
     actionRow("settings", t("settings"), "pi pi-cog", keymap, run),
     actionRow("fullscreen", t("fullscreen"), "pi pi-window-maximize", keymap, run),
     { separator: true },
@@ -139,7 +144,9 @@ function playerItems(
   );
   if (!line) items.push(actionRow("replayLine", t("act_replayLine"), "pi pi-replay", keymap, run));
   items.push(
-    actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run),
+    ...(player.selectedView()
+      ? [actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run)]
+      : []),
     row(
       `${t("speed")}: ${Math.abs(speed - 1) < 0.01 ? t("speedNormal") : `${speed.toFixed(2).replace(/0$/, "")}×`}`,
       "pi pi-gauge",
@@ -160,7 +167,7 @@ function playerItems(
     actionRow("info", t("fileInfo"), "pi pi-info-circle", keymap, run),
     { separator: true },
     actionRow("fullscreen", t("fullscreen"), "pi pi-window-maximize", keymap, run),
-    actionRow("help", t("shortcutsTitle"), "pi pi-question-circle", keymap, run),
+    ...helpRow(keymap, run),
     actionRow("settings", t("settings"), "pi pi-cog", keymap, run),
     { separator: true },
     // Not the "back" action: with a panel open that only closes the panel.

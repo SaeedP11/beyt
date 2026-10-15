@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { api, events, isAndroid } from "./api";
 import * as clock from "./clock";
 import { getLang, subscribeLang } from "./i18n";
 import { Player } from "./player";
@@ -28,6 +29,35 @@ export function useMediaQuery(query: string): boolean {
       return () => list.removeEventListener("change", onChange);
     },
     () => window.matchMedia(query).matches,
+  );
+}
+
+// Desktops always have a keyboard; Android reports one once it is plugged in.
+let hardKeyboard = !isAndroid;
+const keyboardListeners = new Set<() => void>();
+function setHardKeyboard(attached: boolean): void {
+  if (attached === hardKeyboard) return;
+  hardKeyboard = attached;
+  keyboardListeners.forEach((l) => l());
+}
+if (isAndroid) {
+  // Listen first, so a change during the first read isn't lost.
+  void events.hardKeyboard(setHardKeyboard).then(() => api.hardKeyboard().then(setHardKeyboard, () => {}));
+}
+
+/** True while a physical keyboard is attached, so keyboard shortcuts are worth showing. */
+export function hasHardKeyboard(): boolean {
+  return hardKeyboard;
+}
+
+/** `hasHardKeyboard`, re-rendering when a keyboard is plugged in or removed. */
+export function useHardKeyboard(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      keyboardListeners.add(onChange);
+      return () => keyboardListeners.delete(onChange);
+    },
+    hasHardKeyboard,
   );
 }
 

@@ -3,6 +3,23 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.14.4 (2026-10-15)
+
+### Fixed
+
+- The Pause after each line button and menu item no longer appear when
+  no subtitle is loaded, since there are no lines to pause after. Pressing
+  P without a subtitle now says to add one instead of switching on an
+  auto-pause that never pauses.
+
+## 0.14.3 (2026-10-15)
+
+### Changed
+
+- On Android, the Keyboard shortcuts button and menu items only appear
+  while a physical keyboard is connected, over USB or Bluetooth. Plug one
+  in and they show up straight away; unplug it and they go again.
+
 ## 0.14.2 (2026-10-15)
 
 ### Changed
