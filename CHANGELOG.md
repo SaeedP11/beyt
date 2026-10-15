@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.14.2 (2026-10-15)
+
+### Changed
+
+- On Android, Beyt now runs full screen: the status bar and the navigation
+  bar stay hidden, leaving the whole screen for your videos and subtitles.
+  Swipe in from the top or bottom edge to show them for a moment.
+
 ## 0.14.0 (2026-10-15)
 
 ### Added
