@@ -497,6 +497,11 @@ async fn list_folder(app: State<'_, App>, path: String) -> Result<serde_json::Va
 }
 
 #[tauri::command]
+async fn list_subtitle_folder(path: String) -> Result<media::Folder, String> {
+    media::list_subtitle_folder(Path::new(&path)).map_err(err)
+}
+
+#[tauri::command]
 fn recent_files(app: State<App>) -> Result<Vec<store::Recent>, String> {
     let mut recent = app.store.recent(30).map_err(err)?;
     recent.retain(|r| Path::new(&r.path).is_file());
@@ -797,6 +802,7 @@ pub fn run() {
             data_info,
             stop,
             list_folder,
+            list_subtitle_folder,
             recent_files,
             thumbnail,
             video_sidecars,

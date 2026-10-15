@@ -50,6 +50,8 @@ export const api = {
   vocabMediaDir: () => invoke<string>("vocab_media_dir"),
 
   listFolder: (path: string) => invoke<Folder>("list_folder", { path }),
+  /** Subfolders and .srt/.vtt files, for picking subtitles on Android. */
+  listSubtitleFolder: (path: string) => invoke<Folder>("list_subtitle_folder", { path }),
   /** Android: whether videos can be read by path, and where shared storage starts. */
   storageAccess: () => invoke<{ granted: boolean; root: string | null }>("storage_access"),
   requestStorageAccess: () => invoke<void>("request_storage_access"),

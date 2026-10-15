@@ -12,6 +12,10 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.media.AudioFormat
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -44,7 +48,11 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 import org.json.JSONArray
@@ -283,6 +291,112 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val scaled = Bitmap.createScaledBitmap(frame, width, frame.height * width / frame.width, true)
     frame.recycle()
     return scaled
+  }
+
+  // ---------- soundtrack ----------
+
+  /** Decodes `length` seconds of the first audio track from `start` (both in
+   *  seconds) with the phone's own decoders, and writes them to `out` as mono
+   *  16-bit little-endian samples, for sync.rs in place of ffmpeg. Resolves
+   *  with their sample `rate`. Decoding is slow, so it runs off the UI thread. */
+  @Command
+  fun decodeAudio(invoke: Invoke) {
+    val args = invoke.getArgs()
+    val path = args.getString("path")
+    val out = args.getString("out")
+    val startUs = (args.optDouble("start", 0.0) * 1_000_000).toLong()
+    val endUs = startUs + (args.optDouble("length", 0.0) * 1_000_000).toLong()
+    Thread {
+      val extractor = MediaExtractor()
+      var codec: MediaCodec? = null
+      try {
+        extractor.setDataSource(path)
+        val track = (0 until extractor.trackCount).firstOrNull {
+          extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
+        } ?: throw IllegalStateException("no audio track")
+        extractor.selectTrack(track)
+        val input = extractor.getTrackFormat(track)
+        val decoder = MediaCodec.createDecoderByType(input.getString(MediaFormat.KEY_MIME)!!)
+        codec = decoder
+        decoder.configure(input, null, null, 0)
+        decoder.start()
+        extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+
+        var rate = input.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        var channels = input.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        var isFloat = false
+        val info = MediaCodec.BufferInfo()
+        var inputDone = false
+        var outputDone = false
+        BufferedOutputStream(FileOutputStream(out)).use { sink ->
+          while (!outputDone) {
+            if (!inputDone) {
+              val i = decoder.dequeueInputBuffer(10_000)
+              if (i >= 0) {
+                val size = extractor.readSampleData(decoder.getInputBuffer(i)!!, 0)
+                if (size < 0 || extractor.sampleTime > endUs) {
+                  decoder.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                  inputDone = true
+                } else {
+                  decoder.queueInputBuffer(i, 0, size, extractor.sampleTime, 0)
+                  extractor.advance()
+                }
+              }
+            }
+            val o = decoder.dequeueOutputBuffer(info, 10_000)
+            if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+              val format = decoder.outputFormat
+              rate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+              channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+              isFloat = format.containsKey(MediaFormat.KEY_PCM_ENCODING) &&
+                format.getInteger(MediaFormat.KEY_PCM_ENCODING) == AudioFormat.ENCODING_PCM_FLOAT
+            } else if (o >= 0) {
+              val buffer = decoder.getOutputBuffer(o)!!
+              buffer.position(info.offset)
+              buffer.limit(info.offset + info.size)
+              writeMono(buffer.slice().order(ByteOrder.nativeOrder()), info.presentationTimeUs, startUs, endUs, rate, channels, isFloat, sink)
+              decoder.releaseOutputBuffer(o, false)
+              if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
+            }
+          }
+        }
+        invoke.resolve(JSObject().apply { put("rate", rate) })
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      } finally {
+        try { codec?.stop() } catch (_: Exception) {}
+        codec?.release()
+        extractor.release()
+      }
+    }.start()
+  }
+
+  /** Writes the frames of one decoded buffer that fall between `startUs` and
+   *  `endUs`, each the average of its channels, as 16-bit little-endian. */
+  private fun writeMono(
+    pcm: ByteBuffer, ptsUs: Long, startUs: Long, endUs: Long,
+    rate: Int, channels: Int, isFloat: Boolean, sink: BufferedOutputStream,
+  ) {
+    val samples = if (isFloat) pcm.remaining() / 4 else pcm.remaining() / 2
+    val frames = samples / channels
+    val floats = if (isFloat) pcm.asFloatBuffer() else null
+    val shorts = if (isFloat) null else pcm.asShortBuffer()
+    val bytes = ByteArray(frames * 2)
+    var n = 0
+    for (f in 0 until frames) {
+      val at = ptsUs + f * 1_000_000L / rate
+      if (at < startUs) continue
+      if (at >= endUs) break
+      var sum = 0.0
+      for (c in 0 until channels) {
+        val i = f * channels + c
+        sum += if (floats != null) floats.get(i) * 32767.0 else shorts!!.get(i).toDouble()
+      }
+      val s = (sum / channels).roundToInt().coerceIn(-32768, 32767)
+      bytes[n++] = (s and 0xff).toByte()
+      bytes[n++] = (s shr 8 and 0xff).toByte()
+    }
+    sink.write(bytes, 0, n)
   }
 
   // ---------- file details ----------

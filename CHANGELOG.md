@@ -3,6 +3,22 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.18.0 (2026-10-15)
+
+### Added
+
+- On Android, "Find the best match" now works: Beyt listens to the
+  soundtrack with the phone's own audio decoders, so it can tell which
+  subtitle file fits the video and by how much it needs shifting.
+
+### Fixed
+
+- On Android, "Add subtitle file" and "Find the best match" open a file
+  browser that starts in the video's folder and shows only subtitle
+  files. Android's own picker returned files Beyt couldn't open, so
+  picking a subtitle there did nothing. To find the best match, tick the
+  files to compare (or "Select all") and tap Compare.
+
 ## 0.17.1 (2026-10-15)
 
 ### Fixed

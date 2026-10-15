@@ -336,6 +336,16 @@ pub struct Folder {
 
 /// Subfolders and videos in `dir`, folders first, both in natural order.
 pub fn list_folder(dir: &Path) -> Result<Folder> {
+    list_folder_of(dir, is_video_file)
+}
+
+/// Subfolders and subtitle files in `dir`, for picking subtitles where the
+/// system's file picker gives no paths (Android).
+pub fn list_subtitle_folder(dir: &Path) -> Result<Folder> {
+    list_folder_of(dir, subs::is_subtitle_file)
+}
+
+fn list_folder_of(dir: &Path, wanted: fn(&Path) -> bool) -> Result<Folder> {
     let mut entries: Vec<FolderEntry> = fs::read_dir(dir)
         .with_context(|| format!("reading {}", dir.display()))?
         .filter_map(|e| e.ok())
@@ -346,7 +356,7 @@ pub fn list_folder(dir: &Path) -> Result<Folder> {
                 return None;
             }
             let is_dir = path.is_dir();
-            (is_dir || is_video_file(&path)).then(|| FolderEntry {
+            (is_dir || wanted(&path)).then(|| FolderEntry {
                 path: path.to_string_lossy().into_owned(),
                 name,
                 is_dir,

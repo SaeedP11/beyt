@@ -10,8 +10,11 @@
 
 use std::{
     fs,
-    io::{BufReader, Read},
     path::{Path, PathBuf},
+};
+#[cfg(not(target_os = "android"))]
+use std::{
+    io::{BufReader, Read},
     process::{Command, Stdio},
 };
 
@@ -26,7 +29,10 @@ use crate::{
 
 /// Seconds per loudness sample.
 const STEP: f64 = 0.05;
+/// The rate ffmpeg resamples to; Android keeps the track's own.
+#[cfg(not(target_os = "android"))]
 const SAMPLE_RATE: usize = 8000;
+#[cfg(not(target_os = "android"))]
 const SAMPLES_PER_STEP: usize = (SAMPLE_RATE as f64 * STEP) as usize;
 /// Stretches of audio decoded, and how long each is.
 const WINDOWS: usize = 12;
@@ -223,12 +229,18 @@ fn words(name: &str) -> impl Iterator<Item = &str> {
 
 /// Duration in seconds (0 if unknown) and the container's title tag.
 fn probe(video: &Path) -> Result<(f64, Option<String>)> {
-    let out = Command::new("ffprobe")
-        .args(["-v", "error", "-show_entries", "format=duration:format_tags=title", "-of", "json"])
-        .arg(video)
-        .output()
-        .context("running ffprobe (is ffmpeg installed?)")?;
-    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+    // Phones have no ffprobe; the player plugin answers in its shape.
+    #[cfg(target_os = "android")]
+    let json = crate::player::probe(video)?;
+    #[cfg(not(target_os = "android"))]
+    let json: serde_json::Value = {
+        let out = Command::new("ffprobe")
+            .args(["-v", "error", "-show_entries", "format=duration:format_tags=title", "-of", "json"])
+            .arg(video)
+            .output()
+            .context("running ffprobe (is ffmpeg installed?)")?;
+        serde_json::from_slice(&out.stdout).unwrap_or_default()
+    };
     let format = &json["format"];
     let duration = format["duration"].as_str().and_then(|d| d.parse().ok()).unwrap_or(0.0);
     let title = format["tags"].as_object().and_then(|tags| {
@@ -262,7 +274,7 @@ fn sample_audio(video: &Path, duration: f64, cache_root: &Path, mut progress: im
             let starts = window_starts(duration);
             let mut samples = Vec::with_capacity(starts.len());
             for (i, &(start, len)) in starts.iter().enumerate() {
-                samples.push(Sample { start, loudness: decode(video, start, len)? });
+                samples.push(Sample { start, loudness: decode(video, start, len, &cache)? });
                 progress((i + 1) as f64 / starts.len() as f64);
             }
             if let Some(dir) = cache.parent()
@@ -277,9 +289,16 @@ fn sample_audio(video: &Path, duration: f64, cache_root: &Path, mut progress: im
     Ok(samples.iter().map(|s| Window::new(s.start, &s.loudness)).collect())
 }
 
+/// Loudness in dB of one step's worth of samples.
+fn step_loudness(samples: impl Iterator<Item = f64>, count: usize) -> f32 {
+    let power = samples.map(|s| s * s).sum::<f64>() / count as f64;
+    (10.0 * (power + 1.0).log10()) as f32
+}
+
 /// Speech-band (200–3500 Hz) loudness of `len` seconds from `start`. ffmpeg
 /// seeks straight there, so only this stretch is read and decoded.
-fn decode(video: &Path, start: f64, len: f64) -> Result<Vec<f32>> {
+#[cfg(not(target_os = "android"))]
+fn decode(video: &Path, start: f64, len: f64, _scratch: &Path) -> Result<Vec<f32>> {
     let mut child = Command::new("ffmpeg")
         .args(["-v", "error", "-nostdin", "-ss", &format!("{start:.3}"), "-t", &format!("{len:.3}"), "-i"])
         .arg(video)
@@ -298,9 +317,8 @@ fn decode(video: &Path, start: f64, len: f64) -> Result<Vec<f32>> {
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
             Err(e) => return Err(e).context("reading audio from ffmpeg"),
         }
-        let power = buf.as_chunks::<2>().0.iter().map(|b| f64::from(i16::from_le_bytes(*b)).powi(2)).sum::<f64>()
-            / SAMPLES_PER_STEP as f64;
-        out.push((10.0 * (power + 1.0).log10()) as f32);
+        let samples = buf.as_chunks::<2>().0.iter().map(|b| f64::from(i16::from_le_bytes(*b)));
+        out.push(step_loudness(samples, SAMPLES_PER_STEP));
     }
     let status = child.wait()?;
     if !status.success() || out.is_empty() {
@@ -311,6 +329,77 @@ fn decode(video: &Path, start: f64, len: f64) -> Result<Vec<f32>> {
         bail!("couldn't read the soundtrack: {}", if err.trim().is_empty() { "no audio track" } else { err.trim() });
     }
     Ok(out)
+}
+
+/// Android has no ffmpeg: the player plugin decodes the stretch with the
+/// phone's own decoders into mono 16-bit samples at the track's rate, and the
+/// same speech band is kept here with the filters ffmpeg would use.
+#[cfg(target_os = "android")]
+fn decode(video: &Path, start: f64, len: f64, scratch: &Path) -> Result<Vec<f32>> {
+    let pcm = scratch.with_file_name("speech.pcm");
+    if let Some(dir) = pcm.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let rate = crate::player::decode_audio(video, start, len, &pcm);
+    let bytes = fs::read(&pcm);
+    let _ = fs::remove_file(&pcm);
+    let (rate, bytes) = (rate?, bytes.context("reading the decoded audio")?);
+
+    let per_step = (rate as f64 * STEP).round() as usize;
+    let mut high = Biquad::high_pass(200.0, rate as f64);
+    let mut low = Biquad::low_pass(3500.0, rate as f64);
+    let filtered: Vec<f64> = bytes
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|b| low.run(high.run(f64::from(i16::from_le_bytes(*b)))))
+        .collect();
+    let out: Vec<f32> = filtered.chunks_exact(per_step.max(1)).map(|c| step_loudness(c.iter().copied(), c.len())).collect();
+    if out.is_empty() {
+        bail!("couldn't read the soundtrack: no audio in this stretch");
+    }
+    Ok(out)
+}
+
+/// A two-pole Butterworth filter, as ffmpeg's `highpass` and `lowpass` are by default.
+#[cfg(any(target_os = "android", test))]
+struct Biquad {
+    b: [f64; 3],
+    a: [f64; 2],
+    x: [f64; 2],
+    y: [f64; 2],
+}
+
+#[cfg(any(target_os = "android", test))]
+impl Biquad {
+    fn new(cutoff: f64, rate: f64, high: bool) -> Self {
+        let w = std::f64::consts::TAU * cutoff / rate;
+        let alpha = w.sin() / std::f64::consts::SQRT_2;
+        let cos = w.cos();
+        let (b0, b1) = if high { ((1.0 + cos) / 2.0, -(1.0 + cos)) } else { ((1.0 - cos) / 2.0, 1.0 - cos) };
+        let a0 = 1.0 + alpha;
+        Biquad {
+            b: [b0 / a0, b1 / a0, b0 / a0],
+            a: [-2.0 * cos / a0, (1.0 - alpha) / a0],
+            x: [0.0; 2],
+            y: [0.0; 2],
+        }
+    }
+
+    fn high_pass(cutoff: f64, rate: f64) -> Self {
+        Self::new(cutoff, rate, true)
+    }
+
+    fn low_pass(cutoff: f64, rate: f64) -> Self {
+        Self::new(cutoff, rate, false)
+    }
+
+    fn run(&mut self, x: f64) -> f64 {
+        let y = self.b[0] * x + self.b[1] * self.x[0] + self.b[2] * self.x[1] - self.a[0] * self.y[0] - self.a[1] * self.y[1];
+        self.x = [x, self.x[0]];
+        self.y = [y, self.y[0]];
+        y
+    }
 }
 
 // ---------- lining up ----------
@@ -552,6 +641,26 @@ mod tests {
     fn overlapping_cues_merge() {
         let cues = [cue(2.0, 3.0), cue(0.0, 1.0), cue(0.5, 1.5)];
         assert_eq!(spans(&cues, 1.0, 0.0, 10.0), [(0, 30), (40, 60)]);
+    }
+
+    #[test]
+    fn speech_band_filters_keep_only_speech() {
+        // Root-mean-square of a tone after both filters, at a phone's 48 kHz.
+        let level = |hz: f64| {
+            let rate = 48_000.0;
+            let (mut high, mut low) = (Biquad::high_pass(200.0, rate), Biquad::low_pass(3500.0, rate));
+            let out: Vec<f64> = (0..48_000)
+                .map(|i| low.run(high.run((std::f64::consts::TAU * hz * i as f64 / rate).sin())))
+                .skip(4800)
+                .collect();
+            (out.iter().map(|y| y * y).sum::<f64>() / out.len() as f64).sqrt()
+        };
+        let full = std::f64::consts::FRAC_1_SQRT_2;
+        assert!((level(1000.0) / full - 1.0).abs() < 0.05);
+        assert!(level(50.0) / full < 0.1);
+        assert!(level(12_000.0) / full < 0.1);
+        // At the cutoffs a Butterworth filter keeps 1/√2 of the level.
+        assert!((level(200.0) / full - full).abs() < 0.05);
     }
 }
 
