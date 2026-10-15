@@ -83,6 +83,20 @@ Every key can be changed in Settings → Keyboard shortcuts; press `?` in the ap
 | , | Settings |
 | Ctrl+Q | Quit |
 
+On a touch screen (`src/gestures.ts`):
+
+| Gesture | Action |
+| --- | --- |
+| Tap | Show / hide the controls |
+| Double-tap left / right third | Seek back / forward; keep tapping to go further |
+| Double-tap the middle | Pause / play |
+| Swipe up / down, start half | Brightness |
+| Swipe up / down, end half | Volume |
+| Drag sideways | Scrub (seeks on release) |
+| Press and hold | Play at 2× while held |
+| Swipe sideways on a subtitle line | Previous / next line |
+| Tap a word | Dictionary popup |
+
 ## Android (in progress)
 
 ```sh

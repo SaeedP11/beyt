@@ -3,6 +3,28 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.12.0 (2026-10-15)
+
+### Added
+
+- Touch gestures while a video plays, the ones phone video players share:
+  tap to show or hide the controls; double-tap the left or right third to
+  seek back or forward by the seek step (keep tapping to go further) and
+  the middle to pause; swipe up or down on the start half for brightness and
+  on the end half for volume; drag sideways to scrub, with the time shown;
+  press and hold to play at 2× until you let go. Swiping sideways on a
+  subtitle line moves to the previous or next line. Mouse and keyboard work
+  as before.
+
+### Changed
+
+- On a phone, the library lists videos as rows with a small thumbnail
+  beside the name, so several fit on screen, and the open buttons sit side
+  by side. On touch screens each video's ⋯ button always shows (it only
+  appeared on hover, so renaming and moving to the Trash were out of
+  reach), and the keyboard-shortcuts button is hidden.
+- The page no longer zooms with a pinch.
+
 ## 0.11.2 (2026-10-15)
 
 ### Changed
