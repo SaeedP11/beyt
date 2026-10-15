@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.16.1 (2026-10-15)
+
+### Changed
+
+- On the Recent, Library and Vocabulary pages, the header with the Beyt
+  wordmark and buttons now stays at the top while you scroll, so Settings
+  is always within reach. The Settings button is also bigger and easier
+  to tap.
+
 ## 0.16.0 (2026-10-15)
 
 ### Added

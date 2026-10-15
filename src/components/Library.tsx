@@ -446,11 +446,13 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   return (
     <main className="absolute inset-0 flex flex-col bg-ink-950">
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 md:px-10 2xl:max-w-[100rem]">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-3 sm:px-6 sm:pt-4 md:px-10 2xl:max-w-[100rem]">
           {/* In a narrow window: the wordmark and settings on one line, the two
               open buttons sharing the next. From `sm` up, everything on one row.
-              Android has no open buttons: the Library tab browses storage. */}
-          <header className="mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 sm:mb-10 sm:flex sm:flex-wrap">
+              Android has no open buttons: the Library tab browses storage.
+              It stays pinned to the top, reaching over the side gutters so
+              scrolled cards never show beside it. */}
+          <header className="sticky top-0 z-10 -mx-4 mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 bg-ink-950/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:mb-10 sm:flex sm:flex-wrap sm:px-6 sm:py-4 md:-mx-10 md:px-10">
             <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
               <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
                 بیت
@@ -493,6 +495,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
                 rounded
                 text
                 severity="secondary"
+                className="!h-12 !w-12 [&_.p-button-icon]:!text-2xl"
                 aria-label={t("settings")}
                 tooltip={`${t("settings")} (,)`}
                 tooltipOptions={{ position: "bottom" }}
