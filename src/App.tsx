@@ -325,7 +325,7 @@ export function App() {
 
   /** Opens the dictionary popup for a subtitle word element. */
   const lookUp = (e: React.MouseEvent | MouseEvent, el: HTMLElement) => {
-    if (el.tagName !== "SPAN" || el.classList.contains("line")) return;
+    if (!el.classList.contains("word")) return;
     if (locked) return showLocked();
     const picked = player.wordContext(el);
     if (picked && picked.word.trim()) wordPopup.current?.open(e, el, picked);
