@@ -10,6 +10,7 @@ import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
 import { PlayerChrome } from "./components/PlayerChrome";
 import { type Section, SettingsDialog } from "./components/SettingsDialog";
+import { SettingsPage } from "./components/SettingsPage";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SubtitlePanel } from "./components/SubtitlePanel";
 import { Transcript } from "./components/Transcript";
@@ -78,7 +79,8 @@ export function App() {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<Section>("general");
+  // Null only on Android: its settings page then shows the list of sections.
+  const [settingsSection, setSettingsSection] = useState<Section | null>(isAndroid ? null : "general");
   const [controls, setControls] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const toastRef = useRef<Toast>(null);
@@ -88,7 +90,8 @@ export function App() {
   const closeTranscript = useCallback(() => setTranscriptOpen(false), []);
 
   const openSettings = useCallback((section?: Section) => {
-    if (section) setSettingsSection(section);
+    // The dialog reopens where it was left; the Android page on its list.
+    if (section || isAndroid) setSettingsSection(section ?? null);
     setHelpOpen(false);
     setSettingsOpen(true);
   }, []);
@@ -469,12 +472,21 @@ export function App() {
         onHide={() => setInfoOpen(false)}
       />
       <ShortcutsDialog visible={helpOpen} onHide={() => setHelpOpen(false)} onCustomise={() => openSettings("shortcuts")} />
-      <SettingsDialog
-        visible={settingsOpen}
-        section={settingsSection}
-        onSection={setSettingsSection}
-        onHide={() => setSettingsOpen(false)}
-      />
+      {isAndroid ? (
+        <SettingsPage
+          visible={settingsOpen}
+          section={settingsSection}
+          onSection={setSettingsSection}
+          onHide={() => setSettingsOpen(false)}
+        />
+      ) : (
+        <SettingsDialog
+          visible={settingsOpen}
+          section={settingsSection ?? "general"}
+          onSection={setSettingsSection}
+          onHide={() => setSettingsOpen(false)}
+        />
+      )}
       <AppContextMenu
         screen={screen}
         runAction={runAction}
