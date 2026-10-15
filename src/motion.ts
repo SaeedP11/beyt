@@ -164,3 +164,17 @@ export function slideIn(el: HTMLElement, forward: boolean, ms = 260): void {
     ms,
   );
 }
+
+/** The way back from `slideIn`: slides `el` out towards the end side as it fades. */
+export function slideOut(el: HTMLElement, ms = 200): void {
+  const to = (getComputedStyle(el).direction === "rtl" ? -1 : 1) * 28;
+  animate(
+    el,
+    (e, shown) => {
+      e.style.opacity = String(shown);
+      e.style.transform = `translateX(${to * (1 - shown)}px)`;
+    },
+    true,
+    ms,
+  );
+}

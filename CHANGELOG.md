@@ -3,6 +3,27 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.15.0 (2026-10-15)
+
+### Added
+
+- On Android, Settings is now a full-screen page instead of a dialog. It
+  opens on a list of sections, each with a short summary of what's in it;
+  tap one to open it as its own page. The back arrow, Android's Back button
+  and Escape go up one level at a time, from a section to the list and
+  from the list back to where you were. The app's version is shown at the
+  bottom of the list.
+
+### Changed
+
+- The settings on Android are laid out for a phone: related settings sit
+  together in cards, drop-downs, sliders and text boxes use the full width
+  under their label, and the − and + steppers are quieter. The subtitle
+  preview stays at the top while you scroll through the subtitle settings,
+  and clearing history, clearing the cache and resetting settings are now
+  rows you tap (they still ask first). Keyboard shortcuts only appear in
+  the list while a physical keyboard is connected.
+
 ## 0.14.4 (2026-10-15)
 
 ### Fixed
