@@ -193,7 +193,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
             )}
           </div>
 
-          <div className="max-h-72 overflow-y-auto px-4 py-3">
+          <div className="max-h-[min(18rem,calc(100dvh-12rem))] overflow-y-auto px-4 py-3">
             {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
             {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
             {state.kind === "missing" && <DictionaryInstallCard />}

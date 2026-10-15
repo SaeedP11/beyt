@@ -54,15 +54,15 @@ export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
       header={t("settings")}
       visible={visible}
       onHide={onHide}
-      className="w-[min(60rem,96vw)]"
-      contentClassName="p-0"
+      className="h-[min(44rem,90dvh)] w-[min(60rem,96vw)]"
+      contentClassName="flex min-h-0 flex-col p-0"
       dismissableMask
       draggable={false}
       {...motion}
     >
       <ConfirmPopup />
       {/* On narrow windows the section list becomes a scrolling strip on top. */}
-      <div className="flex h-[min(38rem,80vh)] min-h-0 flex-col md:h-[min(38rem,75vh)] md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-ink-700 p-2 md:block md:w-52 md:border-e md:border-b-0">
           {SECTIONS.map((s) => (
             <button

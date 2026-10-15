@@ -42,6 +42,9 @@ export function PlayerChrome({
   const p = usePlayback(8);
   const narrow = useMediaQuery(NARROW);
   const more = useRef<Menu>(null);
+  /** The ⋯ button, which the aspect menu opens from on narrow screens. */
+  const moreButton = useRef<EventTarget | null>(null);
+  const aspectMenu = useRef<Menu>(null);
   // Widening the window unmounts the menu without an onHide.
   useEffect(() => {
     if (!narrow) onMenuVisibleChange(false);
@@ -50,8 +53,16 @@ export function PlayerChrome({
     { label: t("fileInfo"), icon: "pi pi-info-circle", command: onInfo },
     { label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp },
     { label: t("settings"), icon: "pi pi-cog", command: onSettings },
+    { separator: true },
+    {
+      label: `${t("aspect")}: ${aspectLabel(player.aspect)}`,
+      icon: "pi pi-expand",
+      // Opens from the ⋯ button once this menu has closed.
+      command: () => setTimeout(() => aspectMenu.current?.show({ currentTarget: moreButton.current } as never)),
+    },
+    // Phone apps already fill the screen.
+    ...(isAndroid ? [] : [{ label: t("fullscreen"), icon: "pi pi-window-maximize", command: () => void api.toggleFullscreen() }]),
   ];
-  const aspectMenu = useRef<Menu>(null);
   const aspectItems: MenuItem[] = [
     {
       label: t("aspect"),
@@ -66,6 +77,10 @@ export function PlayerChrome({
   const time = dragging ?? p.time;
   const duration = Math.max(p.duration, 0.1);
   const fade = `transition-opacity duration-300 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`;
+  // Smaller buttons on phones, so the whole bar fits a 320px-wide screen.
+  const size = narrow ? "size-10" : "";
+  const plain = `${size} text-white`;
+  const popupAlignment = getLang() === "fa" ? "left" : "right";
 
   const seek = (to: number) => {
     clock.jump(to);
@@ -84,27 +99,27 @@ export function PlayerChrome({
           tooltip={t("back")}
           tooltipOptions={{ position: "bottom" }}
           onClick={onBack}
-          className="text-white"
+          className="shrink-0 text-white"
         />
-        <h1 className="truncate text-base font-semibold drop-shadow sm:text-lg" dir="auto">
+        <h1 className="min-w-0 truncate text-base font-semibold drop-shadow sm:text-lg" dir="auto">
           {player.media?.title}
         </h1>
       </div>
 
-      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-3 pb-3 pt-12 sm:px-5 ${fade}`}>
-        <div dir="ltr" className="px-1">
+      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pb-2 pt-12 sm:px-5 sm:pb-3 ${fade}`}>
+        <div dir="ltr" className="px-2 sm:px-1">
           <SeekBar time={time} duration={duration} onScrub={setDragging} onSeek={seek} />
         </div>
-        <div className="mt-3 flex items-center gap-0.5 sm:gap-1">
+        <div className="mt-2 flex items-center gap-0.5 sm:mt-3 sm:gap-1">
           <Button
             icon={p.paused ? "pi pi-play" : "pi pi-pause"}
             rounded
             text
             aria-label={p.paused ? t("play") : t("pause")}
             onClick={() => void api.togglePause()}
-            className="text-white"
+            className={plain}
           />
-          <span className="ms-1 whitespace-nowrap text-sm tabular-nums text-zinc-200 sm:ms-2" dir="ltr">
+          <span className="ms-1 min-w-0 truncate whitespace-nowrap text-sm tabular-nums text-zinc-200 sm:ms-2" dir="ltr">
             {fmtTime(time)} <span className="text-zinc-500">/ {fmtTime(p.duration)}</span>
           </span>
           <div className="flex-1" />
@@ -117,7 +132,7 @@ export function PlayerChrome({
             tooltip={`${t("autoPause")} (P)`}
             tooltipOptions={{ position: "top" }}
             onClick={() => player.toggleAutoPause()}
-            className={player.autoPause ? "" : "text-white"}
+            className={player.autoPause ? size : plain}
           />
           {player.selectedView() && (
             <Button
@@ -128,7 +143,7 @@ export function PlayerChrome({
               tooltip={`${t("transcript")} (R)`}
               tooltipOptions={{ position: "top" }}
               onClick={onToggleTranscript}
-              className="text-white"
+              className={plain}
             />
           )}
           <Button
@@ -139,7 +154,7 @@ export function PlayerChrome({
             tooltip={`${t("tracks")} (L)`}
             tooltipOptions={{ position: "top" }}
             onClick={onToggleSubtitles}
-            className="text-white"
+            className={plain}
           />
           {narrow ? (
             <>
@@ -151,14 +166,17 @@ export function PlayerChrome({
                 aria-haspopup="menu"
                 tooltip={t("moreActions")}
                 tooltipOptions={{ position: "top" }}
-                onClick={(e) => more.current?.toggle(e)}
-                className="text-white"
+                onClick={(e) => {
+                  moreButton.current = e.currentTarget;
+                  more.current?.toggle(e);
+                }}
+                className={plain}
               />
               <Menu
                 ref={more}
                 model={moreItems}
                 popup
-                popupAlignment={getLang() === "fa" ? "left" : "right"}
+                popupAlignment={popupAlignment}
                 transitionOptions={popupMotions.connected}
                 onShow={() => onMenuVisibleChange(true)}
                 onHide={() => onMenuVisibleChange(false)}
@@ -174,7 +192,7 @@ export function PlayerChrome({
                 tooltip={`${t("fileInfo")} (I)`}
                 tooltipOptions={{ position: "top" }}
                 onClick={onInfo}
-                className="text-white"
+                className={plain}
               />
               <Button
                 icon="pi pi-question-circle"
@@ -184,7 +202,7 @@ export function PlayerChrome({
                 tooltip={`${t("shortcutsTitle")} (?)`}
                 tooltipOptions={{ position: "top" }}
                 onClick={onHelp}
-                className="text-white"
+                className={plain}
               />
               <Button
                 icon="pi pi-cog"
@@ -194,43 +212,43 @@ export function PlayerChrome({
                 tooltip={`${t("settings")} (,)`}
                 tooltipOptions={{ position: "top" }}
                 onClick={onSettings}
-                className="text-white"
+                className={plain}
               />
+              <Button
+                icon="pi pi-expand"
+                rounded
+                text
+                aria-label={t("aspect")}
+                aria-haspopup="menu"
+                tooltip={`${t("aspect")} (Z)`}
+                tooltipOptions={{ position: "top" }}
+                onClick={(e) => aspectMenu.current?.toggle(e)}
+                className={plain}
+              />
+              {/* Phone apps already fill the screen. */}
+              {!isAndroid && (
+                <Button
+                  icon="pi pi-window-maximize"
+                  rounded
+                  text
+                  aria-label={t("fullscreen")}
+                  tooltip={`${t("fullscreen")} (F)`}
+                  tooltipOptions={{ position: "top" }}
+                  onClick={() => void api.toggleFullscreen()}
+                  className={plain}
+                />
+              )}
             </>
           )}
-          <Button
-            icon="pi pi-expand"
-            rounded
-            text
-            aria-label={t("aspect")}
-            aria-haspopup="menu"
-            tooltip={`${t("aspect")} (Z)`}
-            tooltipOptions={{ position: "top" }}
-            onClick={(e) => aspectMenu.current?.toggle(e)}
-            className="text-white"
-          />
           <Menu
             ref={aspectMenu}
             model={aspectItems}
             popup
-            popupAlignment={getLang() === "fa" ? "left" : "right"}
+            popupAlignment={popupAlignment}
             transitionOptions={popupMotions.connected}
             onShow={() => onMenuVisibleChange(true)}
             onHide={() => onMenuVisibleChange(false)}
           />
-          {/* Phone apps already fill the screen. */}
-          {!isAndroid && (
-            <Button
-              icon="pi pi-window-maximize"
-              rounded
-              text
-              aria-label={t("fullscreen")}
-              tooltip={`${t("fullscreen")} (F)`}
-              tooltipOptions={{ position: "top" }}
-              onClick={() => void api.toggleFullscreen()}
-              className="text-white"
-            />
-          )}
         </div>
       </div>
     </>

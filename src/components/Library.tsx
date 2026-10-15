@@ -7,11 +7,11 @@ import { Dialog } from "primereact/dialog";
 import { Menu } from "primereact/menu";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { TabPanel, TabView } from "primereact/tabview";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { api, isAndroid } from "../api";
 import { getLang, t } from "../i18n";
-import { popupMotions, useDialogMotion } from "../motion";
+import { popupMotions, slideIn, useDialogMotion } from "../motion";
 import type { Folder, FolderEntry, Recent } from "../types";
 import { toast } from "../ui";
 import { VocabularyView } from "./VocabularyView";
@@ -20,6 +20,11 @@ const VIDEO_EXTENSIONS = ["mkv", "mp4", "m4v", "webm", "avi", "mov", "ts", "m2ts
 const WATCHED = 0.92;
 /** How long Undo is offered before a removal or move to the Trash happens. */
 const UNDO_MS = 6000;
+/** The library's tabs, in order. Continue watching opens first. */
+const TAB_RECENT = 0;
+const TAB_FOLDER = 1;
+/** The tab last shown, so coming back from a video returns to it. */
+let lastTab = TAB_RECENT;
 
 /** A video in the library, from Continue watching or the open folder. */
 interface Video {
@@ -205,6 +210,19 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   const [trashing, setTrashing] = useState<Video | null>(null);
   const [menuModel, setMenuModel] = useState<MenuItem[]>([]);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [tab, setTab] = useState(lastTab);
+  /** Whether the tab being shown came from further left, for its slide. */
+  const [forward, setForward] = useState(true);
+  const [switched, setSwitched] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const showTab = useCallback((next: number) => {
+    if (next === lastTab) return;
+    setForward(next > lastTab);
+    setSwitched(true);
+    setTab(next);
+    lastTab = next;
+    scroller.current?.scrollTo({ top: 0 });
+  }, []);
   const menu = useRef<Menu>(null);
   const contextMenu = useRef<ContextMenu>(null);
   const folderPath = useRef<string | null>(null);
@@ -348,7 +366,10 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     try {
       const access = await api.storageAccess();
       if (access.granted) {
-        if (access.root) await showFolder(folder?.path ?? access.root);
+        if (access.root) {
+          await showFolder(folder?.path ?? access.root);
+          showTab(TAB_FOLDER);
+        }
         return;
       }
       toast(t("storageAccessNeeded"), 6000);
@@ -361,7 +382,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
         void api.storageAccess().then((a) => {
           if (!a.granted) return;
           window.clearInterval(check);
-          if (a.root) void showFolder(a.root);
+          if (a.root) void showFolder(a.root).then(() => showTab(TAB_FOLDER));
         });
       }, 1000);
     } catch (e) {
@@ -383,100 +404,116 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   const pickFolder = async () => {
     if (isAndroid) return browseStorage();
     const path = await open({ multiple: false, directory: true, defaultPath: folder?.path });
-    if (typeof path === "string") await showFolder(path);
+    if (typeof path !== "string") return;
+    await showFolder(path);
+    showTab(TAB_FOLDER);
   };
 
   const shownRecent = recent.filter((r) => !hidden.has(r.path) && !hidden.has(`recent:${r.path}`));
-  const empty = !shownRecent.length && !folder;
+
+  const pages: Page[] = [
+    {
+      id: "recent",
+      label: t("recent"),
+      icon: "pi pi-history",
+      content:
+        shownRecent.length > 0 ? (
+          <VideoGrid>
+            {shownRecent.map((r) => (
+              <VideoCard key={r.path} video={fromRecent(r)} meta={parentName(r.path)} {...handlers} />
+            ))}
+          </VideoGrid>
+        ) : (
+          <EmptyState icon="pi pi-video" title={t("noRecent")} hint={t("appTagline")} />
+        ),
+    },
+    {
+      id: "folder",
+      label: t("libraryTab"),
+      icon: "pi pi-folder",
+      content: folder ? (
+        <FolderView folder={folder} hidden={hidden} onOpen={(p) => void showFolder(p)} handlers={handlers} />
+      ) : (
+        <EmptyState icon="pi pi-folder-open" title={t("noFolder")}>
+          <Button icon="pi pi-folder-open" label={t("openFolder")} outlined onClick={() => void pickFolder()} />
+        </EmptyState>
+      ),
+    },
+    { id: "vocabulary", label: t("vocabulary"), icon: "pi pi-bookmark", content: <VocabularyView /> },
+  ];
 
   return (
-    <main className="absolute inset-0 overflow-y-auto bg-ink-950">
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 md:px-10 2xl:max-w-[100rem]">
-        {/* On a phone: the wordmark and settings on one line, the two open
-            buttons sharing the next. From `sm` up, everything on one row. */}
-        <header className="mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 sm:mb-10 sm:flex sm:flex-wrap">
-          <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
-            <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
-              بیت
-            </span>
-            <span className="hidden text-zinc-400 sm:inline">{t("appTagline")}</span>
-          </div>
-          <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
-            <Button
-              icon="pi pi-play"
-              label={t("openFile")}
-              className="justify-center whitespace-nowrap"
-              onClick={() => void pickFile()}
-            />
-            <Button
-              icon="pi pi-folder-open"
-              label={t("openFolder")}
-              outlined
-              className="justify-center whitespace-nowrap"
-              onClick={() => void pickFolder()}
-            />
-          </div>
-          <div className="col-start-2 row-start-1 flex items-center">
-            {/* Keyboard shortcuts mean little on a touch screen. */}
-            <Button
-              icon="pi pi-question-circle"
-              rounded
-              text
-              severity="secondary"
-              className="pointer-coarse:hidden"
-              aria-label={t("shortcutsTitle")}
-              tooltip={`${t("shortcutsTitle")} (?)`}
-              tooltipOptions={{ position: "bottom" }}
-              onClick={onHelp}
-            />
-            <Button
-              icon="pi pi-cog"
-              rounded
-              text
-              severity="secondary"
-              aria-label={t("settings")}
-              tooltip={`${t("settings")} (,)`}
-              tooltipOptions={{ position: "bottom" }}
-              onClick={onSettings}
-            />
-          </div>
-        </header>
-
-        <TabView className="beyt-tabs">
-          <TabPanel header={t("libraryTab")} leftIcon="pi pi-home me-2">
-            {empty && (
-              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-ink-600 px-6 py-20 text-center">
-                <i className="pi pi-video text-5xl text-zinc-500" />
-                <p className="text-lg text-zinc-300">{t("dropHint")}</p>
-                <p className="text-sm text-zinc-500">{t("appTagline")}</p>
-              </div>
-            )}
-
-            {shownRecent.length > 0 && (
-              <section className="mb-12">
-                <SectionTitle>{t("recent")}</SectionTitle>
-                <VideoGrid>
-                  {shownRecent.map((r) => (
-                    <VideoCard key={r.path} video={fromRecent(r)} meta={parentName(r.path)} {...handlers} />
-                  ))}
-                </VideoGrid>
-              </section>
-            )}
-
-            {folder && (
-              <FolderView
-                folder={folder}
-                hidden={hidden}
-                onOpen={(p) => void showFolder(p)}
-                handlers={handlers}
+    <main className="absolute inset-0 flex flex-col bg-ink-950">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 md:px-10 2xl:max-w-[100rem]">
+          {/* On a phone: the wordmark and settings on one line, the two open
+              buttons sharing the next. From `sm` up, everything on one row. */}
+          <header className="mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 sm:mb-10 sm:flex sm:flex-wrap">
+            <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
+              <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
+                بیت
+              </span>
+              <span className="hidden text-zinc-400 sm:inline">{t("appTagline")}</span>
+            </div>
+            <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
+              <Button
+                icon="pi pi-play"
+                label={t("openFile")}
+                className="justify-center whitespace-nowrap"
+                onClick={() => void pickFile()}
               />
-            )}
-          </TabPanel>
-          <TabPanel header={t("vocabulary")} leftIcon="pi pi-bookmark me-2">
-            <VocabularyView />
-          </TabPanel>
-        </TabView>
+              <Button
+                icon="pi pi-folder-open"
+                label={t("openFolder")}
+                outlined
+                className="justify-center whitespace-nowrap"
+                onClick={() => void pickFolder()}
+              />
+            </div>
+            <div className="col-start-2 row-start-1 flex items-center">
+              {/* Keyboard shortcuts mean little on a touch screen. */}
+              <Button
+                icon="pi pi-question-circle"
+                rounded
+                text
+                severity="secondary"
+                className="pointer-coarse:hidden"
+                aria-label={t("shortcutsTitle")}
+                tooltip={`${t("shortcutsTitle")} (?)`}
+                tooltipOptions={{ position: "bottom" }}
+                onClick={onHelp}
+              />
+              <Button
+                icon="pi pi-cog"
+                rounded
+                text
+                severity="secondary"
+                aria-label={t("settings")}
+                tooltip={`${t("settings")} (,)`}
+                tooltipOptions={{ position: "bottom" }}
+                onClick={onSettings}
+              />
+            </div>
+          </header>
+  
+          {isAndroid ? (
+            <TabPage key={tab} animate={switched} forward={forward}>
+              {pages[tab]?.content}
+            </TabPage>
+          ) : (
+            <TabView className="beyt-tabs" activeIndex={tab} onTabChange={(e) => showTab(e.index)}>
+              {pages.map((p) => (
+                <TabPanel key={p.id} header={p.label} leftIcon={`${p.icon} me-2`}>
+                  <TabPage animate={switched} forward={forward}>
+                    {p.content}
+                  </TabPage>
+                </TabPanel>
+              ))}
+            </TabView>
+          )}
+        </div>
       </div>
+      {isAndroid && <BottomNav pages={pages} active={tab} onChange={showTab} />}
 
       <Menu
         ref={menu}
@@ -499,8 +536,83 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-4 text-sm font-semibold tracking-wide text-zinc-400">{children}</h2>;
+function SectionTitle({ children, count }: { children: React.ReactNode; count?: number }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wide text-zinc-400 sm:mb-4">
+      {children}
+      {count !== undefined && (
+        <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-medium tabular-nums text-zinc-500">{count}</span>
+      )}
+    </h2>
+  );
+}
+
+interface Page {
+  id: string;
+  label: string;
+  icon: string;
+  content: React.ReactNode;
+}
+
+/** A tab's content, which slides in from the side it was picked from. */
+function TabPage({ animate, forward, children }: { animate: boolean; forward: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (animate && ref.current) slideIn(ref.current, forward);
+    // Only as it first shows.
+  }, []);
+  return <div ref={ref}>{children}</div>;
+}
+
+/** Android: the library's tabs as a bottom navigation bar, in thumb's reach. */
+function BottomNav({ pages, active, onChange }: { pages: Page[]; active: number; onChange: (i: number) => void }) {
+  return (
+    <nav className="shrink-0 border-t border-ink-700/70 bg-ink-900">
+      <div role="tablist" className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${pages.length}, 1fr)` }}>
+        {pages.map((p, i) => {
+          const on = i === active;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onChange(i)}
+              className="flex h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 [-webkit-tap-highlight-color:transparent] focus-visible:outline-none"
+            >
+              <span className="relative grid h-8 w-16 place-items-center">
+                {/* The active pill grows out from the icon's middle. */}
+                <span
+                  className={`absolute inset-0 rounded-full bg-accent/20 transition duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+                    on ? "scale-x-100 opacity-100" : "scale-x-40 opacity-0"
+                  }`}
+                />
+                <i
+                  className={`${p.icon} relative text-lg transition duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+                    on ? "scale-110 text-accent" : "text-zinc-400"
+                  }`}
+                />
+              </span>
+              <span className={`max-w-full truncate text-xs transition-colors duration-200 ${on ? "font-semibold text-zinc-100" : "text-zinc-400"}`}>
+                {p.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function EmptyState({ icon, title, hint, children }: { icon: string; title: string; hint?: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-ink-600 px-6 py-16 text-center sm:py-20">
+      <i className={`${icon} text-5xl text-zinc-500`} />
+      <p className="max-w-md text-lg text-zinc-300">{title}</p>
+      {hint && <p className="text-sm text-zinc-500">{hint}</p>}
+      {children}
+    </div>
+  );
 }
 
 interface ItemHandlers {
@@ -636,63 +748,123 @@ interface FolderProps {
   handlers: ItemHandlers;
 }
 
-/** Subfolders as chips, then the folder's videos as cards. */
+/** The open folder: where it is, its subfolders, then its videos. */
 function FolderView({ folder, hidden, onOpen, handlers }: FolderProps) {
   const dirs = folder.entries.filter((e) => e.isDir);
   const videos = folder.entries.filter((e) => !e.isDir && !hidden.has(e.path));
   return (
-    <section>
-      <div className="mb-4 flex min-w-0 items-baseline gap-3">
-        <h2 className="m-0 shrink-0 text-sm font-semibold tracking-wide text-zinc-400">{t("folder")}</h2>
-        <span className="truncate text-xs text-zinc-500" dir="ltr">
-          {folder.path}
-        </span>
-      </div>
+    <section className="flex flex-col gap-8">
+      <PathBar folder={folder} onOpen={onOpen} />
 
-      {(folder.parent || dirs.length > 0) && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          {folder.parent && <FolderChip icon="pi pi-arrow-up" label={t("up")} muted onClick={() => onOpen(folder.parent!)} />}
-          {dirs.map((d) => (
-            <FolderChip key={d.path} icon="pi pi-folder" label={d.name} onClick={() => onOpen(d.path)} />
-          ))}
+      {dirs.length > 0 && (
+        <div>
+          <SectionTitle count={dirs.length}>{t("subfolders")}</SectionTitle>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2 sm:grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] sm:gap-3">
+            {dirs.map((d) => (
+              <FolderTile key={d.path} entry={d} onClick={() => onOpen(d.path)} />
+            ))}
+          </div>
         </div>
       )}
 
-      {videos.length > 0 ? (
-        <VideoGrid>
-          {videos.map((e) => (
-            <VideoCard key={e.path} video={fromEntry(e)} {...handlers} />
-          ))}
-        </VideoGrid>
-      ) : (
-        !dirs.length && (
-          <p className="rounded-xl border border-dashed border-ink-600 px-5 py-10 text-center text-zinc-500">
-            {t("emptyFolder")}
-          </p>
-        )
+      {videos.length > 0 && (
+        <div>
+          <SectionTitle count={videos.length}>{t("videosTitle")}</SectionTitle>
+          <VideoGrid>
+            {videos.map((e) => (
+              <VideoCard key={e.path} video={fromEntry(e)} {...handlers} />
+            ))}
+          </VideoGrid>
+        </div>
       )}
+
+      {!dirs.length && !videos.length && <EmptyState icon="pi pi-inbox" title={t("emptyFolder")} />}
     </section>
   );
 }
 
-interface ChipProps {
-  icon: string;
-  label: string;
-  muted?: boolean;
-  onClick: () => void;
+/** Android's shared storage; nothing above it can be read. */
+const ANDROID_ROOT = "/storage/emulated/0";
+
+/** The folder's path as clickable steps, from the root down. */
+function crumbsOf(path: string): { name: string; path: string }[] {
+  const root = isAndroid && (path === ANDROID_ROOT || path.startsWith(`${ANDROID_ROOT}/`)) ? ANDROID_ROOT : "/";
+  const crumbs = [{ name: "", path: root }];
+  let at = root;
+  for (const name of path.slice(root.length).split("/").filter(Boolean)) {
+    at = at.endsWith("/") ? `${at}${name}` : `${at}/${name}`;
+    crumbs.push({ name, path: at });
+  }
+  return crumbs;
 }
 
-function FolderChip({ icon, label, muted, onClick }: ChipProps) {
+/** An Up button and the path as a breadcrumb, scrolled so the open folder shows. */
+function PathBar({ folder, onOpen }: { folder: Folder; onOpen: (path: string) => void }) {
+  const scroller = useRef<HTMLElement>(null);
+  const crumbs = crumbsOf(folder.path);
+  const atRoot = !folder.parent || crumbs.length === 1;
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [folder.path]);
+
+  return (
+    <div className="flex min-w-0 items-center gap-1 rounded-xl border border-ink-700 bg-ink-900 p-1">
+      <Button
+        icon="pi pi-arrow-up"
+        rounded
+        text
+        severity="secondary"
+        disabled={atRoot}
+        aria-label={t("up")}
+        tooltip={t("up")}
+        tooltipOptions={{ position: "bottom", showOnDisabled: false }}
+        onClick={() => folder.parent && onOpen(folder.parent)}
+        className="size-9! shrink-0"
+      />
+      <span className="h-5 w-px shrink-0 bg-ink-700" />
+      <nav ref={scroller} aria-label={t("folder")} dir="ltr" className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
+        <ol className="flex w-max items-center pe-1 text-sm">
+          {crumbs.map((c, i) => {
+            const last = i === crumbs.length - 1;
+            return (
+              <li key={c.path} className="flex items-center">
+                {i > 0 && <i className="pi pi-angle-right px-0.5 text-xs text-zinc-600" />}
+                <button
+                  type="button"
+                  title={c.path}
+                  aria-current={last ? "location" : undefined}
+                  onClick={() => !last && onOpen(c.path)}
+                  className={`rounded-md px-2 py-1.5 transition focus-visible:outline-2 focus-visible:outline-accent ${
+                    last ? "cursor-default font-semibold text-zinc-100" : "text-zinc-400 hover:bg-ink-800 hover:text-zinc-100"
+                  }`}
+                >
+                  {i === 0 ? <i className={`${isAndroid ? "pi pi-mobile" : "pi pi-server"} text-xs`} /> : <span dir="auto">{c.name}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+    </div>
+  );
+}
+
+function FolderTile({ entry, onClick }: { entry: FolderEntry; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex h-10 max-w-72 items-center gap-2.5 rounded-lg border border-ink-700 bg-ink-850 px-3.5 text-start transition hover:border-ink-600 hover:bg-ink-800 focus-visible:outline-2 focus-visible:outline-accent"
+      title={entry.path}
+      className="group flex min-w-0 items-center gap-3 rounded-xl border border-ink-700 bg-ink-900 p-2 text-start transition hover:border-accent/50 hover:bg-ink-850 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:p-2.5"
     >
-      <i className={`${icon} text-sm ${muted ? "text-zinc-500" : "text-accent"}`} />
-      <span className={`truncate text-sm ${muted ? "text-zinc-400" : "font-medium"}`} dir="auto">
-        {label}
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent transition group-hover:bg-accent/20 sm:size-10">
+        <i className="pi pi-folder" />
       </span>
+      <span className={`min-w-0 flex-1 truncate text-sm font-medium ${getLang() === "fa" ? "text-right" : "text-left"}`} dir="auto">
+        {entry.name}
+      </span>
+      <i className="pi pi-angle-right text-xs text-zinc-600 transition group-hover:text-zinc-400 rtl:rotate-180" />
     </button>
   );
 }

@@ -167,6 +167,44 @@ body.idle {
   background: rgb(248 113 113 / 0.12);
 }
 
+/* ---------- small and short screens ----------
+   Phones, phones held sideways and small windows: dialogs keep more room
+   for their content, and the long right-click menu still fits the height. */
+@media (max-width: 639px), (max-height: 520px) {
+  .p-dialog-mask .p-dialog {
+    max-height: calc(100dvh - 1rem);
+  }
+  .p-dialog .p-dialog-header {
+    padding: 0.875rem 1rem;
+  }
+  .p-dialog .p-dialog-content {
+    padding: 0 1rem 1rem;
+  }
+  .p-dialog .p-dialog-footer {
+    padding: 0.75rem 1rem;
+  }
+  .p-sidebar .p-sidebar-header,
+  .p-sidebar .p-sidebar-content {
+    padding-inline: 1rem;
+  }
+}
+@media (max-height: 720px) {
+  .p-menu .p-menuitem-link,
+  .p-contextmenu .p-menuitem-link {
+    padding-block: 0.375rem;
+  }
+  .p-menu .p-menuitem-separator,
+  .p-contextmenu .p-menuitem-separator {
+    margin-block: 2px;
+  }
+}
+/* Too short for every row even then: popup menus scroll. (Not the
+   right-click menu: scrolling would clip its submenus.) */
+.p-menu {
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+}
+
 .track .line span.picked {
   background: rgb(96 165 250 / 0.45);
 }

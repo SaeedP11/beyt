@@ -3,6 +3,36 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.14.0 (2026-10-15)
+
+### Added
+
+- On Android, the library's sections sit in a navigation bar at the bottom
+  of the screen, within reach of your thumb. The active section is marked
+  with a highlight that grows in as you tap it.
+
+### Changed
+
+- Continue watching has its own tab in the library, and it's the one that
+  opens first. The Library tab holds the open folder, and opening a folder
+  switches to it. Coming back from a video returns to the tab you left.
+- The folder view is redesigned. A bar at the top shows where you are as a
+  clickable path, with an Up button beside it. Subfolders are tiles
+  you can scan at a glance, and the folders and videos each have a heading
+  with how many there are.
+- Switching tabs in the library slides the new tab in from the side you
+  picked it from.
+
+### Fixed
+
+- The player's control bar fits narrow phone screens. Below tablet width
+  its buttons are a little smaller, and the aspect ratio and fullscreen
+  buttons move into the ⋯ menu.
+- Dialogs, the word popup and menus fit short screens, such as a phone
+  held sideways. Settings no longer scrolls inside a scrolling dialog,
+  dialogs use less padding on small screens, and menus taller than the
+  window scroll.
+
 ## 0.13.0 (2026-10-15)
 
 ### Added

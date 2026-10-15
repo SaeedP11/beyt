@@ -149,3 +149,18 @@ export function fade(el: HTMLElement, show: boolean, ms: number): void {
   const to = show ? 1 : 0;
   animate(el, (e, shown) => (e.style.opacity = String(from + (to - from) * (show ? shown : 1 - shown))), !show, ms);
 }
+
+/** Slides a page in sideways as it fades in: from the end side when `forward`. */
+export function slideIn(el: HTMLElement, forward: boolean, ms = 260): void {
+  const rtl = getComputedStyle(el).direction === "rtl";
+  const from = (forward !== rtl ? 1 : -1) * 28;
+  animate(
+    el,
+    (e, shown) => {
+      e.style.opacity = String(shown);
+      e.style.transform = shown >= 1 ? "" : `translateX(${from * (1 - shown)}px)`;
+    },
+    false,
+    ms,
+  );
+}
