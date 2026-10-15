@@ -291,7 +291,7 @@ export function App() {
       // that closed it stops here too.
       if (helpOpen || settingsOpen || infoOpen || menuOpen || document.querySelector(".p-dialog-mask")) return;
       // Escape closes the word popup; it mustn't also leave the video.
-      if (e.key === "Escape" && document.querySelector(".p-overlaypanel")) return;
+      if (e.key === "Escape" && document.querySelector(".p-overlaypanel, .word-sheet")) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
       const key = eventKey(e);
@@ -307,7 +307,7 @@ export function App() {
   // the background. Without this, Back closed Beyt from anywhere.
   const onAndroidBack = useRef(() => {});
   onAndroidBack.current = () => {
-    const overlay = document.querySelector(".p-dialog-mask, .p-overlaypanel, .p-menu-overlay, .p-contextmenu");
+    const overlay = document.querySelector(".p-dialog-mask, .p-overlaypanel, .word-sheet, .p-menu-overlay, .p-contextmenu");
     if (helpOpen || settingsOpen || infoOpen || menuOpen || overlay) {
       // They close on Escape, as on the desktop.
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
