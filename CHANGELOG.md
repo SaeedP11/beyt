@@ -3,6 +3,25 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.17.0 (2026-10-15)
+
+### Added
+
+- You can choose which audio track plays. The new headphones button in the
+  player's control bar lists the video's audio tracks by language, title
+  and channels (Stereo, 5.1), with a tick next to the one playing; on a
+  phone it is under ⋯, and it is also in the right-click menu. Press # to
+  move to the next track. The track you pick is remembered for the series,
+  so the next episode starts in the same language.
+- You can add an audio file to a video, such as a dub or a commentary kept
+  next to it (MKA, MP3, M4A, AAC, AC3, DTS, FLAC, Ogg, Opus, WAV). Choose
+  Add audio file… in the audio menu; Beyt switches to it right away, and
+  loads it again whenever you reopen that video. Its language is read from
+  the file name, like subtitle files (`Movie.fa.mka`). Added files can be
+  removed from the same menu.
+- Lines saved to Vocabulary while an added audio file plays take their
+  audio clip from that file.
+
 ## 0.16.1 (2026-10-15)
 
 ### Changed

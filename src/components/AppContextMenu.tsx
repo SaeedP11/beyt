@@ -3,6 +3,7 @@ import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
+import { audioItems, audioMenuLabel } from "../audio";
 import * as clock from "../clock";
 import { hasHardKeyboard, player } from "../hooks";
 import { t } from "../i18n";
@@ -109,6 +110,15 @@ function helpRow(keymap: Keymap, run: (a: Action) => void): MenuItem[] {
   return hasHardKeyboard() ? [actionRow("help", t("shortcutsTitle"), "pi pi-question-circle", keymap, run)] : [];
 }
 
+/** The audio tracks, and adding or removing audio files. */
+function audioRow(): MenuItem {
+  const { tracks, actions } = audioItems((label, icon, command, disabled) => ({
+    ...row(label, icon, undefined, command),
+    disabled,
+  }));
+  return row(audioMenuLabel(), "pi pi-headphones", [...tracks, ...(tracks.length ? [{ separator: true }] : []), ...actions]);
+}
+
 function libraryItems(keymap: Keymap, run: (a: Action) => void): MenuItem[] {
   return [
     ...helpRow(keymap, run),
@@ -164,6 +174,7 @@ function playerItems(
         }),
       ),
     ),
+    audioRow(),
     row(
       `${t("aspect")}: ${aspectLabel(player.aspect)}`,
       "pi pi-expand",

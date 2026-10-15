@@ -3,6 +3,7 @@
 // The app lives in this library so Android can load it as a shared library;
 // `main.rs` only starts it on the desktop.
 
+mod audio;
 mod brightness;
 mod dict;
 mod info;
@@ -53,6 +54,9 @@ struct App {
     dictionary_path: PathBuf,
     /// Set while `install_dictionary` runs, so two installs can't overlap.
     installing_dictionary: AtomicBool,
+    /// The audio tracks last sent to the page (see `audio_changed`); cleared
+    /// when a file opens, so its tracks are always sent.
+    audio_signature: Mutex<Option<String>>,
 }
 
 struct Current {
@@ -63,6 +67,36 @@ struct Current {
 impl App {
     fn current(&self) -> std::sync::MutexGuard<'_, Option<Current>> {
         self.current.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn current_path(&self) -> Option<PathBuf> {
+        self.current().as_ref().map(|c| c.path.clone())
+    }
+
+    fn audio_signature(&self) -> std::sync::MutexGuard<'_, Option<String>> {
+        self.audio_signature.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The open video's audio tracks, as the page shows them.
+    fn audio_tracks(&self, video: &Path) -> Vec<audio::AudioTrack> {
+        let mut tracks = player::audio_tracks(self.mpv);
+        let added = self.store.added_audio(&video.to_string_lossy()).unwrap_or_default();
+        audio::finish(&mut tracks, video.file_stem().and_then(|s| s.to_str()), &added);
+        tracks
+    }
+
+    /// Sends `audio-tracks` when the open video's audio tracks have changed
+    /// since they were last sent (they are only known once it has loaded).
+    fn audio_changed(&self, handle: &AppHandle) {
+        let Some(video) = self.current_path() else { return };
+        let path = video.to_string_lossy().into_owned();
+        let Some(signature) = player::audio_signature(self.mpv, &path) else { return };
+        if self.audio_signature().as_ref() == Some(&signature) {
+            return;
+        }
+        let tracks = self.audio_tracks(&video);
+        *self.audio_signature() = Some(signature);
+        let _ = handle.emit("audio-tracks", AudioUpdate { path, tracks });
     }
 
     /// Records how far the current file has been watched.
@@ -98,6 +132,13 @@ struct Media {
 struct TrackUpdate {
     path: String,
     track: Track,
+}
+
+/// The `audio-tracks` event payload.
+#[derive(Clone, Serialize)]
+struct AudioUpdate {
+    path: String,
+    tracks: Vec<audio::AudioTrack>,
 }
 
 /// Settings that shape how a file opens.
@@ -153,12 +194,18 @@ async fn open_media(
     let start = resumed_at.map_or_else(|| "none".to_string(), |p| format!("{p:.3}"));
     app.mpv.set_property("start", start.as_str()).map_err(|e| format!("{e:?}"))?;
     app.mpv.set_property("pause", false).map_err(|e| format!("{e:?}"))?;
-    player::load(app.mpv, &path).map_err(err)?;
+    // Audio files added earlier, those still there. A content:// link from
+    // Android's file picker may no longer be readable, so it isn't reopened.
+    let audio: Vec<String> =
+        app.store.added_audio(&path).map_err(err)?.into_iter().filter(|p| Path::new(p).is_file()).collect();
+    player::load(app.mpv, &path, &audio).map_err(err)?;
 
     let added: Vec<PathBuf> =
         app.store.added_subtitles(&path).map_err(err)?.into_iter().map(PathBuf::from).collect();
     let tracks = media::tracks_for(&video, &added, &options.preferred_languages);
     *app.current() = Some(Current { path: video.clone(), tracks: tracks.clone() });
+    // Sent for the new file even if its tracks look like the last file's.
+    *app.audio_signature() = None;
     spawn_extraction(&handle, &video, &tracks);
 
     let folder = video.parent().unwrap_or(Path::new("/")).to_string_lossy().into_owned();
@@ -267,7 +314,48 @@ fn remove_subtitle(app: State<App>, id: usize) -> Result<Vec<TrackKey>, String> 
 async fn stop(app: State<'_, App>) -> Result<(), String> {
     app.save_position();
     *app.current() = None;
+    *app.audio_signature() = None;
     app.mpv.command("stop", &[]).map_err(|e| format!("{e:?}"))
+}
+
+// ---------- commands: audio tracks ----------
+
+/// The open video's audio tracks; `audio-tracks` events follow changes.
+#[tauri::command]
+async fn audio_tracks(app: State<'_, App>) -> Result<Vec<audio::AudioTrack>, String> {
+    let video = app.current_path().ok_or("no video is open")?;
+    Ok(app.audio_tracks(&video))
+}
+
+#[tauri::command]
+async fn select_audio(app: State<'_, App>, id: i64) -> Result<(), String> {
+    player::select_audio(app.mpv, id).map_err(|e| format!("{e:#}"))
+}
+
+/// Adds an audio file to the open video and switches to it. It is
+/// remembered, so it loads again the next time this video is opened.
+#[tauri::command]
+async fn add_audio(app: State<'_, App>, path: String) -> Result<(), String> {
+    let video = app.current_path().ok_or("no video is open")?;
+    if app.audio_tracks(&video).iter().any(|t| t.file.as_deref() == Some(path.as_str())) {
+        return Err("This audio file is already loaded.".into());
+    }
+    player::add_audio(app.mpv, &path).map_err(|e| format!("{e:#}"))?;
+    app.store.add_audio(&video.to_string_lossy(), &path).map_err(err)
+}
+
+/// Removes an audio file the user added, and forgets it for this video.
+#[tauri::command]
+async fn remove_audio(app: State<'_, App>, id: i64) -> Result<(), String> {
+    let video = app.current_path().ok_or("no video is open")?;
+    let tracks = app.audio_tracks(&video);
+    let file = tracks
+        .iter()
+        .find(|t| t.id == id && t.added)
+        .and_then(|t| t.file.clone())
+        .ok_or("not an added audio file")?;
+    player::remove_audio(app.mpv, id).map_err(|e| format!("{e:#}"))?;
+    app.store.remove_audio(&video.to_string_lossy(), &file).map_err(err)
 }
 
 // ---------- commands: dictionary ----------
@@ -704,8 +792,8 @@ fn quit(app: State<App>, handle: AppHandle) {
     handle.exit(0);
 }
 
-/// Sends the playback position to the overlay 20 times a second, and saves
-/// the watch position every 5 seconds.
+/// Sends the playback position to the overlay 20 times a second, checks the
+/// audio tracks 4 times a second and saves the watch position every 5 seconds.
 fn spawn_clock(handle: AppHandle) {
     std::thread::spawn(move || {
         let app = handle.state::<App>();
@@ -713,6 +801,9 @@ fn spawn_clock(handle: AppHandle) {
         loop {
             tick += 1;
             let _ = handle.emit("playback", player::playback(app.mpv));
+            if tick.is_multiple_of(5) {
+                app.audio_changed(&handle);
+            }
             if tick.is_multiple_of(100) {
                 app.save_position();
             }
@@ -812,6 +903,10 @@ pub fn run() {
             set_pause,
             seek_absolute,
             set_mpv_subtitle,
+            audio_tracks,
+            select_audio,
+            add_audio,
+            remove_audio,
             set_aspect,
             toggle_fullscreen,
             quit,
@@ -842,6 +937,7 @@ pub fn run() {
                 dictionary: RwLock::new(dictionary),
                 dictionary_path,
                 installing_dictionary: AtomicBool::new(false),
+                audio_signature: Mutex::new(None),
             });
 
             let window = app.get_webview_window("main").expect("main window");

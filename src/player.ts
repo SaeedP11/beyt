@@ -3,7 +3,20 @@ import * as clock from "./clock";
 import { activeCues, cueIndexAt, neighbourCue } from "./cues";
 import { languageName, t } from "./i18n";
 import { TrackView, defaultStyle } from "./overlay";
-import type { Aspect, Cue, Media, Mode, Playback, PickedWord, Track, TrackStyle, TrackUpdate } from "./types";
+import type {
+  Aspect,
+  AudioChoice,
+  AudioTrack,
+  AudioUpdate,
+  Cue,
+  Media,
+  Mode,
+  Playback,
+  PickedWord,
+  Track,
+  TrackStyle,
+  TrackUpdate,
+} from "./types";
 import type { Action } from "./keymap";
 import { getSettings } from "./settings";
 import { debounce, fmtTime, toast } from "./ui";
@@ -40,6 +53,24 @@ export function trackLabel(track: Track): string {
   return parts.join(" · ");
 }
 
+/** "English · Commentary · 5.1" */
+export function audioLabel(track: AudioTrack): string {
+  const parts = [languageName(track.lang)];
+  if (track.detail) parts.push(track.detail);
+  const ch = track.channels;
+  if (ch) parts.push(ch === 1 ? t("mono") : ch === 2 ? t("stereo") : ch === 6 ? "5.1" : ch === 8 ? "7.1" : `${ch} ch`);
+  return parts.join(" · ");
+}
+
+/** The track that best fits a series' saved choice: same language and title, else same language. */
+function preferredAudio(tracks: AudioTrack[], choice: AudioChoice): AudioTrack | undefined {
+  const usable = tracks.filter((a) => a.supported);
+  return (
+    usable.find((a) => a.lang === choice.lang && a.detail === choice.detail) ??
+    (choice.lang === "und" ? undefined : usable.find((a) => a.lang === choice.lang))
+  );
+}
+
 function baseName(path: string): string {
   return path.split("/").pop() ?? path;
 }
@@ -52,6 +83,14 @@ export class Player {
   autoPause = false;
   /** The picture's shape, saved with the series. */
   aspect: Aspect = "original";
+  /** The video's audio tracks; empty until it has loaded. */
+  audio: AudioTrack[] = [];
+  /** The audio track chosen for the series, picked again in its other episodes. */
+  private audioChoice: AudioChoice | undefined;
+  /** The series' choice has been looked for in this video's tracks. */
+  private audioRestored = false;
+  /** An audio file just added, whose track becomes the series' choice once it shows up. */
+  private addedAudio: string | null = null;
   private pendingLineEnd: number | null = null;
   /** The next episode, counting down to autoplay. */
   upNext: { path: string; name: string; seconds: number; total: number } | null = null;
@@ -149,6 +188,12 @@ export class Player {
     const saved = media.series?.aspect;
     this.aspect = saved && ASPECTS.includes(saved) ? saved : "original";
     void api.setAspect(this.aspect);
+    this.audio = [];
+    this.audioChoice = media.series?.audio;
+    this.audioRestored = false;
+    this.addedAudio = null;
+    // In case `audio-tracks` came before this file was set; later changes come as events.
+    void api.audioTracks().then((tracks) => this.onAudioTracks({ path: media.path, tracks }), () => {});
     document.title = `${media.title} · Beyt`;
     if (media.resumedAt) toast(t("resumed", { time: fmtTime(media.resumedAt) }), 4000);
     this.changed();
@@ -159,6 +204,7 @@ export class Player {
     this.cancelCountdown();
     this.clearViews();
     this.media = null;
+    this.audio = [];
     document.title = "Beyt";
     await api.stop();
   }
@@ -249,14 +295,82 @@ export class Player {
     this.changed();
   }
 
+  // ---------- audio tracks ----------
+
+  onAudioTracks(u: AudioUpdate): void {
+    if (!this.media || u.path !== this.media.path) return;
+    this.audio = u.tracks;
+    // Once the tracks are known, switch to the one chosen in other episodes.
+    if (!this.audioRestored && u.tracks.length) {
+      this.audioRestored = true;
+      const pick = this.audioChoice && preferredAudio(u.tracks, this.audioChoice);
+      if (pick && !pick.selected) void api.selectAudio(pick.id).catch(() => {});
+    }
+    const added = this.addedAudio && u.tracks.find((a) => a.file === this.addedAudio);
+    if (added) {
+      this.addedAudio = null;
+      this.audioChoice = { lang: added.lang, detail: added.detail };
+      this.save();
+    }
+    this.changed();
+  }
+
+  selectedAudio(): AudioTrack | undefined {
+    return this.audio.find((a) => a.selected);
+  }
+
+  /** Switches to an audio track, for this video and the rest of its series. */
+  selectAudio(track: AudioTrack): void {
+    if (track.selected) return;
+    // Shown at once; the next `audio-tracks` event confirms it.
+    this.audio = this.audio.map((a) => ({ ...a, selected: a.id === track.id }));
+    this.audioChoice = { lang: track.lang, detail: track.detail };
+    api.selectAudio(track.id).then(
+      () => toast(t("audioToast", { name: audioLabel(track) })),
+      (e) => toast(String(e), 5000),
+    );
+    this.save();
+    this.changed();
+  }
+
+  /** Plays an audio file alongside the video and switches to it. */
+  async addAudio(path: string): Promise<void> {
+    if (!this.media) return;
+    this.addedAudio = path;
+    try {
+      await api.addAudio(path);
+    } catch (e) {
+      this.addedAudio = null;
+      throw e;
+    }
+    toast(t("audioAdded"));
+  }
+
+  /** Removes an audio file the user added; it won't load next time either. */
+  async removeAudio(track: AudioTrack): Promise<void> {
+    await api.removeAudio(track.id);
+    toast(t("audioRemoved", { name: audioLabel(track) }));
+  }
+
+  /** Moves to the next audio track the player can play. */
+  private cycleAudio(): void {
+    const usable = this.audio.filter((a) => a.supported);
+    if (usable.length < 2) {
+      toast(usable.length ? t("audioOnlyOne") : t("noAudio"));
+      return;
+    }
+    const at = usable.findIndex((a) => a.selected);
+    this.selectAudio(usable[(at + 1) % usable.length]!);
+  }
+
   /** Saves every track's style under its key, keeping keys from other
-      episodes, and the picture's shape. */
+      episodes, the picture's shape and the audio track. */
   private save = debounce(() => {
     const media = this.media;
     if (!media) return;
     const tracks = { ...(media.series?.tracks ?? {}) };
     for (const v of this.views) tracks[v.track.key] = { ...v.style };
-    media.series = { tracks, aspect: this.aspect };
+    media.series = { tracks, aspect: this.aspect, ...(this.audioChoice && { audio: this.audioChoice }) };
     void api.saveSeriesSettings(media.folder, media.series);
   }, 400);
 
@@ -463,6 +577,9 @@ export class Player {
         break;
       case "aspect":
         this.setAspect(ASPECTS[(ASPECTS.indexOf(this.aspect) + 1) % ASPECTS.length]!);
+        break;
+      case "cycleAudio":
+        this.cycleAudio();
         break;
       case "speedReset":
         void api.setMpvOption("speed", "1").then(() => toast(t("speedToast", { n: "1.0" })));

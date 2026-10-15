@@ -20,6 +20,8 @@ use std::{
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
+
+use crate::audio::AudioTrack;
 use tauri::{
     AppHandle, Emitter, WebviewWindow, Wry,
     plugin::{Builder, PluginHandle, TauriPlugin},
@@ -31,7 +33,7 @@ pub struct Error(String);
 
 /// The player's state as `PlayerPlugin.state` reports it.
 #[derive(Clone, Deserialize)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 struct Remote {
     time: f64,
     paused: bool,
@@ -43,6 +45,8 @@ struct Remote {
     error: Option<String>,
     /// A physical keyboard is attached.
     keyboard: bool,
+    /// Bumped whenever the audio tracks change or another is selected.
+    audio_version: i64,
 }
 
 impl Default for Remote {
@@ -57,6 +61,7 @@ impl Default for Remote {
             mute: false,
             error: None,
             keyboard: false,
+            audio_version: 0,
         }
     }
 }
@@ -66,6 +71,8 @@ pub struct Mpv {
     state: Mutex<Remote>,
     /// mpv's `start`: where the next file opens.
     start: Mutex<Option<f64>>,
+    /// mpv's `audio-files`: extra audio tracks for the next file.
+    audio_files: Mutex<Vec<String>>,
 }
 
 static MPV: OnceLock<Mpv> = OnceLock::new();
@@ -144,7 +151,8 @@ impl Mpv {
             ("loadfile", [path, ..]) => {
                 let start = self.start.lock().unwrap_or_else(|e| e.into_inner()).unwrap_or(0.0);
                 let paused = self.state().paused;
-                self.call::<Value>("open", json!({ "path": path, "start": start, "paused": paused }))?;
+                let audio = std::mem::take(&mut *self.audio_files.lock().unwrap_or_else(|e| e.into_inner()));
+                self.call::<Value>("open", json!({ "path": path, "start": start, "paused": paused, "audio": audio }))?;
                 let mut state = self.state();
                 state.time = start;
                 state.duration = 0.0;
@@ -197,6 +205,7 @@ pub fn create_mpv() -> Result<&'static Mpv> {
     Ok(MPV.get_or_init(|| Mpv {
         state: Mutex::new(Remote::default()),
         start: Mutex::new(None),
+        audio_files: Mutex::new(Vec::new()),
     }))
 }
 
@@ -216,8 +225,41 @@ pub fn set_screen_brightness(level: f64) -> Result<()> {
     create_mpv()?.set(json!({ "brightness": level })).map_err(|e| anyhow!("{}", e.0))
 }
 
-pub fn load(mpv: &Mpv, path: &str) -> Result<()> {
+/// Opens `path` with `audio` files as extra audio tracks; see `player.rs`.
+pub fn load(mpv: &Mpv, path: &str, audio: &[String]) -> Result<()> {
+    *mpv.audio_files.lock().unwrap_or_else(|e| e.into_inner()) = audio.to_vec();
     mpv.command("loadfile", &[path, "replace"]).map_err(|e| anyhow!("loading {path}: {}", e.0))
+}
+
+// ---------- audio tracks (see `PlayerPlugin.audioTracks`) ----------
+
+pub fn audio_tracks(mpv: &Mpv) -> Vec<AudioTrack> {
+    #[derive(Deserialize)]
+    struct Tracks {
+        tracks: Vec<AudioTrack>,
+    }
+    mpv.call::<Tracks>("audioTracks", json!({}))
+        .map(|t| t.tracks)
+        .inspect_err(|e| eprintln!("beyt: reading the audio tracks: {}", e.0))
+        .unwrap_or_default()
+}
+
+/// Changes whenever the audio tracks do. ExoPlayer only reports the open file's.
+pub fn audio_signature(mpv: &Mpv, _video: &str) -> Option<String> {
+    Some(mpv.state().audio_version.to_string())
+}
+
+pub fn select_audio(mpv: &Mpv, id: i64) -> Result<()> {
+    mpv.call::<Value>("selectAudio", json!({ "id": id })).map(drop).map_err(|e| anyhow!("{}", e.0))
+}
+
+/// Adds an audio file to the open video and switches to it once it is read.
+pub fn add_audio(mpv: &Mpv, path: &str) -> Result<()> {
+    mpv.call::<Value>("addAudio", json!({ "path": path })).map(drop).map_err(|e| anyhow!("{}", e.0))
+}
+
+pub fn remove_audio(mpv: &Mpv, id: i64) -> Result<()> {
+    mpv.call::<Value>("removeAudio", json!({ "id": id })).map(drop).map_err(|e| anyhow!("{}", e.0))
 }
 
 /// Shapes the picture; see `player.rs`. `PlayerPlugin.fitSurface` sizes the surface to match.

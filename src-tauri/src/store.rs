@@ -1,4 +1,4 @@
-//! Local SQLite storage: watch positions, subtitle files added by hand,
+//! Local SQLite storage: watch positions, subtitle and audio files added by hand,
 //! per-series subtitle settings and app settings.
 
 use std::{
@@ -40,6 +40,11 @@ const SCHEMA: &str = "
         updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS added_subtitles (
+        video TEXT NOT NULL,
+        path  TEXT NOT NULL,
+        PRIMARY KEY (video, path)
+    );
+    CREATE TABLE IF NOT EXISTS added_audio (
         video TEXT NOT NULL,
         path  TEXT NOT NULL,
         PRIMARY KEY (video, path)
@@ -138,6 +143,8 @@ impl Store {
             tx.execute("UPDATE OR REPLACE watch SET path = ?2 WHERE path = ?1", params![from, to])?;
             tx.execute("UPDATE OR REPLACE added_subtitles SET video = ?2 WHERE video = ?1", params![from, to])?;
             tx.execute("UPDATE OR REPLACE added_subtitles SET path = ?2 WHERE path = ?1", params![from, to])?;
+            tx.execute("UPDATE OR REPLACE added_audio SET video = ?2 WHERE video = ?1", params![from, to])?;
+            tx.execute("UPDATE OR REPLACE added_audio SET path = ?2 WHERE path = ?1", params![from, to])?;
             tx.execute("UPDATE vocab SET video = ?2 WHERE video = ?1", params![from, to])?;
         }
         tx.commit()?;
@@ -187,6 +194,23 @@ impl Store {
             "DELETE FROM added_subtitles WHERE video = ?1 AND path = ?2",
             params![video, path],
         )?;
+        Ok(())
+    }
+
+    pub fn added_audio(&self, video: &str) -> Result<Vec<String>> {
+        let db = self.db();
+        let mut stmt = db.prepare("SELECT path FROM added_audio WHERE video = ?1 ORDER BY rowid")?;
+        let rows = stmt.query_map([video], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn add_audio(&self, video: &str, path: &str) -> Result<()> {
+        self.db().execute("INSERT OR IGNORE INTO added_audio (video, path) VALUES (?1, ?2)", params![video, path])?;
+        Ok(())
+    }
+
+    pub fn remove_audio(&self, video: &str, path: &str) -> Result<()> {
+        self.db().execute("DELETE FROM added_audio WHERE video = ?1 AND path = ?2", params![video, path])?;
         Ok(())
     }
 
@@ -369,6 +393,18 @@ mod tests {
         store.remove_subtitle("/v.mkv", "/subs/b.srt").unwrap();
         assert_eq!(store.added_subtitles("/v.mkv").unwrap(), ["/subs/a.srt"]);
         assert_eq!(store.added_subtitles("/w.mkv").unwrap(), ["/subs/c.srt"]);
+    }
+
+    #[test]
+    fn added_audio_follows_renames() {
+        let store = Store::in_memory().unwrap();
+        store.add_audio("/a.mkv", "/dub/a.fa.mka").unwrap();
+        store.add_audio("/a.mkv", "/dub/a.fa.mka").unwrap();
+        store.rename_paths(&[("/a.mkv".to_string(), "/b.mkv".to_string())]).unwrap();
+        assert!(store.added_audio("/a.mkv").unwrap().is_empty());
+        assert_eq!(store.added_audio("/b.mkv").unwrap(), ["/dub/a.fa.mka"]);
+        store.remove_audio("/b.mkv", "/dub/a.fa.mka").unwrap();
+        assert!(store.added_audio("/b.mkv").unwrap().is_empty());
     }
 
     #[test]
