@@ -3,6 +3,31 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.17.0 (2026-10-15)
+
+### Added
+
+- On Android, tapping a subtitle word opens its translation in a sheet
+  instead of a small popup over the word. Holding the phone upright, the
+  sheet rises from the bottom of the screen; turned sideways, it slides in
+  as a drawer from the side, the right in English and the left in Persian,
+  so the subtitles stay in view. Drag it back towards its edge, tap outside
+  it, press Back or use its close button to dismiss it, and tap another
+  word behind it to look that one up straight away.
+
+## 0.16.2 (2026-10-15)
+
+### Changed
+
+- Words in the subtitles respond more clearly to the pointer. Hovering a
+  word underlines it from the middle out over a soft tint, pressing it
+  answers at once, and a word you look up fills with a blue highlight that
+  drains away when its popup closes. The highlight is a little roomier, so
+  words are easier to hit.
+- Punctuation next to a word is no longer part of it: clicking "hello,"
+  highlights and looks up just "hello".
+- A blurred subtitle stays readable while you look up one of its words.
+
 ## 0.16.1 (2026-10-15)
 
 ### Changed

@@ -76,6 +76,10 @@ export class TrackView {
   }
 }
 
+/** Punctuation around a word, kept outside its span so the highlight and
+ *  the lookup cover only the word ("hello," → "hello"). */
+const EDGES = /^([^\p{L}\p{M}\p{N}]*)(.*?)([^\p{L}\p{M}\p{N}]*)$/su;
+
 /** One subtitle line, a span per word so the word popup can attach later. */
 function renderLine(text: string, cueIndex: number): HTMLElement {
   const line = document.createElement("span");
@@ -84,13 +88,15 @@ function renderLine(text: string, cueIndex: number): HTMLElement {
   line.dataset.cue = String(cueIndex);
   for (const part of text.split(/(\s+)/)) {
     if (!part) continue;
-    if (/^\s+$/.test(part)) {
+    const [, lead = "", core = "", trail = ""] = EDGES.exec(part) ?? [];
+    if (!core) {
       line.append(part);
-    } else {
-      const word = document.createElement("span");
-      word.textContent = part;
-      line.append(word);
+      continue;
     }
+    const word = document.createElement("span");
+    word.className = "word";
+    word.textContent = core;
+    line.append(lead, word, trail);
   }
   return line;
 }
