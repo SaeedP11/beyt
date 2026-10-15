@@ -3,6 +3,13 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.12.2 (2026-10-15)
+
+### Fixed
+
+- On Android, the library shows video thumbnails. They were made with
+  ffmpeg, which phones don't have; Android's own decoders make them now.
+
 ## 0.12.1 (2026-10-15)
 
 ### Fixed

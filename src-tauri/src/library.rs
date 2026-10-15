@@ -6,9 +6,10 @@ use std::{
     fs,
     hash::{Hash, Hasher},
     path::{Path, PathBuf},
-    process::Command,
     time::{Duration, UNIX_EPOCH},
 };
+#[cfg(not(target_os = "android"))]
+use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 #[cfg(target_os = "linux")]
@@ -43,12 +44,9 @@ pub fn thumbnail(video: &Path, at: Option<f64>, cache_root: &Path) -> Result<Pat
     let meta = fs::metadata(video).with_context(|| format!("reading {}", video.display()))?;
     let modified = meta.modified().ok().and_then(|m| m.duration_since(UNIX_EPOCH).ok()).unwrap_or(Duration::ZERO);
 
-    let at = match at {
-        Some(t) if t > 0.0 => t,
-        _ => duration(video).map_or(60.0, |d| d * 0.15),
-    };
+    let at = at.filter(|t| *t > 0.0);
     // Five-second steps, so resuming a little later doesn't make a new image.
-    let step = (at / 5.0).floor() as u64;
+    let step = at.map(|t| (t / 5.0).floor() as u64);
 
     let mut hasher = DefaultHasher::new();
     (video, meta.len(), modified.as_secs(), step).hash(&mut hasher);
@@ -58,27 +56,47 @@ pub fn thumbnail(video: &Path, at: Option<f64>, cache_root: &Path) -> Result<Pat
     }
     fs::create_dir_all(cache_root).with_context(|| format!("creating {}", cache_root.display()))?;
 
+    // Written under another name first, so a half-written file is never served.
+    let partial = out.with_extension("part.jpg");
+    let grabbed = grab_frame(video, at, &partial);
+    if grabbed.is_ok() && partial.is_file() {
+        fs::rename(&partial, &out)?;
+        return Ok(out);
+    }
+    let _ = fs::remove_file(&partial);
+    grabbed?;
+    bail!("no frame could be read from {}", video.display())
+}
+
+/// Writes one frame of `video` to `out` with ffmpeg.
+#[cfg(not(target_os = "android"))]
+fn grab_frame(video: &Path, at: Option<f64>, out: &Path) -> Result<()> {
+    let at = at.unwrap_or_else(|| duration(video).map_or(60.0, |d| d * 0.15));
     // Seeking past the end gives no frame; then take the first one.
     for seek in [at, 0.0] {
-        // Written under another name first, so a half-written file is never served.
-        let partial = out.with_extension("part.jpg");
         let output = Command::new("ffmpeg")
             .args(["-v", "error", "-nostdin", "-y", "-ss", &format!("{seek:.1}"), "-i"])
             .arg(video)
             .args(["-an", "-sn", "-frames:v", "1", "-vf", &format!("scale={THUMB_WIDTH}:-2"), "-q:v", "5"])
-            .arg(&partial)
+            .arg(out)
             .output()
             .context("running ffmpeg (is ffmpeg installed?)")?;
-        if output.status.success() && partial.is_file() {
-            fs::rename(&partial, &out)?;
-            return Ok(out);
+        if output.status.success() && out.is_file() {
+            return Ok(());
         }
-        let _ = fs::remove_file(&partial);
     }
     bail!("no frame could be read from {}", video.display())
 }
 
+/// Android has no ffmpeg; the player plugin reads the frame with the
+/// system's own decoders.
+#[cfg(target_os = "android")]
+fn grab_frame(video: &Path, at: Option<f64>, out: &Path) -> Result<()> {
+    crate::player::thumbnail(video, at, THUMB_WIDTH, out)
+}
+
 /// Length of `video` in seconds, from its header.
+#[cfg(not(target_os = "android"))]
 fn duration(video: &Path) -> Option<f64> {
     let out = Command::new("ffprobe")
         .args(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0"])

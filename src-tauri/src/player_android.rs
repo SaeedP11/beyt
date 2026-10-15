@@ -12,6 +12,7 @@
 //! worker threads).
 
 use std::{
+    path::Path,
     sync::{Mutex, OnceLock},
     time::Duration,
 };
@@ -227,6 +228,13 @@ pub fn plugin() -> TauriPlugin<Wry> {
 /// Runs one of the plugin's other commands (`storageAccess`, `requestStorageAccess`, `moveToBack`).
 pub fn run<T: DeserializeOwned>(command: &str) -> Result<T> {
     create_mpv()?.call(command, json!({})).map_err(|e| anyhow!("{}", e.0))
+}
+
+/// Writes a JPEG of one frame of `video` to `out`, `width` pixels wide; see
+/// `PlayerPlugin.thumbnail`. Without `at` (seconds) the frame is 15% in.
+pub fn thumbnail(video: &Path, at: Option<f64>, width: u32, out: &Path) -> Result<()> {
+    let args = json!({ "path": video, "at": at, "width": width, "out": out });
+    create_mpv()?.call::<Value>("thumbnail", args).map(drop).map_err(|e| anyhow!("{}", e.0))
 }
 
 fn poll_state() {

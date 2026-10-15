@@ -36,7 +36,11 @@ error states. Design for both English (LTR) and Persian (RTL) from the start.
   changes raise the patch version (0.2.0 → 0.2.1).
 - Update every copy together: `package.json`, `src-tauri/tauri.conf.json`,
   `src-tauri/Cargo.toml` (and `Cargo.lock`) and `flake.nix`.
-- Add an entry to `CHANGELOG.md` for the new version.
+- Always write a `CHANGELOG.md` entry for every new version, in the same
+  change as the bump; never bump without one. Put it at the top as
+  `## X.Y.Z (YYYY-MM-DD)` with `### Added`, `### Changed` or `### Fixed`
+  sections, and describe each change from the user's point of view in
+  plain sentences, like the existing entries.
 
 ## Commands
 
