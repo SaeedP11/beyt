@@ -3,6 +3,19 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.12.1 (2026-10-15)
+
+### Fixed
+
+- On Android, brightness is the screen's brightness from 1 to 100%, like
+  the phone's own slider, and starts from where the screen already is. It
+  used the desktop's video-picture scale (50–115%) instead. Leaving Beyt
+  hands brightness back to the phone.
+- On Android, a long press on the video plays at 2× without also opening
+  the player menu.
+- On Android, the last frame of a video no longer shows around the library
+  after leaving it.
+
 ## 0.12.0 (2026-10-15)
 
 ### Added

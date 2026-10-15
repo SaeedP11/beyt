@@ -16,6 +16,7 @@ import android.os.Environment
 import android.provider.Settings
 import android.view.Gravity
 import android.view.SurfaceView
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.WebView
@@ -126,6 +127,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val path = args.getString("path")
     val uri = if (path.contains("://")) Uri.parse(path) else Uri.fromFile(File(path))
     lastError = null
+    stage.visibility = View.VISIBLE
     player.setMediaItem(MediaItem.fromUri(uri), (args.optDouble("start", 0.0) * 1000).toLong())
     player.playWhenReady = !args.getBoolean("paused", false)
     player.prepare()
@@ -136,6 +138,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   fun stop(invoke: Invoke) {
     player.stop()
     player.clearMediaItems()
+    // A surface keeps its last frame, which would show around the library.
+    stage.visibility = View.GONE
     invoke.resolve()
   }
 
@@ -160,6 +164,22 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       activity.window.attributes = attrs
     }
     invoke.resolve()
+  }
+
+  /** Beyt's screen brightness (0–1): its own if it has set one, else the phone's. */
+  @Command
+  fun brightness(invoke: Invoke) {
+    val own = activity.window.attributes.screenBrightness
+    val level = if (own >= 0) {
+      own.toDouble()
+    } else {
+      try {
+        Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255.0
+      } catch (e: Settings.SettingNotFoundException) {
+        0.5
+      }
+    }
+    invoke.resolve(JSObject().apply { put("level", level.coerceIn(0.0, 1.0)) })
   }
 
   @Command

@@ -53,8 +53,6 @@ pub struct Mpv {
     state: Mutex<Remote>,
     /// mpv's `start`: where the next file opens.
     start: Mutex<Option<f64>>,
-    /// mpv's picture `brightness` (-100–100); shown as the screen's brightness.
-    brightness: Mutex<i64>,
 }
 
 static MPV: OnceLock<Mpv> = OnceLock::new();
@@ -106,13 +104,6 @@ impl Mpv {
                 *self.start.lock().unwrap_or_else(|e| e.into_inner()) = number(&value).ok();
                 Ok(())
             }
-            "brightness" => {
-                let picture = number(&value)?.round() as i64;
-                *self.brightness.lock().unwrap_or_else(|e| e.into_inner()) = picture;
-                // brightness.rs keeps the picture level within 50–115.
-                let screen = ((100 + picture) as f64 - 50.0) / 65.0;
-                self.set(json!({ "brightness": screen.clamp(0.01, 1.0) }))
-            }
             // ExoPlayer picks its decoder itself, and text subtitles are the
             // overlay's; picture subtitles aren't drawn on Android yet.
             "hwdec" | "sid" => Ok(()),
@@ -130,7 +121,6 @@ impl Mpv {
             "eof-reached" => json!(state.eof),
             "volume" => json!(state.volume),
             "mute" => json!(state.mute),
-            "brightness" => json!(*self.brightness.lock().unwrap_or_else(|e| e.into_inner())),
             _ => return Err(Error(format!("{name} is not available on Android"))),
         };
         serde_json::from_value(value).map_err(|e| Error(e.to_string()))
@@ -194,8 +184,23 @@ pub fn create_mpv() -> Result<&'static Mpv> {
     Ok(MPV.get_or_init(|| Mpv {
         state: Mutex::new(Remote::default()),
         start: Mutex::new(None),
-        brightness: Mutex::new(0),
     }))
+}
+
+/// The screen's brightness for Beyt's window, 0–1. Android brightness is the
+/// screen's, not the picture's as with mpv, so brightness.rs asks for it here.
+pub fn screen_brightness() -> Result<f64> {
+    #[derive(Deserialize)]
+    struct Level {
+        level: f64,
+    }
+    let level: Level = create_mpv()?.call("brightness", json!({})).map_err(|e| anyhow!("{}", e.0))?;
+    Ok(level.level)
+}
+
+/// Sets the screen's brightness (0–1) while Beyt is in front.
+pub fn set_screen_brightness(level: f64) -> Result<()> {
+    create_mpv()?.set(json!({ "brightness": level })).map_err(|e| anyhow!("{}", e.0))
 }
 
 pub fn load(mpv: &Mpv, path: &str) -> Result<()> {
