@@ -3,12 +3,22 @@ import * as clock from "./clock";
 import { activeCues, cueIndexAt, neighbourCue } from "./cues";
 import { languageName, t } from "./i18n";
 import { TrackView, defaultStyle } from "./overlay";
-import type { Cue, Media, Mode, Playback, PickedWord, Track, TrackStyle, TrackUpdate } from "./types";
+import type { Aspect, Cue, Media, Mode, Playback, PickedWord, Track, TrackStyle, TrackUpdate } from "./types";
 import type { Action } from "./keymap";
 import { getSettings } from "./settings";
 import { debounce, fmtTime, toast } from "./ui";
 
 const MODES: Mode[] = ["show", "blur", "hide"];
+
+/** Picture shapes in the order the aspect key cycles through them. */
+export const ASPECTS: Aspect[] = ["original", "16:9", "4:3", "1.85:1", "2.35:1", "fill", "stretch"];
+
+export function aspectLabel(aspect: Aspect): string {
+  if (aspect === "original") return t("aspectOriginal");
+  if (aspect === "fill") return t("aspectFill");
+  if (aspect === "stretch") return t("aspectStretch");
+  return aspect;
+}
 
 /** A volume or brightness change, as the level indicator shows it. */
 export interface LevelChange {
@@ -40,6 +50,8 @@ export class Player {
   views: TrackView[] = [];
   /** Pause at the end of every line of the selected track (shadowing practice). */
   autoPause = false;
+  /** The picture's shape, saved with the series. */
+  aspect: Aspect = "original";
   private pendingLineEnd: number | null = null;
   /** The next episode, counting down to autoplay. */
   upNext: { path: string; name: string; seconds: number; total: number } | null = null;
@@ -134,6 +146,9 @@ export class Player {
     this.selected = Math.max(0, this.views.findIndex((v) => v.style.enabled && v.isText));
     this.eofHandled = false;
     this.syncMpvSubtitle();
+    const saved = media.series?.aspect;
+    this.aspect = saved && ASPECTS.includes(saved) ? saved : "original";
+    void api.setAspect(this.aspect);
     document.title = `${media.title} · Beyt`;
     if (media.resumedAt) toast(t("resumed", { time: fmtTime(media.resumedAt) }), 4000);
     this.changed();
@@ -223,13 +238,25 @@ export class Player {
     void api.setMpvSubtitle(sid);
   }
 
-  /** Saves every track's style under its key, keeping keys from other episodes. */
+  /** Changes the picture's shape for this video and the rest of its series. */
+  setAspect(aspect: Aspect): void {
+    this.aspect = aspect;
+    api.setAspect(aspect).then(
+      () => toast(t("aspectToast", { name: aspectLabel(aspect) })),
+      (e) => toast(String(e), 5000),
+    );
+    this.save();
+    this.changed();
+  }
+
+  /** Saves every track's style under its key, keeping keys from other
+      episodes, and the picture's shape. */
   private save = debounce(() => {
     const media = this.media;
     if (!media) return;
     const tracks = { ...(media.series?.tracks ?? {}) };
     for (const v of this.views) tracks[v.track.key] = { ...v.style };
-    media.series = { tracks };
+    media.series = { tracks, aspect: this.aspect };
     void api.saveSeriesSettings(media.folder, media.series);
   }, 400);
 
@@ -428,6 +455,9 @@ export class Player {
         void api
           .adjustProperty("speed", action === "speedUp" ? 0.1 : -0.1)
           .then((n) => toast(t("speedToast", { n: n.toFixed(2).replace(/0$/, "") })));
+        break;
+      case "aspect":
+        this.setAspect(ASPECTS[(ASPECTS.indexOf(this.aspect) + 1) % ASPECTS.length]!);
         break;
       case "speedReset":
         void api.setMpvOption("speed", "1").then(() => toast(t("speedToast", { n: "1.0" })));

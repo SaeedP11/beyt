@@ -41,6 +41,23 @@ pub fn load(mpv: &Mpv, path: &str) -> Result<()> {
         .map_err(|e| anyhow!("loading {path}: {e:?}"))
 }
 
+/// Shapes the picture: `original`, a ratio such as `16:9` (checked by the
+/// `set_aspect` command), `fill` (zoom in until the bars are gone) or `stretch`.
+pub fn set_aspect(mpv: &Mpv, aspect: &str) -> Result<()> {
+    let (ratio, panscan, keep) = match aspect {
+        "original" => ("no", 0.0, true),
+        "fill" => ("no", 1.0, true),
+        "stretch" => ("no", 0.0, false),
+        ratio => (ratio, 0.0, true),
+    };
+    let set = || -> libmpv2::Result<()> {
+        mpv.set_property("video-aspect-override", ratio)?;
+        mpv.set_property("panscan", panscan)?;
+        mpv.set_property("keepaspect", keep)
+    };
+    set().map_err(|e| anyhow!("setting the aspect ratio: {e:?}"))
+}
+
 /// Puts a GL area for mpv's video under the window's webview.
 pub fn attach_video(window: &WebviewWindow, mpv: &'static Mpv) -> Result<()> {
     let vbox = window.default_vbox()?;

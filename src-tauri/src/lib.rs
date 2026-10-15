@@ -620,6 +620,17 @@ async fn seek_absolute(app: State<'_, App>, time: f64) -> Result<(), String> {
         .map_err(|e| format!("{e:?}"))
 }
 
+/// The picture shapes the player offers; ratios are width:height.
+const ASPECTS: &[&str] = &["original", "16:9", "4:3", "1.85:1", "2.35:1", "fill", "stretch"];
+
+#[tauri::command]
+async fn set_aspect(app: State<'_, App>, aspect: String) -> Result<(), String> {
+    if !ASPECTS.contains(&aspect.as_str()) {
+        return Err(format!("not an aspect ratio: {aspect}"));
+    }
+    player::set_aspect(app.mpv, &aspect).map_err(|e| format!("{e:#}"))
+}
+
 /// Shows a picture-based subtitle track drawn by mpv itself, or none.
 #[tauri::command]
 async fn set_mpv_subtitle(app: State<'_, App>, sid: Option<i64>) -> Result<(), String> {
@@ -791,6 +802,7 @@ pub fn run() {
             set_pause,
             seek_absolute,
             set_mpv_subtitle,
+            set_aspect,
             toggle_fullscreen,
             quit,
             log_error,

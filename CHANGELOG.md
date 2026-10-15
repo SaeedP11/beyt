@@ -3,6 +3,29 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.13.0 (2026-10-15)
+
+### Added
+
+- The picture's aspect ratio can be changed, on the desktop and on
+  Android: the video's own shape, 16:9, 4:3, 1.85:1 or 2.35:1, Fill
+  screen (zooms in until the black bars are gone, cropping the edges) or
+  Stretch. Pick one from the new button in the control bar or the player's
+  right-click menu, or press Z to step through them. The choice is
+  remembered for the rest of the series.
+
+### Changed
+
+- On Android, the control bar no longer shows the fullscreen button: the
+  player already fills the phone's screen.
+
+### Fixed
+
+- On Android, the file details dialog shows the video's streams, frame
+  rate, duration and hash. It only showed an error, because it read them
+  with ffprobe, which phones don't have; Android's own media library reads
+  them now.
+
 ## 0.12.2 (2026-10-15)
 
 ### Fixed

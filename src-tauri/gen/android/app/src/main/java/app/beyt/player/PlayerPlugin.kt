@@ -29,18 +29,24 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.MetadataRetriever
 import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import java.io.File
+import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
+import org.json.JSONArray
 
 @TauriPlugin
 class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
@@ -52,6 +58,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private var volume = 100.0
   private var muted = false
   private var lastError: String? = null
+  /** The picture's shape: `original`, a ratio like `16:9`, `fill` or `stretch`. */
+  private var aspect = "original"
 
   override fun load(webView: WebView) {
     // Black behind the video; the surface is sized to the video's shape. It
@@ -97,13 +105,24 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
-  /** Letterboxes the surface so the video keeps its shape. */
+  /** Sizes the surface for the picture shape in `aspect`. Letterboxed shapes
+   *  fit inside the screen; `fill` covers it, with the overflow cut off. */
   private fun fitSurface() {
     val size = player.videoSize
     val (w, h) = stage.width to stage.height
     if (size.width == 0 || size.height == 0 || w == 0 || h == 0) return
-    val aspect = size.width * size.pixelWidthHeightRatio / size.height
-    val (sw, sh) = if (w.toFloat() / h > aspect) (h * aspect).toInt() to h else w to (w / aspect).toInt()
+    val natural = size.width * size.pixelWidthHeightRatio / size.height
+    val ratio = aspect.split(":").mapNotNull { it.toFloatOrNull() }
+      .takeIf { it.size == 2 && it[1] > 0 }?.let { it[0] / it[1] }
+    val (shape, cover) = when (aspect) {
+      "fill" -> natural to true
+      else -> (ratio ?: natural) to false
+    }
+    val (sw, sh) = when {
+      aspect == "stretch" -> w to h
+      (w.toFloat() / h > shape) != cover -> (h * shape).toInt() to h
+      else -> w to (w / shape).toInt()
+    }
     val params = surface.layoutParams as FrameLayout.LayoutParams
     if (params.width != sw || params.height != sh) {
       params.width = sw
@@ -159,6 +178,10 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     if (args.has("volume")) volume = args.getDouble("volume")
     if (args.has("mute")) muted = args.getBoolean("mute")
     player.volume = if (muted) 0f else (volume / 100).coerceIn(0.0, 1.0).toFloat()
+    if (args.has("aspect")) {
+      aspect = args.getString("aspect")
+      fitSurface()
+    }
     if (args.has("brightness")) {
       // 0–1 sets the screen's brightness for this app; below 0 follows the system.
       val attrs = activity.window.attributes
@@ -250,6 +273,177 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val scaled = Bitmap.createScaledBitmap(frame, width, frame.height * width / frame.width, true)
     frame.recycle()
     return scaled
+  }
+
+  // ---------- file details ----------
+
+  /** Describes `path` the way `ffprobe -show_format -show_streams -of json`
+   *  does, for info.rs: Media3's extractors read the streams, the same ones
+   *  that play the video. Reading the file is slow, so it runs off the UI thread. */
+  @Command
+  fun probe(invoke: Invoke) {
+    val path = invoke.getArgs().getString("path")
+    Thread {
+      try {
+        val item = MediaItem.fromUri(Uri.fromFile(File(path)))
+        val (groups, durationUs) = MetadataRetriever.Builder(activity, item).build().use {
+          it.retrieveTrackGroups().get(20, TimeUnit.SECONDS) to it.retrieveDurationUs().get(20, TimeUnit.SECONDS)
+        }
+        val streams = JSONArray()
+        var container: String? = null
+        for (i in 0 until groups.length) {
+          val group = groups[i]
+          for (j in 0 until group.length) {
+            val format = group.getFormat(j)
+            container = container ?: format.containerMimeType
+            stream(group.type, format)?.let { streams.put(it) }
+          }
+        }
+        val seconds = if (durationUs == C.TIME_UNSET || durationUs <= 0) null else durationUs / 1e6
+        val (title, bitrate) = fileTags(path)
+        invoke.resolve(JSObject().apply {
+          put("format", JSObject().apply {
+            formatName(container, path)?.let { put("format_name", it) }
+            seconds?.let { put("duration", it.toString()) }
+            // Matroska keeps no overall bitrate; ffprobe works it out the same way.
+            (bitrate ?: seconds?.let { (File(path).length() * 8 / it).toLong() })?.let { put("bit_rate", it.toString()) }
+            put("tags", JSObject().apply { title?.let { put("title", it) } })
+          })
+          put("streams", streams)
+        })
+      } catch (e: Exception) {
+        invoke.reject((e.cause ?: e).message ?: e.toString())
+      }
+    }.start()
+  }
+
+  /** One stream as ffprobe lists it, or null for kinds info.rs doesn't show. */
+  private fun stream(type: Int, format: Format): JSObject? {
+    val kind = when (type) {
+      C.TRACK_TYPE_VIDEO -> "video"
+      C.TRACK_TYPE_AUDIO -> "audio"
+      C.TRACK_TYPE_TEXT -> "subtitle"
+      else -> return null
+    }
+    // Text subtitles are turned into cues while being read; `codecs` keeps their own type.
+    val mime = if (format.sampleMimeType == MimeTypes.APPLICATION_MEDIA3_CUES) format.codecs else format.sampleMimeType
+    return JSObject().apply {
+      put("codec_type", kind)
+      put("codec_name", codecName(mime))
+      put("tags", JSObject().apply {
+        format.language?.let { put("language", it) }
+        format.label?.let { put("title", it) }
+      })
+      put("disposition", JSObject().apply {
+        put("default", if (format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0) 1 else 0)
+        put("forced", if (format.selectionFlags and C.SELECTION_FLAG_FORCED != 0) 1 else 0)
+      })
+      when (kind) {
+        "video" -> {
+          if (format.width > 0) put("width", format.width)
+          if (format.height > 0) put("height", format.height)
+          if (format.frameRate > 0) put("avg_frame_rate", "${(format.frameRate * 1000).roundToInt()}/1000")
+          videoProfile(format.codecs)?.let { put("profile", it) }
+          format.colorInfo?.let { color ->
+            if (color.lumaBitdepth > 0) put("bits_per_raw_sample", color.lumaBitdepth.toString())
+            when (color.colorTransfer) {
+              C.COLOR_TRANSFER_ST2084 -> put("color_transfer", "smpte2084")
+              C.COLOR_TRANSFER_HLG -> put("color_transfer", "arib-std-b67")
+              else -> {}
+            }
+          }
+        }
+        "audio" -> {
+          if (format.channelCount > 0) put("channels", format.channelCount)
+          if (format.sampleRate > 0) put("sample_rate", format.sampleRate.toString())
+        }
+      }
+    }
+  }
+
+  /** The container's title tag and overall bitrate, where Android can read them. */
+  private fun fileTags(path: String): Pair<String?, Long?> {
+    val retriever = MediaMetadataRetriever()
+    return try {
+      retriever.setDataSource(path)
+      val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+      val bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toLongOrNull()
+      title to bitrate
+    } catch (e: Exception) {
+      null to null
+    } finally {
+      retriever.release()
+    }
+  }
+
+  /** ffprobe's format names, which info.rs and the dialog know. */
+  private fun formatName(container: String?, path: String): String? = when (container) {
+    MimeTypes.VIDEO_MATROSKA, MimeTypes.VIDEO_WEBM, MimeTypes.AUDIO_MATROSKA, MimeTypes.AUDIO_WEBM -> "matroska,webm"
+    MimeTypes.VIDEO_MP4, MimeTypes.AUDIO_MP4 -> "mov,mp4,m4a,3gp,3g2,mj2"
+    MimeTypes.VIDEO_AVI -> "avi"
+    MimeTypes.VIDEO_MP2T -> "mpegts"
+    else -> when (path.substringAfterLast('.', "").lowercase()) {
+      "mkv", "webm" -> "matroska,webm"
+      "mp4", "m4v", "mov" -> "mov,mp4,m4a,3gp,3g2,mj2"
+      "avi" -> "avi"
+      "ts", "m2ts" -> "mpegts"
+      else -> container
+    }
+  }
+
+  /** ffprobe's codec names for Android's MIME types. */
+  private fun codecName(mime: String?): String = when (mime) {
+    null -> "unknown"
+    MimeTypes.VIDEO_H264 -> "h264"
+    MimeTypes.VIDEO_H265, MimeTypes.VIDEO_DOLBY_VISION -> "hevc"
+    MimeTypes.VIDEO_AV1 -> "av1"
+    MimeTypes.VIDEO_VP9 -> "vp9"
+    MimeTypes.VIDEO_VP8 -> "vp8"
+    MimeTypes.VIDEO_MP4V -> "mpeg4"
+    MimeTypes.VIDEO_MPEG2 -> "mpeg2video"
+    MimeTypes.AUDIO_AAC -> "aac"
+    MimeTypes.AUDIO_AC3 -> "ac3"
+    MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> "eac3"
+    MimeTypes.AUDIO_TRUEHD -> "truehd"
+    MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_DTS_EXPRESS -> "dts"
+    MimeTypes.AUDIO_OPUS -> "opus"
+    MimeTypes.AUDIO_VORBIS -> "vorbis"
+    MimeTypes.AUDIO_FLAC -> "flac"
+    MimeTypes.AUDIO_MPEG -> "mp3"
+    MimeTypes.AUDIO_RAW -> "pcm_s16le"
+    MimeTypes.APPLICATION_SUBRIP -> "subrip"
+    MimeTypes.TEXT_SSA -> "ass"
+    MimeTypes.TEXT_VTT -> "webvtt"
+    MimeTypes.APPLICATION_TX3G -> "mov_text"
+    MimeTypes.APPLICATION_PGS -> "hdmv_pgs_subtitle"
+    MimeTypes.APPLICATION_VOBSUB -> "dvd_subtitle"
+    MimeTypes.APPLICATION_DVBSUBS -> "dvb_subtitle"
+    else -> mime.substringAfter('/').removePrefix("x-")
+  }
+
+  /** The profile from an RFC 6381 codec string: "avc1.640028" → "High", "hvc1.2.4.L120" → "Main 10". */
+  private fun videoProfile(codecs: String?): String? {
+    val parts = codecs?.split('.') ?: return null
+    return when (parts[0]) {
+      "avc1", "avc3" -> when (parts.getOrNull(1)?.take(2)?.toIntOrNull(16)) {
+        66 -> "Baseline"
+        77 -> "Main"
+        88 -> "Extended"
+        100 -> "High"
+        110 -> "High 10"
+        122 -> "High 4:2:2"
+        244 -> "High 4:4:4 Predictive"
+        else -> null
+      }
+      "hvc1", "hev1" -> when (parts.getOrNull(1)?.trimStart('A', 'B', 'C')?.toIntOrNull()) {
+        1 -> "Main"
+        2 -> "Main 10"
+        3 -> "Main Still Picture"
+        4 -> "Rext"
+        else -> null
+      }
+      else -> null
+    }
   }
 
   // ---------- storage ----------

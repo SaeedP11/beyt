@@ -5,6 +5,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
   AnkiResult,
+  Aspect,
   Candidate,
   FileInfo,
   Folder,
@@ -74,6 +75,7 @@ export const api = {
   setPause: (paused: boolean) => invoke<void>("set_pause", { paused }),
   seekAbsolute: (time: number) => invoke<void>("seek_absolute", { time }),
   setMpvSubtitle: (sid: number | null) => invoke<void>("set_mpv_subtitle", { sid }),
+  setAspect: (aspect: Aspect) => invoke<void>("set_aspect", { aspect }),
   toggleFullscreen: () => invoke<void>("toggle_fullscreen"),
   quit: () => invoke<void>("quit"),
 

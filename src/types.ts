@@ -93,9 +93,14 @@ export interface TrackStyle {
   offset: number;
 }
 
-/** Saved per series folder, keyed by track key. */
+/** The picture's shape: the video's own, a forced width:height ratio,
+ *  zoomed in to fill the screen (cropping), or stretched to it. */
+export type Aspect = "original" | "16:9" | "4:3" | "1.85:1" | "2.35:1" | "fill" | "stretch";
+
+/** Saved per series folder: track styles keyed by track key, and the picture shape. */
 export interface SeriesSettings {
   tracks: Record<string, TrackStyle>;
+  aspect?: Aspect;
 }
 
 export interface DictEntry {

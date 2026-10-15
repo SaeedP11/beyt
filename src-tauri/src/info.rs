@@ -6,8 +6,9 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
     path::Path,
-    process::Command,
 };
+#[cfg(not(target_os = "android"))]
+use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
@@ -164,6 +165,14 @@ struct ProbeStream {
     disposition: HashMap<String, i64>,
 }
 
+/// Phones have no ffprobe: Media3, which plays the video, describes it in
+/// ffprobe's shape instead (`PlayerPlugin.probe`).
+#[cfg(target_os = "android")]
+fn probe(video: &Path) -> Result<Probe> {
+    serde_json::from_value(crate::player::probe(video)?).context("reading the video's details")
+}
+
+#[cfg(not(target_os = "android"))]
 fn probe(video: &Path) -> Result<Probe> {
     let out = Command::new("ffprobe")
         .args(["-v", "error", "-show_format", "-show_streams", "-of", "json"])

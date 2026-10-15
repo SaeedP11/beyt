@@ -3,11 +3,12 @@ import { Menu } from "primereact/menu";
 import type { MenuItem } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
-import { api } from "../api";
+import { api, isAndroid } from "../api";
 import * as clock from "../clock";
 import { player, useMediaQuery, usePlayback, usePlayer } from "../hooks";
 import { getLang, t } from "../i18n";
 import { popupMotions } from "../motion";
+import { ASPECTS, aspectLabel } from "../player";
 import { fmtTime } from "../ui";
 import { SeekBar } from "./SeekBar";
 
@@ -49,6 +50,17 @@ export function PlayerChrome({
     { label: t("fileInfo"), icon: "pi pi-info-circle", command: onInfo },
     { label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp },
     { label: t("settings"), icon: "pi pi-cog", command: onSettings },
+  ];
+  const aspectMenu = useRef<Menu>(null);
+  const aspectItems: MenuItem[] = [
+    {
+      label: t("aspect"),
+      items: ASPECTS.map((a) => ({
+        label: aspectLabel(a),
+        icon: a === player.aspect ? "pi pi-check" : "pi pi-fw",
+        command: () => player.setAspect(a),
+      })),
+    },
   ];
   const [dragging, setDragging] = useState<number | null>(null);
   const time = dragging ?? p.time;
@@ -187,15 +199,38 @@ export function PlayerChrome({
             </>
           )}
           <Button
-            icon="pi pi-window-maximize"
+            icon="pi pi-expand"
             rounded
             text
-            aria-label={t("fullscreen")}
-            tooltip={`${t("fullscreen")} (F)`}
+            aria-label={t("aspect")}
+            aria-haspopup="menu"
+            tooltip={`${t("aspect")} (Z)`}
             tooltipOptions={{ position: "top" }}
-            onClick={() => void api.toggleFullscreen()}
+            onClick={(e) => aspectMenu.current?.toggle(e)}
             className="text-white"
           />
+          <Menu
+            ref={aspectMenu}
+            model={aspectItems}
+            popup
+            popupAlignment={getLang() === "fa" ? "left" : "right"}
+            transitionOptions={popupMotions.connected}
+            onShow={() => onMenuVisibleChange(true)}
+            onHide={() => onMenuVisibleChange(false)}
+          />
+          {/* Phone apps already fill the screen. */}
+          {!isAndroid && (
+            <Button
+              icon="pi pi-window-maximize"
+              rounded
+              text
+              aria-label={t("fullscreen")}
+              tooltip={`${t("fullscreen")} (F)`}
+              tooltipOptions={{ position: "top" }}
+              onClick={() => void api.toggleFullscreen()}
+              className="text-white"
+            />
+          )}
         </div>
       </div>
     </>

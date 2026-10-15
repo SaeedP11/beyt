@@ -208,6 +208,11 @@ pub fn load(mpv: &Mpv, path: &str) -> Result<()> {
     mpv.command("loadfile", &[path, "replace"]).map_err(|e| anyhow!("loading {path}: {}", e.0))
 }
 
+/// Shapes the picture; see `player.rs`. `PlayerPlugin.fitSurface` sizes the surface to match.
+pub fn set_aspect(mpv: &Mpv, aspect: &str) -> Result<()> {
+    mpv.set(json!({ "aspect": aspect })).map_err(|e| anyhow!("setting the aspect ratio: {}", e.0))
+}
+
 /// The video surface is set up by `PlayerPlugin.load`; see `plugin`.
 pub fn attach_video(_window: &WebviewWindow, _mpv: &'static Mpv) -> Result<()> {
     Ok(())
@@ -235,6 +240,11 @@ pub fn run<T: DeserializeOwned>(command: &str) -> Result<T> {
 pub fn thumbnail(video: &Path, at: Option<f64>, width: u32, out: &Path) -> Result<()> {
     let args = json!({ "path": video, "at": at, "width": width, "out": out });
     create_mpv()?.call::<Value>("thumbnail", args).map(drop).map_err(|e| anyhow!("{}", e.0))
+}
+
+/// The streams and format of `video`, in ffprobe's JSON shape; see `PlayerPlugin.probe`.
+pub fn probe(video: &Path) -> Result<Value> {
+    create_mpv()?.call("probe", json!({ "path": video })).map_err(|e| anyhow!("{}", e.0))
 }
 
 fn poll_state() {

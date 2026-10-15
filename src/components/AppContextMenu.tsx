@@ -8,6 +8,7 @@ import { player } from "../hooks";
 import { t } from "../i18n";
 import { type Action, type Keymap, keyParts, keysFor } from "../keymap";
 import { popupMotions } from "../motion";
+import { ASPECTS, aspectLabel } from "../player";
 import { getSettings } from "../settings";
 import { toast } from "../ui";
 
@@ -147,6 +148,11 @@ function playerItems(
           void api.setMpvOption("speed", String(n)).then(() => toast(t("speedToast", { n: n === 1 ? "1.0" : n })));
         }),
       ),
+    ),
+    row(
+      `${t("aspect")}: ${aspectLabel(player.aspect)}`,
+      "pi pi-expand",
+      ASPECTS.map((a) => row(aspectLabel(a), a === player.aspect ? "pi pi-check" : null, undefined, () => player.setAspect(a))),
     ),
     { separator: true },
     actionRow("subtitles", t("tracks"), "pi pi-comments", keymap, run),
