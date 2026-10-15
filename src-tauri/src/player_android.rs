@@ -265,6 +265,19 @@ pub fn probe(video: &Path) -> Result<Value> {
     create_mpv()?.call("probe", json!({ "path": video })).map_err(|e| anyhow!("{}", e.0))
 }
 
+/// Decodes `len` seconds of `video`'s soundtrack from `start` into `out` as
+/// mono 16-bit little-endian samples, and returns their rate; see
+/// `PlayerPlugin.decodeAudio`. Used by sync.rs in place of ffmpeg.
+pub fn decode_audio(video: &Path, start: f64, len: f64, out: &Path) -> Result<u32> {
+    #[derive(Deserialize)]
+    struct Decoded {
+        rate: u32,
+    }
+    let args = json!({ "path": video, "start": start, "length": len, "out": out });
+    let decoded: Decoded = create_mpv()?.call("decodeAudio", args).map_err(|e| anyhow!("{}", e.0))?;
+    Ok(decoded.rate)
+}
+
 /// Also tells the page when a physical keyboard is plugged in or removed.
 fn poll_state(app: AppHandle<Wry>) {
     let Ok(mpv) = create_mpv() else { return };

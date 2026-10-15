@@ -10,6 +10,7 @@ import { Slider } from "primereact/slider";
 import { Tag } from "primereact/tag";
 import { useState } from "react";
 
+import { isAndroid } from "../api";
 import { usePlayer } from "../hooks";
 import { t } from "../i18n";
 import { popupMotions, usePanelMotion } from "../motion";
@@ -18,6 +19,10 @@ import { trackLabel } from "../player";
 import type { Mode, Position, TrackStyle } from "../types";
 import { toast } from "../ui";
 import { MatchDialog } from "./MatchDialog";
+import { SubtitleBrowser } from "./SubtitleBrowser";
+
+/** Where shared storage starts on Android, for a video with no folder. */
+const ANDROID_STORAGE = "/storage/emulated/0";
 
 interface Props {
   visible: boolean;
@@ -29,9 +34,20 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
   const motion = usePanelMotion();
   const player = usePlayer();
   const [matching, setMatching] = useState<string[]>([]);
+  /** Android: which kind of pick the storage browser is open for. */
+  const [browsing, setBrowsing] = useState<"add" | "match" | null>(null);
+
+  const add = async (path: string) => {
+    try {
+      await player.addSubtitle(path);
+    } catch (e) {
+      toast(String(e), 5000);
+    }
+  };
 
   // Several files: rank them against the soundtrack.
   const findMatch = async () => {
+    if (isAndroid) return setBrowsing("match");
     const picked = await open({
       multiple: true,
       directory: false,
@@ -42,18 +58,21 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
   };
 
   const addFile = async () => {
+    if (isAndroid) return setBrowsing("add");
     const path = await open({
       multiple: false,
       directory: false,
       defaultPath: player.media?.folder,
       filters: [{ name: t("tracks"), extensions: ["srt", "vtt"] }],
     });
-    if (typeof path !== "string") return;
-    try {
-      await player.addSubtitle(path);
-    } catch (e) {
-      toast(String(e), 5000);
-    }
+    if (typeof path === "string") await add(path);
+  };
+
+  const onBrowsed = (paths: string[]) => {
+    const kind = browsing;
+    setBrowsing(null);
+    if (kind === "match") setMatching(paths);
+    else if (paths[0]) void add(paths[0]);
   };
 
   return (
@@ -94,6 +113,14 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
         </div>
       </Sidebar>
       <MatchDialog files={matching} onHide={() => setMatching([])} />
+      {isAndroid && (
+        <SubtitleBrowser
+          start={browsing && (player.media?.folder ?? ANDROID_STORAGE)}
+          multiple={browsing === "match"}
+          onPick={onBrowsed}
+          onHide={() => setBrowsing(null)}
+        />
+      )}
     </>
   );
 }

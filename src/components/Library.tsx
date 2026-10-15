@@ -807,7 +807,7 @@ function crumbsOf(path: string): { name: string; path: string }[] {
 }
 
 /** An Up button and the path as a breadcrumb, scrolled so the open folder shows. */
-function PathBar({ folder, onOpen }: { folder: Folder; onOpen: (path: string) => void }) {
+export function PathBar({ folder, onOpen }: { folder: Folder; onOpen: (path: string) => void }) {
   const scroller = useRef<HTMLElement>(null);
   const crumbs = crumbsOf(folder.path);
   const atRoot = !folder.parent || crumbs.length === 1;
