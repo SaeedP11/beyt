@@ -163,6 +163,7 @@ export function App() {
         player.onPlayback(p);
       });
       await events.trackUpdated((u) => player.onTrackUpdated(u));
+      await events.audioTracks((u) => player.onAudioTracks(u));
 
       const frame = () => {
         player.render(clock.now());

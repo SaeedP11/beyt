@@ -19,6 +19,8 @@ use libmpv2::render::{OpenGLInitParams, RenderContext, RenderParam, RenderParamA
 use serde::Serialize;
 use tauri::WebviewWindow;
 
+use crate::audio::AudioTrack;
+
 /// Creates the mpv instance. It lives for the whole process, which lets the
 /// render context borrow it from GTK callbacks.
 pub fn create_mpv() -> Result<&'static Mpv> {
@@ -36,9 +38,85 @@ pub fn create_mpv() -> Result<&'static Mpv> {
     Ok(Box::leak(Box::new(mpv)))
 }
 
-pub fn load(mpv: &Mpv, path: &str) -> Result<()> {
+/// Opens `path` with `audio` files as extra audio tracks. mpv picks the
+/// audio track itself; the page switches to the series' choice once the
+/// tracks are known.
+pub fn load(mpv: &Mpv, path: &str, audio: &[String]) -> Result<()> {
+    let set = || -> libmpv2::Result<()> {
+        // A track chosen for the last file would carry over to this one.
+        mpv.set_property("aid", "auto")?;
+        mpv.command("change-list", &["audio-files", "clr", ""])?;
+        for file in audio {
+            // `-append` takes one path as is, even with `:` in it.
+            mpv.command("change-list", &["audio-files", "append", file])?;
+        }
+        Ok(())
+    };
+    set().map_err(|e| anyhow!("setting up audio files: {e:?}"))?;
     mpv.command("loadfile", &[path, "replace"])
         .map_err(|e| anyhow!("loading {path}: {e:?}"))
+}
+
+// ---------- audio tracks ----------
+
+/// The open file's audio tracks, raw; `audio::finish` tidies them.
+pub fn audio_tracks(mpv: &Mpv) -> Vec<AudioTrack> {
+    let count = mpv.get_property::<i64>("track-list/count").unwrap_or(0);
+    (0..count)
+        .filter_map(|i| {
+            let get = |field: &str| mpv.get_property::<String>(&format!("track-list/{i}/{field}")).ok();
+            let flag = |field: &str| mpv.get_property::<bool>(&format!("track-list/{i}/{field}")).unwrap_or(false);
+            if get("type").as_deref() != Some("audio") {
+                return None;
+            }
+            Some(AudioTrack {
+                id: mpv.get_property(&format!("track-list/{i}/id")).ok()?,
+                lang: get("lang").unwrap_or_default(),
+                detail: get("title").unwrap_or_default(),
+                codec: get("codec"),
+                channels: mpv.get_property(&format!("track-list/{i}/demux-channel-count")).ok(),
+                default: flag("default"),
+                selected: flag("selected"),
+                supported: true,
+                file: flag("external").then(|| get("external-filename")).flatten(),
+                added: false,
+            })
+        })
+        .collect()
+}
+
+/// Changes whenever the audio tracks of `video` do (one is added, removed or
+/// selected). None while mpv is still on another file.
+pub fn audio_signature(mpv: &Mpv, video: &str) -> Option<String> {
+    let path = mpv.get_property::<String>("path").ok()?;
+    if path != video {
+        return None;
+    }
+    let count = mpv.get_property::<i64>("track-list/count").unwrap_or(0);
+    let aid = mpv.get_property::<String>("aid").unwrap_or_default();
+    Some(format!("{count}:{aid}"))
+}
+
+pub fn select_audio(mpv: &Mpv, id: i64) -> Result<()> {
+    mpv.set_property("aid", id).map_err(|e| anyhow!("switching audio tracks: {e:?}"))
+}
+
+/// Adds an audio file to the open video and switches to it.
+pub fn add_audio(mpv: &Mpv, path: &str) -> Result<()> {
+    mpv.command("audio-add", &[path, "select"])
+        .map_err(|_| anyhow!("This file has no audio Beyt can play."))
+}
+
+pub fn remove_audio(mpv: &Mpv, id: i64) -> Result<()> {
+    let playing = audio_tracks(mpv).iter().any(|t| t.id == id && t.selected);
+    mpv.command("audio-remove", &[&id.to_string()])
+        .map_err(|e| anyhow!("removing the audio track: {e:?}"))?;
+    // Removing the playing track leaves mpv silent rather than picking another.
+    let rest = audio_tracks(mpv);
+    match rest.iter().find(|t| t.default).or(rest.first()) {
+        Some(next) if playing => select_audio(mpv, next.id),
+        _ => Ok(()),
+    }
 }
 
 /// Shapes the picture: `original`, a ratio such as `16:9` (checked by the

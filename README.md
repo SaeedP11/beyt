@@ -65,6 +65,7 @@ Every key can be changed in Settings → Keyboard shortcuts; press `?` in the ap
 | ← / → | Seek (step set in Settings) |
 | ↑ / ↓ , M | Volume, mute |
 | - / = , 0 | Slower, faster, normal speed |
+| # | Next audio track |
 | A / D | Previous / next subtitle line |
 | S | Replay current line |
 | Tab | Select next track |

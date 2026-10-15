@@ -40,9 +40,14 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.MetadataRetriever
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
 import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
@@ -69,6 +74,14 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private var lastError: String? = null
   /** The picture's shape: `original`, a ratio like `16:9`, `fill` or `stretch`. */
   private var aspect = "original"
+
+  /** The open video, and audio files played alongside it as extra tracks. */
+  private var video: Uri? = null
+  private val audioFiles = mutableListOf<String>()
+  /** Bumped when the tracks change or another is selected, so Rust knows to ask again. */
+  private var audioVersion = 0
+  /** An audio file (1-based, as in `audioFiles`) to switch to once its tracks are known. */
+  private var selectAudioFile: Int? = null
 
   override fun load(webView: WebView) {
     // Black behind the video; the surface is sized to the video's shape. It
@@ -109,6 +122,15 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
         override fun onPlayerError(error: PlaybackException) {
           lastError = error.cause?.message ?: error.message ?: error.errorCodeName
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+          audioVersion++
+          val file = selectAudioFile ?: return
+          audioEntries().firstOrNull { it.file == file }?.let {
+            selectAudioFile = null
+            select(it)
+          }
         }
       })
     }
@@ -154,20 +176,49 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun open(invoke: Invoke) {
     val args = invoke.getArgs()
-    val path = args.getString("path")
-    val uri = if (path.contains("://")) Uri.parse(path) else Uri.fromFile(File(path))
     lastError = null
     stage.visibility = View.VISIBLE
-    player.setMediaItem(MediaItem.fromUri(uri), (args.optDouble("start", 0.0) * 1000).toLong())
+    video = uriOf(args.getString("path"))
+    audioFiles.clear()
+    args.optJSONArray("audio")?.let { list -> for (i in 0 until list.length()) audioFiles.add(list.getString(i)) }
+    selectAudioFile = null
+    clearAudioChoice()
+    player.setMediaSource(mediaSource(), (args.optDouble("start", 0.0) * 1000).toLong())
     player.playWhenReady = !args.getBoolean("paused", false)
     player.prepare()
     invoke.resolve()
+  }
+
+  private fun uriOf(path: String): Uri = if (path.contains("://")) Uri.parse(path) else Uri.fromFile(File(path))
+
+  /** The video, merged with the audio files when there are any. */
+  private fun mediaSource(): MediaSource {
+    val factory = DefaultMediaSourceFactory(activity)
+    val main = factory.createMediaSource(MediaItem.fromUri(video ?: Uri.EMPTY))
+    if (audioFiles.isEmpty()) return main
+    val extra = audioFiles.map { factory.createMediaSource(MediaItem.fromUri(uriOf(it))) }
+    return MergingMediaSource(main, *extra.toTypedArray())
+  }
+
+  /** Lets ExoPlayer pick the audio track again. */
+  private fun clearAudioChoice() {
+    player.trackSelectionParameters =
+      player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
+  }
+
+  /** Swaps in the video with the current audio files, carrying on from where it was. */
+  private fun reload() {
+    clearAudioChoice()
+    player.setMediaSource(mediaSource(), player.currentPosition)
+    player.prepare()
   }
 
   @Command
   fun stop(invoke: Invoke) {
     player.stop()
     player.clearMediaItems()
+    video = null
+    audioFiles.clear()
     // A surface keeps its last frame, which would show around the library.
     stage.visibility = View.GONE
     invoke.resolve()
@@ -229,7 +280,96 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       put("mute", muted)
       put("error", lastError)
       put("keyboard", hasHardKeyboard())
+      put("audioVersion", audioVersion)
     })
+  }
+
+  // ---------- audio tracks ----------
+
+  /** One audio track: its group and place in it, and which added file (1-based) it is from, if any. */
+  private class AudioEntry(val id: Int, val group: Tracks.Group, val index: Int, val file: Int?)
+
+  /** Every audio track, numbered from 1 in order like mpv's. With audio files
+   *  merged in, each group's id starts with its source's place: `0:` for the
+   *  video, `1:` for the first file. */
+  private fun audioEntries(): List<AudioEntry> {
+    val entries = mutableListOf<AudioEntry>()
+    for (group in player.currentTracks.groups) {
+      if (group.type != C.TRACK_TYPE_AUDIO) continue
+      val source = if (audioFiles.isEmpty()) 0 else group.mediaTrackGroup.id.substringBefore(':').toIntOrNull() ?: 0
+      for (i in 0 until group.length) {
+        entries.add(AudioEntry(entries.size + 1, group, i, source.takeIf { it > 0 }))
+      }
+    }
+    return entries
+  }
+
+  private fun select(entry: AudioEntry) {
+    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+      .setOverrideForType(TrackSelectionOverride(entry.group.mediaTrackGroup, entry.index))
+      .build()
+  }
+
+  /** The tracks in audio.rs's `AudioTrack` shape. */
+  @Command
+  fun audioTracks(invoke: Invoke) {
+    val list = JSONArray()
+    for (entry in audioEntries()) {
+      val format = entry.group.getTrackFormat(entry.index)
+      list.put(JSObject().apply {
+        put("id", entry.id)
+        put("lang", format.language ?: "")
+        put("detail", format.label ?: "")
+        put("codec", codecName(format.sampleMimeType))
+        if (format.channelCount > 0) put("channels", format.channelCount)
+        put("default", format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0)
+        put("selected", entry.group.isTrackSelected(entry.index))
+        put("supported", entry.group.isTrackSupported(entry.index))
+        entry.file?.let { audioFiles.getOrNull(it - 1) }?.let { put("file", it) }
+      })
+    }
+    invoke.resolve(JSObject().apply { put("tracks", list) })
+  }
+
+  @Command
+  fun selectAudio(invoke: Invoke) {
+    val id = invoke.getArgs().getInt("id")
+    val entry = audioEntries().firstOrNull { it.id == id } ?: return invoke.reject("no audio track $id")
+    select(entry)
+    invoke.resolve()
+  }
+
+  /** Plays an audio file alongside the video and switches to it. The file is
+   *  read first, off the UI thread: one ExoPlayer can't play would stop the video. */
+  @Command
+  fun addAudio(invoke: Invoke) {
+    val path = invoke.getArgs().getString("path")
+    Thread {
+      val playable = try {
+        val groups = MetadataRetriever.Builder(activity, MediaItem.fromUri(uriOf(path))).build().use {
+          it.retrieveTrackGroups().get(20, TimeUnit.SECONDS)
+        }
+        (0 until groups.length).any { groups[it].type == C.TRACK_TYPE_AUDIO }
+      } catch (e: Exception) {
+        false
+      }
+      activity.runOnUiThread {
+        if (!playable) return@runOnUiThread invoke.reject("This file has no audio Beyt can play.")
+        audioFiles.add(path)
+        selectAudioFile = audioFiles.size
+        reload()
+        invoke.resolve()
+      }
+    }.start()
+  }
+
+  @Command
+  fun removeAudio(invoke: Invoke) {
+    val id = invoke.getArgs().getInt("id")
+    val file = audioEntries().firstOrNull { it.id == id }?.file ?: return invoke.reject("not an added audio file")
+    audioFiles.removeAt(file - 1)
+    reload()
+    invoke.resolve()
   }
 
   /** A physical keyboard is attached (USB or Bluetooth), not just the on-screen one.

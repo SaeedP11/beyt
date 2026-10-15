@@ -97,10 +97,42 @@ export interface TrackStyle {
  *  zoomed in to fill the screen (cropping), or stretched to it. */
 export type Aspect = "original" | "16:9" | "4:3" | "1.85:1" | "2.35:1" | "fill" | "stretch";
 
-/** Saved per series folder: track styles keyed by track key, and the picture shape. */
+/** Saved per series folder: track styles keyed by track key, the picture
+ *  shape, and the audio track last chosen (matched by language and title). */
 export interface SeriesSettings {
   tracks: Record<string, TrackStyle>;
   aspect?: Aspect;
+  audio?: AudioChoice;
+}
+
+export interface AudioChoice {
+  lang: string;
+  detail: string;
+}
+
+/** An audio track of the open video (see src-tauri/src/audio.rs). */
+export interface AudioTrack {
+  /** The player's id, used to select it. */
+  id: number;
+  /** Two-letter code when known, else the raw tag, else "und". */
+  lang: string;
+  /** The track's title, or an audio file's name. */
+  detail: string;
+  codec: string | null;
+  channels: number | null;
+  default: boolean;
+  selected: boolean;
+  /** The player can decode it. */
+  supported: boolean;
+  /** The audio file it comes from, when it isn't part of the video. */
+  file: string | null;
+  /** A file the user added, so it can be removed again. */
+  added: boolean;
+}
+
+export interface AudioUpdate {
+  path: string;
+  tracks: AudioTrack[];
 }
 
 export interface DictEntry {

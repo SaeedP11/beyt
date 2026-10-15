@@ -4,6 +4,7 @@ import type { MenuItem } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
 import { api, isAndroid } from "../api";
+import { audioItems, audioMenuLabel } from "../audio";
 import * as clock from "../clock";
 import { player, useHardKeyboard, useMediaQuery, usePlayback, usePlayer } from "../hooks";
 import { getLang, t } from "../i18n";
@@ -51,11 +52,13 @@ export function PlayerChrome({
   const keyboard = useHardKeyboard();
   const { keymap } = useSettings();
   const lockKey = keysFor("lock", keymap)[0];
+  const audioKey = keysFor("cycleAudio", keymap)[0];
   const lockLabel = locked ? t("unlock") : t("lock");
   const more = useRef<Menu>(null);
   /** The ⋯ button, which the aspect menu opens from on narrow screens. */
   const moreButton = useRef<EventTarget | null>(null);
   const aspectMenu = useRef<Menu>(null);
+  const audioMenu = useRef<Menu>(null);
   // Widening the window unmounts the menu without an onHide.
   useEffect(() => {
     if (!narrow) onMenuVisibleChange(false);
@@ -65,6 +68,11 @@ export function PlayerChrome({
     ...(keyboard ? [{ label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp }] : []),
     { label: t("settings"), icon: "pi pi-cog", command: onSettings },
     { separator: true },
+    {
+      label: audioMenuLabel(),
+      icon: "pi pi-headphones",
+      command: () => setTimeout(() => audioMenu.current?.show({ currentTarget: moreButton.current } as never)),
+    },
     {
       label: `${t("aspect")}: ${aspectLabel(player.aspect)}`,
       icon: "pi pi-expand",
@@ -83,6 +91,11 @@ export function PlayerChrome({
         command: () => player.setAspect(a),
       })),
     },
+  ];
+  const audio = audioItems((label, icon, command, disabled) => ({ label, icon: icon ?? "pi pi-fw", command, disabled }));
+  const audioMenuItems: MenuItem[] = [
+    ...(audio.tracks.length ? [{ label: t("audioTrack"), items: audio.tracks }, { separator: true }] : []),
+    ...audio.actions,
   ];
   const [dragging, setDragging] = useState<number | null>(null);
   const time = dragging ?? p.time;
@@ -250,6 +263,17 @@ export function PlayerChrome({
                   className={plain}
                 />
                 <Button
+                  icon="pi pi-headphones"
+                  rounded
+                  text
+                  aria-label={t("audioTrack")}
+                  aria-haspopup="menu"
+                  tooltip={audioKey ? `${t("audioTrack")} (${keyParts(audioKey).join("+")})` : t("audioTrack")}
+                  tooltipOptions={{ position: "top" }}
+                  onClick={(e) => audioMenu.current?.toggle(e)}
+                  className={plain}
+                />
+                <Button
                   icon="pi pi-expand"
                   rounded
                   text
@@ -275,6 +299,16 @@ export function PlayerChrome({
                 )}
               </>
             )}
+            <Menu
+              ref={audioMenu}
+              model={audioMenuItems}
+              popup
+              popupAlignment={popupAlignment}
+              transitionOptions={popupMotions.connected}
+              className="max-w-[min(24rem,92vw)]"
+              onShow={() => onMenuVisibleChange(true)}
+              onHide={() => onMenuVisibleChange(false)}
+            />
             <Menu
               ref={aspectMenu}
               model={aspectItems}

@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use crate::player::Mpv;
+use crate::player::{self, Mpv};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -59,9 +59,18 @@ pub fn capture(
         })
         .flatten();
     let clip = format!("beyt-{id}.mp3");
-    // mpv numbers audio tracks from 1; ffmpeg's a:N from 0.
-    let aid = mpv.get_property::<i64>("aid").unwrap_or(1).max(1) - 1;
-    let audio = cut_audio(video, &media_dir.join(&clip), start - opts.padding, end + opts.padding, aid)
+    // The audio being heard: an added file's own track, or the video's Nth
+    // (ffmpeg's a:N counts the video's audio tracks only, from 0).
+    let tracks = player::audio_tracks(mpv);
+    let selected = tracks.iter().find(|t| t.selected);
+    let (source, aid) = match selected.and_then(|t| t.file.as_deref()) {
+        Some(file) => (Path::new(file), 0),
+        None => {
+            let before = selected.map_or(0, |s| tracks.iter().filter(|t| t.file.is_none() && t.id < s.id).count());
+            (video, before as i64)
+        }
+    };
+    let audio = cut_audio(source, &media_dir.join(&clip), start - opts.padding, end + opts.padding, aid)
         .map(|_| clip)
         .inspect_err(|e| eprintln!("beyt: audio clip failed: {e:#}"))
         .ok();
