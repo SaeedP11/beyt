@@ -41,7 +41,8 @@ export class TrackView {
     if (this.el.parentElement !== parent) parent.append(this.el);
     this.el.lang = this.track.lang;
     this.el.dataset.track = String(this.track.id);
-    this.el.style.fontSize = `${s.size}px`;
+    // The size is set for a 1280×720 window; --sub-scale follows the window.
+    this.el.style.fontSize = `calc(${s.size}px * var(--sub-scale))`;
     this.el.style.color = s.color;
     this.el.classList.toggle("rtl", this.track.rtl);
     this.el.classList.toggle("blur", s.mode === "blur");

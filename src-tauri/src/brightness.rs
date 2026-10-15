@@ -1,12 +1,17 @@
 //! Screen brightness: the display's backlight where Linux can reach one
 //! (laptops), else mpv's picture brightness (external monitors have none).
+//! On Android it is always the screen's brightness, for Beyt's window.
+
+// Android uses only its own get and set; the Linux paths stay unused there.
+#![cfg_attr(target_os = "android", allow(dead_code))]
 
 use std::fs;
 use std::path::PathBuf;
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use libmpv2::Mpv;
+use crate::player::Mpv;
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
@@ -65,6 +70,7 @@ fn read_u32(path: &std::path::Path) -> Option<u32> {
 
 /// Asks logind to set the backlight, which needs no root for the active
 /// session; falls back to writing sysfs (works if a udev rule allows it).
+#[cfg(target_os = "linux")]
 fn set_backlight(b: &Backlight, value: u32) -> Result<()> {
     let via_logind = || -> Result<(), dbus::Error> {
         let conn = dbus::blocking::Connection::new_system()?;
@@ -82,6 +88,13 @@ fn set_backlight(b: &Backlight, value: u32) -> Result<()> {
     }
 }
 
+/// Android has no logind; sysfs is all there is (usually closed to apps).
+#[cfg(not(target_os = "linux"))]
+fn set_backlight(b: &Backlight, value: u32) -> Result<()> {
+    fs::write(b.dir.join("brightness"), value.to_string()).context("could not set the brightness")
+}
+
+#[cfg(not(target_os = "android"))]
 pub fn get(mpv: &Mpv) -> Result<Brightness> {
     if let Some(b) = backlight() {
         let now = read_u32(&b.dir.join("brightness")).context("could not read the brightness")?;
@@ -93,6 +106,7 @@ pub fn get(mpv: &Mpv) -> Result<Brightness> {
 }
 
 /// Sets the brightness to `level` percent, clamped to what the source allows.
+#[cfg(not(target_os = "android"))]
 pub fn set(mpv: &Mpv, level: f64) -> Result<Brightness> {
     if let Some(b) = backlight() {
         let level = level.clamp(BACKLIGHT_MIN, 100.0).round();
@@ -103,6 +117,27 @@ pub fn set(mpv: &Mpv, level: f64) -> Result<Brightness> {
     let picture = video_picture(level);
     mpv.set_property("brightness", picture).map_err(|e| anyhow::anyhow!("{e:?}"))?;
     Ok(Brightness { level: video_level(picture), source: Source::Video })
+}
+
+/// Lowest screen level on Android: 0 is the dimmest the panel goes, which in
+/// a bright room looks like off.
+#[cfg(target_os = "android")]
+const SCREEN_MIN: f64 = 1.0;
+
+/// The screen's brightness for Beyt's window: what Beyt last set, else the
+/// phone's own, so the first swipe starts where the screen already is.
+#[cfg(target_os = "android")]
+pub fn get(_mpv: &Mpv) -> Result<Brightness> {
+    let level = (crate::player::screen_brightness()? * 100.0).round();
+    Ok(Brightness { level: level.clamp(SCREEN_MIN, 100.0), source: Source::Backlight })
+}
+
+/// Sets Beyt's screen brightness; the phone's own comes back when Beyt is left.
+#[cfg(target_os = "android")]
+pub fn set(_mpv: &Mpv, level: f64) -> Result<Brightness> {
+    let level = level.clamp(SCREEN_MIN, 100.0).round();
+    crate::player::set_screen_brightness(level / 100.0)?;
+    Ok(Brightness { level, source: Source::Backlight })
 }
 
 /// mpv's `brightness` (-100–100) for a picture level.

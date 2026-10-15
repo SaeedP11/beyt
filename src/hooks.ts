@@ -19,6 +19,18 @@ export function useLang(): string {
   return useSyncExternalStore(subscribeLang, getLang);
 }
 
+/** True while the CSS media query matches, e.g. `(max-width: 767px)`. */
+export function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const list = window.matchMedia(query);
+      list.addEventListener("change", onChange);
+      return () => list.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(query).matches,
+  );
+}
+
 /** Playback state for controls, sampled `hz` times a second (not every frame). */
 export function usePlayback(hz = 4): Playback {
   const read = () => ({ ...clock.snapshot(), time: clock.now() });

@@ -1,7 +1,9 @@
 node_modules/
 dist/
 src-tauri/target/
-src-tauri/gen/
+src-tauri/gen/schemas/
+# gen/android is the Android Studio project from `cargo tauri android init`.
+# It is kept in git; its own .gitignore leaves out build output.
 samples/
 data/
 result

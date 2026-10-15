@@ -1,8 +1,9 @@
+import { onBackButtonPress } from "@tauri-apps/api/app";
 import { Button } from "primereact/button";
 import { Toast, type ToastMessage } from "primereact/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, events } from "./api";
+import { api, events, isAndroid } from "./api";
 import * as clock from "./clock";
 import { AppContextMenu } from "./components/AppContextMenu";
 import { FileInfoDialog } from "./components/FileInfoDialog";
@@ -15,13 +16,40 @@ import { Transcript } from "./components/Transcript";
 import { UpNextCard } from "./components/UpNextCard";
 import { LevelIndicator } from "./components/LevelIndicator";
 import { WordPopup, type WordPopupHandle } from "./components/WordPopup";
+import { attachGestures, type GestureHandlers, lineSwipe, type Zone } from "./gestures";
 import { player, useLang } from "./hooks";
+import { getLang } from "./i18n";
 import { type Action, bindingTable, eventKey } from "./keymap";
 import { popupMotions } from "./motion";
 import { getSettings, loadSettings, useSettings } from "./settings";
-import { setToastHandler, toast } from "./ui";
+import { fmtTime, setToastHandler, toast } from "./ui";
 
 type Screen = "loading" | "library" | "player";
+
+/** Feedback for a gesture: where it shows, and what it says. */
+interface Hint {
+  icon?: string;
+  text: string;
+  at: Zone;
+}
+
+/** Shown over the video while a gesture acts: on the side seeking by taps
+ *  goes, else in the middle. Seeking sides are physical, like the timeline. */
+function GestureHint({ hint }: { hint: Hint }) {
+  const place =
+    hint.at === "back" ? "left-[12%]" : hint.at === "forward" ? "right-[12%]" : "left-1/2 -translate-x-1/2";
+  return (
+    <div className={`pointer-events-none absolute top-1/2 z-30 -translate-y-1/2 ${place}`}>
+      <div
+        className="flex items-center gap-2 rounded-full bg-ink-950/70 px-4 py-2 text-lg font-semibold whitespace-pre text-white tabular-nums"
+        dir="ltr"
+      >
+        {hint.icon && <i className={hint.icon} />}
+        {hint.text}
+      </div>
+    </div>
+  );
+}
 
 /** Actions that work on the library screen too. */
 const GLOBAL_ACTIONS = new Set<Action>(["help", "settings", "fullscreen", "quit", "back"]);
@@ -30,6 +58,15 @@ const GLOBAL_ACTIONS = new Set<Action>(["help", "settings", "fullscreen", "quit"
 const EDGE = 0.2;
 /** Wheel distance for one brightness step (about one mouse wheel notch). */
 const WHEEL_STEP = 50;
+
+/** Scales subtitles with the window, the way mpv scales them with the video:
+ *  the sizes in settings are for 1280×720. The narrower side wins, so lines
+ *  in a tall narrow window still fit across. */
+function updateSubScale() {
+  const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+  const clamped = Math.min(Math.max(scale, 0.6), 3);
+  document.documentElement.style.setProperty("--sub-scale", clamped.toFixed(3));
+}
 
 export function App() {
   const lang = useLang();
@@ -84,6 +121,8 @@ export function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    updateSubScale();
+    window.addEventListener("resize", updateSubScale);
     setToastHandler((msg, ms, action) => {
       if (!action) {
         toastRef.current?.show({ severity: "secondary", detail: msg, life: ms });
@@ -213,6 +252,27 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [keymap, helpOpen, settingsOpen, infoOpen, menuOpen, runAction]);
 
+  // Android's Back button does what Escape does: closes a dialog or popup,
+  // or leaves the video for the library. In the library it sends Beyt to
+  // the background. Without this, Back closed Beyt from anywhere.
+  const onAndroidBack = useRef(() => {});
+  onAndroidBack.current = () => {
+    const overlay = document.querySelector(".p-dialog-mask, .p-overlaypanel, .p-menu-overlay, .p-contextmenu");
+    if (helpOpen || settingsOpen || infoOpen || menuOpen || overlay) {
+      // They close on Escape, as on the desktop.
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    } else if (screen === "player") {
+      runAction("back");
+    } else {
+      void api.moveToBackground();
+    }
+  };
+  useEffect(() => {
+    if (!isAndroid) return;
+    const listener = onBackButtonPress(() => onAndroidBack.current());
+    return () => void listener.then((l) => l.unregister());
+  }, []);
+
   /** Opens the dictionary popup for a subtitle word element. */
   const lookUp = (e: React.MouseEvent | MouseEvent, el: HTMLElement) => {
     if (el.tagName !== "SPAN" || el.classList.contains("line")) return;
@@ -243,15 +303,138 @@ export function App() {
     else player.adjustVolume(-steps * 5);
   };
 
+  // ---------- touch gestures (see gestures.ts) ----------
+
+  const root = useRef<HTMLDivElement>(null);
+  const [hint, setHint] = useState<Hint | null>(null);
+  const hintTimer = useRef<number | undefined>(undefined);
+  /** Shows a hint over the video; `ms` 0 keeps it until replaced. */
+  const flash = (next: Hint, ms = 700) => {
+    clearTimeout(hintTimer.current);
+    setHint(next);
+    if (ms) hintTimer.current = window.setTimeout(() => setHint(null), ms);
+  };
+  const gesture = useRef({ levelSum: 0, scrubFrom: null as number | null, holding: false, speed: 1 });
+  // Read through a ref, so the listeners attached once see the current state.
+  const gestureHandlers = useRef<GestureHandlers | null>(null);
+  gestureHandlers.current = {
+    tap: () => (showControls ? setControls(false) : wake()),
+    multiTap: (zone, count) => {
+      if (zone === "middle") {
+        if (count === 2) runAction("togglePause");
+        return;
+      }
+      player.runAction(zone === "back" ? "seekBack" : "seekForward");
+      const icon = zone === "back" ? "pi pi-angle-double-left" : "pi pi-angle-double-right";
+      flash({ icon, text: `${getSettings().seekStep * (count - 1)}`, at: zone });
+    },
+    level: (kind, percent) => {
+      // Whole steps of 2%, so a slow swipe still adds up.
+      const g = gesture.current;
+      g.levelSum += percent;
+      const steps = Math.trunc(g.levelSum / 2) * 2;
+      if (!steps) return;
+      g.levelSum -= steps;
+      if (kind === "brightness") player.adjustBrightness(steps);
+      else player.adjustVolume(steps);
+    },
+    scrub: (phase, seconds) => {
+      const g = gesture.current;
+      if (phase === "cancel") {
+        g.scrubFrom = null;
+        setHint(null);
+        return;
+      }
+      g.scrubFrom ??= clock.now();
+      const { duration } = clock.snapshot();
+      const target = Math.min(Math.max(g.scrubFrom + seconds, 0), duration || Infinity);
+      const delta = Math.round(target - g.scrubFrom);
+      if (phase === "move") {
+        flash({ text: `${fmtTime(target)}  ${delta < 0 ? "−" : "+"}${Math.abs(delta)}`, at: "middle" }, 0);
+      } else {
+        player.seekTo(target);
+        g.scrubFrom = null;
+        flash({ text: fmtTime(target), at: "middle" }, 500);
+      }
+    },
+    hold: (active) => {
+      const g = gesture.current;
+      if (active) {
+        const now = clock.snapshot();
+        if (now.paused) return;
+        g.holding = true;
+        g.speed = now.speed;
+        void api.setMpvOption("speed", "2");
+        flash({ icon: "pi pi-forward", text: "2×", at: "middle" }, 0);
+      } else if (g.holding) {
+        g.holding = false;
+        void api.setMpvOption("speed", String(g.speed));
+        setHint(null);
+      }
+    },
+  };
+  useEffect(() => {
+    const el = root.current;
+    if (!el || screen !== "player") return;
+    const h = () => gestureHandlers.current!;
+    return attachGestures(
+      el,
+      {
+        tap: () => h().tap(),
+        multiTap: (zone, count) => h().multiTap(zone, count),
+        level: (kind, percent) => h().level(kind, percent),
+        scrub: (phase, seconds) => h().scrub(phase, seconds),
+        hold: (active) => h().hold(active),
+      },
+      () => getLang() === "fa",
+    );
+  }, [screen]);
+
+  /** A sideways swipe on a subtitle line moves to the previous or next line. */
+  const swipeStart = useRef<{ x: number; y: number; at: number } | null>(null);
+  const swiped = useRef(false);
+  const onSubDown = (e: React.PointerEvent) => {
+    swipeStart.current = e.pointerType === "mouse" ? null : { x: e.clientX, y: e.clientY, at: performance.now() };
+  };
+  const onSubUp = (e: React.PointerEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start) return;
+    const next = lineSwipe(start, { x: e.clientX, y: e.clientY, at: performance.now() }, rtl);
+    if (next === null) return;
+    // The swipe isn't also a tap on a word.
+    swiped.current = true;
+    window.setTimeout(() => (swiped.current = false), 400);
+    runAction(next ? "nextLine" : "prevLine");
+  };
+  const pickWordUnlessSwiped = (e: React.MouseEvent) => {
+    if (!swiped.current) pickWord(e);
+  };
+
   return (
     <div
-      className="relative h-full text-zinc-100"
+      ref={root}
+      // While a video plays, the page itself doesn't pan or zoom: touches are gestures.
+      className={`relative h-full text-zinc-100 ${screen === "player" ? "touch-none" : ""}`}
       onMouseMove={screen === "player" ? wake : undefined}
       onWheel={screen === "player" ? onWheel : undefined}
     >
       {/* TrackView draws subtitle lines into these two stacks. */}
-      <div id="subs-top" className="sub-stack top" onClick={pickWord} />
-      <div id="subs-bottom" className="sub-stack bottom" onClick={pickWord} />
+      <div
+        id="subs-top"
+        className="sub-stack top"
+        onClick={pickWordUnlessSwiped}
+        onPointerDown={onSubDown}
+        onPointerUp={onSubUp}
+      />
+      <div
+        id="subs-bottom"
+        className="sub-stack bottom"
+        onClick={pickWordUnlessSwiped}
+        onPointerDown={onSubDown}
+        onPointerUp={onSubUp}
+      />
+      {hint && screen === "player" && <GestureHint hint={hint} />}
 
       {screen === "player" && (
         <PlayerChrome
@@ -262,6 +445,7 @@ export function App() {
           onToggleTranscript={() => setTranscriptOpen((o) => !o)}
           onHelp={() => setHelpOpen(true)}
           onSettings={() => openSettings()}
+          onMenuVisibleChange={setMenuOpen}
         />
       )}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />

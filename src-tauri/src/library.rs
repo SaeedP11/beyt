@@ -11,6 +11,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+#[cfg(target_os = "linux")]
 use gtk::gio::{self, prelude::*};
 
 use crate::subs;
@@ -125,6 +126,7 @@ pub fn rename(video: &Path, new_stem: &str) -> Result<Moves> {
 }
 
 /// Moves each file to the desktop's Trash, where it can be restored from.
+#[cfg(target_os = "linux")]
 pub fn trash(paths: &[PathBuf]) -> Result<()> {
     for path in paths {
         gio::File::for_path(path)
@@ -135,6 +137,7 @@ pub fn trash(paths: &[PathBuf]) -> Result<()> {
 }
 
 /// Opens the file manager with `path` selected, or at least its folder.
+#[cfg(target_os = "linux")]
 pub fn show_in_folder(path: &Path) -> Result<()> {
     let uri = gio::File::for_path(path).uri().to_string();
     let via_file_manager = || -> Result<(), dbus::Error> {
@@ -149,6 +152,19 @@ pub fn show_in_folder(path: &Path) -> Result<()> {
             .context("opening the folder")?;
     }
     Ok(())
+}
+
+// Android keeps no Trash for plain files, and its file managers take no
+// "select this file" request.
+
+#[cfg(not(target_os = "linux"))]
+pub fn trash(_paths: &[PathBuf]) -> Result<()> {
+    bail!("Moving to the Trash is not available on this system.")
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn show_in_folder(_path: &Path) -> Result<()> {
+    bail!("Showing files in a folder is not available on this system.")
 }
 
 #[cfg(test)]

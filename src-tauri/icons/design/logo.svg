@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Beyt's app icon: the wordmark over two subtitle lines, the couplet a
+       beyt is named for. Rendered by scripts/make-icons.sh, which supplies
+       the Vazirmatn font. Keep the shapes in step with foreground.svg and
+       monochrome.svg (Android's layers). -->
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="#0b0c0f"/>
+  <text x="512" y="483" font-family="Vazirmatn" font-weight="900" font-size="380"
+        fill="#60a5fa" text-anchor="middle" direction="rtl">بیت</text>
+  <rect x="242" y="640" width="540" height="46" rx="23" fill="#ffffff"/>
+  <rect x="322" y="718" width="380" height="46" rx="23" fill="#ffe9a8"/>
+</svg>

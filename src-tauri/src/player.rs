@@ -14,10 +14,8 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use gtk::{glib, prelude::*};
-use libmpv2::{
-    Mpv,
-    render::{OpenGLInitParams, RenderContext, RenderParam, RenderParamApiType},
-};
+pub use libmpv2::Mpv;
+use libmpv2::render::{OpenGLInitParams, RenderContext, RenderParam, RenderParamApiType};
 use serde::Serialize;
 use tauri::WebviewWindow;
 

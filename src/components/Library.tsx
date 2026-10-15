@@ -9,7 +9,7 @@ import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { TabPanel, TabView } from "primereact/tabview";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { api } from "../api";
+import { api, isAndroid } from "../api";
 import { getLang, t } from "../i18n";
 import { popupMotions, useDialogMotion } from "../motion";
 import type { Folder, FolderEntry, Recent } from "../types";
@@ -131,22 +131,28 @@ function useThumbnail(path: string, at: number | null): string | null {
   return src;
 }
 
+/** A small fixed thumbnail (`small`), or a card's: small beside the name on a
+ *  phone, the card's full width from `sm` up. */
 function Thumbnail({ video, small, children }: { video: Video; small?: boolean; children?: React.ReactNode }) {
   const src = useThumbnail(video.path, video.at);
   const watched = video.fraction >= WATCHED;
   return (
-    <div className={`relative aspect-video shrink-0 overflow-hidden bg-ink-800 ${small ? "w-28 rounded-md" : "w-full rounded-xl"}`}>
+    <div
+      className={`relative aspect-video shrink-0 overflow-hidden bg-ink-800 ${
+        small ? "w-28 rounded-md" : "w-32 rounded-lg sm:w-full sm:rounded-xl"
+      }`}
+    >
       {src ? (
         <img src={src} alt="" draggable={false} className="size-full object-cover" />
       ) : (
         <div className="absolute inset-0 grid place-items-center">
-          <i className={`pi pi-video text-zinc-600 ${small ? "" : "text-2xl"}`} />
+          <i className={`pi pi-video text-zinc-600 ${small ? "" : "sm:text-2xl"}`} />
         </div>
       )}
       {watched && <div className="absolute inset-0 bg-ink-950/50" />}
       {children}
       {video.fraction > 0 && !watched && (
-        <div className={`absolute inset-x-0 bottom-0 bg-white/20 ${small ? "h-[3px]" : "h-1"}`}>
+        <div className={`absolute inset-x-0 bottom-0 bg-white/20 ${small ? "h-[3px]" : "h-[3px] sm:h-1"}`}>
           <div className="h-full bg-accent" style={{ width: `${video.fraction * 100}%` }} />
         </div>
       )}
@@ -337,7 +343,34 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     menuFor,
   };
 
+  /** Android: shows the phone's storage here, asking for access first. */
+  const browseStorage = async () => {
+    try {
+      const access = await api.storageAccess();
+      if (access.granted) {
+        if (access.root) await showFolder(folder?.path ?? access.root);
+        return;
+      }
+      toast(t("storageAccessNeeded"), 6000);
+      await api.requestStorageAccess();
+      // Android shows its own settings screen, and the page isn't told when
+      // Beyt is back, so check for a while and carry on once access is given.
+      const started = Date.now();
+      const check = window.setInterval(() => {
+        if (Date.now() - started > 120_000) return window.clearInterval(check);
+        void api.storageAccess().then((a) => {
+          if (!a.granted) return;
+          window.clearInterval(check);
+          if (a.root) void showFolder(a.root);
+        });
+      }, 1000);
+    } catch (e) {
+      toast(String(e), 5000);
+    }
+  };
+
   const pickFile = async () => {
+    if (isAndroid) return browseStorage();
     const path = await open({
       multiple: false,
       directory: false,
@@ -348,6 +381,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   };
 
   const pickFolder = async () => {
+    if (isAndroid) return browseStorage();
     const path = await open({ multiple: false, directory: true, defaultPath: folder?.path });
     if (typeof path === "string") await showFolder(path);
   };
@@ -357,22 +391,39 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
 
   return (
     <main className="absolute inset-0 overflow-y-auto bg-ink-950">
-      <div className="mx-auto max-w-6xl px-6 pb-16 pt-8 md:px-10">
-        <header className="mb-10 flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-baseline gap-4">
-            <span className="font-sans text-5xl font-bold text-accent" lang="fa">
+      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 md:px-10 2xl:max-w-[100rem]">
+        {/* On a phone: the wordmark and settings on one line, the two open
+            buttons sharing the next. From `sm` up, everything on one row. */}
+        <header className="mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 sm:mb-10 sm:flex sm:flex-wrap">
+          <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
+            <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
               بیت
             </span>
-            <span className="text-zinc-400">{t("appTagline")}</span>
+            <span className="hidden text-zinc-400 sm:inline">{t("appTagline")}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button icon="pi pi-play" label={t("openFile")} onClick={() => void pickFile()} />
-            <Button icon="pi pi-folder-open" label={t("openFolder")} outlined onClick={() => void pickFolder()} />
+          <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
+            <Button
+              icon="pi pi-play"
+              label={t("openFile")}
+              className="justify-center whitespace-nowrap"
+              onClick={() => void pickFile()}
+            />
+            <Button
+              icon="pi pi-folder-open"
+              label={t("openFolder")}
+              outlined
+              className="justify-center whitespace-nowrap"
+              onClick={() => void pickFolder()}
+            />
+          </div>
+          <div className="col-start-2 row-start-1 flex items-center">
+            {/* Keyboard shortcuts mean little on a touch screen. */}
             <Button
               icon="pi pi-question-circle"
               rounded
               text
               severity="secondary"
+              className="pointer-coarse:hidden"
               aria-label={t("shortcutsTitle")}
               tooltip={`${t("shortcutsTitle")} (?)`}
               tooltipOptions={{ position: "bottom" }}
@@ -485,25 +536,34 @@ function MoreButton({ video, onMenu, className = "" }: { video: Video; onMenu: I
   );
 }
 
-/** Continue watching and the open folder lay their videos out alike. */
+/** Continue watching and the open folder lay their videos out alike: a list
+ *  on a phone, a grid of cards from `sm` up. */
 function VideoGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-5 gap-y-7">{children}</div>;
+  return (
+    <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] sm:gap-x-5 sm:gap-y-7">
+      {children}
+    </div>
+  );
 }
 
-/** A video as a card: thumbnail, name, and a ⋯ button with its actions. */
+/** A video as a card: thumbnail, name, and a ⋯ button with its actions. On
+ *  a phone the thumbnail sits beside the name, as a list row. */
 function VideoCard({ video, meta, ...h }: { video: Video; meta?: string } & ItemHandlers) {
   const label = progressLabel(video);
   const [stem] = splitName(video.name);
   const active = h.menuFor === video.path;
   const editing = h.renaming === video.path;
   const reveal = active ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+  // Touch screens can't hover, so there the ⋯ button always shows (the play
+  // overlay doesn't: tapping anywhere on the row plays).
+  const revealMore = `${reveal} pointer-coarse:opacity-100`;
   // Names in either script line up with the page, not with their own direction.
   const align = getLang() === "fa" ? "text-right" : "text-left";
 
   return (
     <article
       title={video.path}
-      className="group relative flex min-w-0 flex-col gap-3"
+      className="group relative flex min-w-0 flex-row items-center gap-3 sm:flex-col sm:items-stretch"
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -515,12 +575,12 @@ function VideoCard({ video, meta, ...h }: { video: Video; meta?: string } & Item
         type="button"
         onClick={() => h.onPlay(video.path)}
         aria-label={`${t("play")}: ${stem}`}
-        className={`block rounded-xl text-start transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+        className={`block shrink-0 rounded-lg text-start transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:rounded-xl ${
           active ? "-translate-y-0.5" : "hover:-translate-y-0.5"
         }`}
       >
         <div
-          className={`overflow-hidden rounded-xl border transition ${
+          className={`overflow-hidden rounded-lg border transition sm:rounded-xl ${
             active
               ? "border-accent/60 shadow-lg shadow-black/40"
               : "border-ink-700 group-hover:border-accent/60 group-hover:shadow-lg group-hover:shadow-black/40"
@@ -533,7 +593,7 @@ function VideoCard({ video, meta, ...h }: { video: Video; meta?: string } & Item
               </span>
             </div>
             {label && (
-              <span className="absolute end-2 top-2 rounded-md bg-ink-950/80 px-1.5 py-0.5 text-xs font-medium text-zinc-200">
+              <span className="absolute end-2 top-2 hidden rounded-md bg-ink-950/80 px-1.5 py-0.5 text-xs font-medium text-zinc-200 sm:block">
                 {label}
               </span>
             )}
@@ -542,9 +602,11 @@ function VideoCard({ video, meta, ...h }: { video: Video; meta?: string } & Item
       </button>
 
       {editing ? (
-        <RenameField video={video} onSubmit={(s) => h.onRename(video, s)} onCancel={h.onCancelRename} />
+        <div className="min-w-0 flex-1">
+          <RenameField video={video} onSubmit={(s) => h.onRename(video, s)} onCancel={h.onCancelRename} />
+        </div>
       ) : (
-        <div className="flex items-start gap-1">
+        <div className="flex min-w-0 flex-1 items-start gap-1">
           <button type="button" onClick={() => h.onPlay(video.path)} tabIndex={-1} className="min-w-0 flex-1 text-start">
             <span
               className={`line-clamp-2 font-semibold break-words ${align} ${video.fraction >= WATCHED ? "text-zinc-400" : ""}`}
@@ -557,8 +619,10 @@ function VideoCard({ video, meta, ...h }: { video: Video; meta?: string } & Item
                 {meta}
               </span>
             )}
+            {/* On a phone the thumbnail is too small for the badge. */}
+            {label && <span className={`mt-0.5 block text-xs text-zinc-500 sm:hidden ${align}`}>{label}</span>}
           </button>
-          <MoreButton video={video} onMenu={h.onMenu} className={`-mt-1.5 -me-2 transition ${reveal}`} />
+          <MoreButton video={video} onMenu={h.onMenu} className={`-mt-1.5 -me-2 transition ${revealMore}`} />
         </div>
       )}
     </article>

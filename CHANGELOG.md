@@ -3,6 +3,128 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.12.1 (2026-10-15)
+
+### Fixed
+
+- On Android, brightness is the screen's brightness from 1 to 100%, like
+  the phone's own slider, and starts from where the screen already is. It
+  used the desktop's video-picture scale (50–115%) instead. Leaving Beyt
+  hands brightness back to the phone.
+- On Android, a long press on the video plays at 2× without also opening
+  the player menu.
+- On Android, the last frame of a video no longer shows around the library
+  after leaving it.
+
+## 0.12.0 (2026-10-15)
+
+### Added
+
+- Touch gestures while a video plays, the ones phone video players share:
+  tap to show or hide the controls; double-tap the left or right third to
+  seek back or forward by the seek step (keep tapping to go further) and
+  the middle to pause; swipe up or down on the start half for brightness and
+  on the end half for volume; drag sideways to scrub, with the time shown;
+  press and hold to play at 2× until you let go. Swiping sideways on a
+  subtitle line moves to the previous or next line. Mouse and keyboard work
+  as before.
+
+### Changed
+
+- On a phone, the library lists videos as rows with a small thumbnail
+  beside the name, so several fit on screen, and the open buttons sit side
+  by side. On touch screens each video's ⋯ button always shows (it only
+  appeared on hover, so renaming and moving to the Trash were out of
+  reach), and the keyboard-shortcuts button is hidden.
+- The page no longer zooms with a pinch.
+
+## 0.11.2 (2026-10-15)
+
+### Changed
+
+- Beyt has its own icon: the بیت wordmark over two subtitle lines, on
+  Android (with adaptive and themed versions) and on the desktop. The old
+  desktop icon showed empty boxes, since it was drawn with a font that has
+  no Persian letters. `scripts/make-icons.sh` renders all of them from
+  `src-tauri/icons/design/`.
+
+## 0.11.1 (2026-10-15)
+
+### Fixed
+
+- Android's Back button closed Beyt from anywhere, including right after
+  coming back from the file-access screen. It now does what Esc does on the
+  desktop: it closes a dialog or popup, or leaves a video for the library.
+  In the library it puts Beyt in the background, still open.
+- On Android, videos showed a black picture, and the top of the library ran
+  under the status bar.
+
+## 0.11.0 (2026-10-15)
+
+### Added
+
+- Videos play on Android. Beyt uses Android's own video player (Media3
+  ExoPlayer, with hardware decoding) under the subtitles, so MKV, MP4 and
+  WebM files play with both subtitle tracks on top. Pause, seeking, speed,
+  volume, mute and resuming where you stopped work as on the desktop, and the
+  screen stays on while a video plays. Brightness sets the screen's
+  brightness for Beyt.
+- On Android, **Open video** and **Open folder** browse the phone's storage
+  in the library. The first time, Beyt asks for access to all files, which it
+  needs to find the subtitle files next to a video.
+
+### Not yet on Android
+
+- Subtitles inside the video file, thumbnails, subtitle matching and the
+  screenshot and audio clip of saved words: these use ffmpeg, which Android
+  doesn't have. Subtitle files next to the video work.
+
+## 0.10.0 (2026-10-15)
+
+### Added
+
+- Groundwork for an Android version. `nix develop .#android` provides the
+  Android SDK, NDK, Java and Rust for Android, and
+  `scripts/build-android.sh` builds a release APK (or an App Bundle with
+  `--aab`). It builds for arm64 only, since every extra ABI adds another
+  copy of the native library, and optimises the Rust code for size.
+  Release builds shrink unused code and resources (about 13 MB) and are
+  signed with the key in `gen/android/keystore.properties`, or with the
+  local debug key when there is none, so they can be installed for testing.
+- On Android the library, subtitles, dictionary and vocabulary work, but
+  videos don't play yet: the desktop player draws mpv into GTK, and Android
+  needs a video surface of its own. Moving to the Trash, showing a file in
+  its folder and the ffmpeg-based features (embedded subtitles, thumbnails,
+  subtitle matching, audio clips) aren't available there either.
+
+### Changed
+
+- The app is now built as a library (`beyt_lib`) with a small desktop
+  launcher, as Android loads apps as shared libraries. GTK, WebKitGTK, mpv
+  and D-Bus are only linked on Linux desktops.
+
+## 0.9.0 (2026-10-15)
+
+### Added
+
+- Beyt fits any window size, from a narrow tiled window to fullscreen on a
+  4K screen.
+- Subtitles scale with the window, the way mpv scales them with the video.
+  The sizes in settings are for a 1280×720 window. At 1080p fullscreen,
+  subtitles are 1.5 times that size; in a small window they shrink, but
+  never below 0.6 times.
+- On narrow windows, File info, Shortcuts and Settings move from the
+  control bar into a ⋯ menu.
+- On narrow windows, the Settings sections become a scrolling row of tabs
+  above the page.
+
+### Changed
+
+- On narrow windows the library, player bars, Up next card and File info
+  use smaller margins. On very wide screens the library uses more of the
+  width.
+- The window can't be made smaller than 480×320.
+
 ## 0.8.0 (2026-10-15)
 
 ### Added

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Android adaptive icon, front layer: logo.svg's mark, shrunk into the
+       middle 66% that every launcher mask keeps. -->
+  <g transform="translate(512 512) scale(0.76) translate(-512 -525)">
+    <text x="512" y="483" font-family="Vazirmatn" font-weight="900" font-size="380"
+          fill="#60a5fa" text-anchor="middle" direction="rtl">بیت</text>
+    <rect x="242" y="640" width="540" height="46" rx="23" fill="#ffffff"/>
+    <rect x="322" y="718" width="380" height="46" rx="23" fill="#ffe9a8"/>
+  </g>
+</svg>

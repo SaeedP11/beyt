@@ -27,6 +27,8 @@
   --sub-outline: 0 0 2px #000, 0 0 2px #000, 0 0 3px #000, 0 0 4px #000;
   /* Raised while the control bar shows, so subtitles move above it. */
   --controls-offset: 0px;
+  /* Subtitle sizes are set for a 1280×720 window; App scales them with it. */
+  --sub-scale: 1;
 }
 
 html,

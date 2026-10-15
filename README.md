@@ -50,6 +50,7 @@ nix develop                      # Rust, libmpv, ffmpeg, WebKitGTK, Node, pnpm
 pnpm install
 ./scripts/make-sample.sh         # sample videos + EN/FA subtitles
 ./scripts/build-dictionary.sh    # optional: the dictionary, without going through the app
+./scripts/make-icons.sh          # after editing src-tauri/icons/design/*.svg
 cargo tauri dev -- -- "$PWD/samples/sync-test.mkv"
 ```
 
@@ -82,8 +83,62 @@ Every key can be changed in Settings → Keyboard shortcuts; press `?` in the ap
 | , | Settings |
 | Ctrl+Q | Quit |
 
+On a touch screen (`src/gestures.ts`):
+
+| Gesture | Action |
+| --- | --- |
+| Tap | Show / hide the controls |
+| Double-tap left / right third | Seek back / forward; keep tapping to go further |
+| Double-tap the middle | Pause / play |
+| Swipe up / down, start half | Brightness |
+| Swipe up / down, end half | Volume |
+| Drag sideways | Scrub (seeks on release) |
+| Press and hold | Play at 2× while held |
+| Swipe sideways on a subtitle line | Previous / next line |
+| Tap a word | Dictionary popup |
+
+## Android (in progress)
+
+```sh
+nix develop .#android            # Android SDK + NDK, JDK 17, Rust with Android targets
+pnpm install
+./scripts/build-android.sh       # release APK for arm64 phones
+./scripts/build-android.sh --aab # App Bundle for Google Play
+cargo tauri android dev          # run on a connected phone with live reload
+```
+
+The first run generates the Android Studio project in `src-tauri/gen/android`,
+which is kept in git. The APK lands in
+`src-tauri/gen/android/app/build/outputs/apk/universal/release/`; install it
+with `adb install -r <apk>`.
+
+Release builds are signed with the local debug key, which is fine for your
+own phone. For Google Play, create a release key once (keep it and its
+passwords safe: every later update must be signed with it) and describe it in
+`src-tauri/gen/android/keystore.properties`, which git ignores:
+
+```sh
+keytool -genkey -v -keystore ~/beyt-release.jks -keyalg RSA -keysize 4096 -validity 10000 -alias beyt
+```
+
+```properties
+storeFile=/home/you/beyt-release.jks
+storePassword=...
+keyAlias=beyt
+keyPassword=...
+```
+
+On Android, Media3 ExoPlayer plays the video in a `SurfaceView` under the
+transparent webview (`gen/android/.../PlayerPlugin.kt`), the way mpv sits under
+WebKitGTK on the desktop. `src-tauri/src/player_android.rs` answers the same
+mpv calls as `player.rs` by forwarding them to that plugin. The library reads
+files by path, so Beyt asks for all-files access the first time a folder is
+opened. Features built on ffmpeg (embedded subtitles, thumbnails, subtitle
+matching, vocabulary clips) aren't available on Android.
+
 ## Layout
 
+- `src-tauri/src/lib.rs`: the app and its commands; `main.rs` starts it on the desktop
 - `src-tauri/src/player.rs`: mpv, and its OpenGL video surface under the webview
 - `src-tauri/src/subs.rs`: sidecar discovery, encoding detection, SRT/VTT parsing, Persian fixes
 - `src/`: the TypeScript overlay (clock, cue lookup, track rendering, keys)

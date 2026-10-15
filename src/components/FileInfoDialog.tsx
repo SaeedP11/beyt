@@ -199,7 +199,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Rows({ children }: { children: ReactNode }) {
-  return <dl className="grid grid-cols-[9rem_1fr] items-center gap-x-4 gap-y-2 text-sm">{children}</dl>;
+  return <dl className="grid grid-cols-[6.5rem_1fr] items-center sm:grid-cols-[9rem_1fr] gap-x-4 gap-y-2 text-sm">{children}</dl>;
 }
 
 function Row({ label, value, copy, mono }: { label: string; value: string; copy?: boolean; mono?: boolean }) {
