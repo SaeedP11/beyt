@@ -9,7 +9,7 @@ import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { TabPanel, TabView } from "primereact/tabview";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { api } from "../api";
+import { api, isAndroid } from "../api";
 import { getLang, t } from "../i18n";
 import { popupMotions, useDialogMotion } from "../motion";
 import type { Folder, FolderEntry, Recent } from "../types";
@@ -337,7 +337,32 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     menuFor,
   };
 
+  /** Android: shows the phone's storage here, asking for access first. */
+  const browseStorage = async () => {
+    try {
+      const access = await api.storageAccess();
+      if (access.granted) {
+        if (access.root) await showFolder(folder?.path ?? access.root);
+        return;
+      }
+      toast(t("storageAccessNeeded"), 6000);
+      await api.requestStorageAccess();
+      // Android shows its own settings screen; carry on once Beyt is back.
+      const onReturn = () => {
+        if (document.visibilityState !== "visible") return;
+        document.removeEventListener("visibilitychange", onReturn);
+        void api.storageAccess().then((a) => {
+          if (a.granted && a.root) void showFolder(a.root);
+        });
+      };
+      document.addEventListener("visibilitychange", onReturn);
+    } catch (e) {
+      toast(String(e), 5000);
+    }
+  };
+
   const pickFile = async () => {
+    if (isAndroid) return browseStorage();
     const path = await open({
       multiple: false,
       directory: false,
@@ -348,6 +373,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   };
 
   const pickFolder = async () => {
+    if (isAndroid) return browseStorage();
     const path = await open({ multiple: false, directory: true, defaultPath: folder?.path });
     if (typeof path === "string") await showFolder(path);
   };

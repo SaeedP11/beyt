@@ -642,6 +642,32 @@ fn toggle_fullscreen(window: WebviewWindow) -> Result<(), String> {
     }
 }
 
+#[derive(Serialize, serde::Deserialize)]
+struct StorageAccess {
+    /// Videos and their subtitle files can be read by path.
+    granted: bool,
+    /// Where the device's own files start (Android's shared storage).
+    root: Option<String>,
+}
+
+/// Android needs all-files access before the library can browse folders.
+/// Async, like the playback commands, so it never waits on the UI thread.
+#[tauri::command]
+async fn storage_access() -> Result<StorageAccess, String> {
+    #[cfg(target_os = "android")]
+    return player::storage("storageAccess").map_err(|e| format!("{e:#}"));
+    #[cfg(not(target_os = "android"))]
+    Ok(StorageAccess { granted: true, root: None })
+}
+
+/// Opens Android's permission screen for all-files access.
+#[tauri::command]
+async fn request_storage_access() -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    player::storage::<serde_json::Value>("requestStorageAccess").map_err(|e| format!("{e:#}"))?;
+    Ok(())
+}
+
 #[tauri::command]
 fn quit(app: State<App>, handle: AppHandle) {
     app.save_position();
@@ -709,8 +735,12 @@ pub fn run() {
         std::process::exit(1);
     });
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    // Android's video player, in PlayerPlugin.kt.
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(player::plugin());
+
+    builder
         .invoke_handler(tauri::generate_handler![
             initial_file,
             open_media,
@@ -755,6 +785,8 @@ pub fn run() {
             toggle_fullscreen,
             quit,
             log_error,
+            storage_access,
+            request_storage_access,
         ])
         .setup(move |app| {
             let paths = app.path();

@@ -3,6 +3,26 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.11.0 (2026-10-15)
+
+### Added
+
+- Videos play on Android. Beyt uses Android's own video player (Media3
+  ExoPlayer, with hardware decoding) under the subtitles, so MKV, MP4 and
+  WebM files play with both subtitle tracks on top. Pause, seeking, speed,
+  volume, mute and resuming where you stopped work as on the desktop, and the
+  screen stays on while a video plays. Brightness sets the screen's
+  brightness for Beyt.
+- On Android, **Open video** and **Open folder** browse the phone's storage
+  in the library. The first time, Beyt asks for access to all files, which it
+  needs to find the subtitle files next to a video.
+
+### Not yet on Android
+
+- Subtitles inside the video file, thumbnails, subtitle matching and the
+  screenshot and audio clip of saved words: these use ffmpeg, which Android
+  doesn't have. Subtitle files next to the video work.
+
 ## 0.10.0 (2026-10-15)
 
 ### Added

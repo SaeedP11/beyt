@@ -113,8 +113,13 @@ keyAlias=beyt
 keyPassword=...
 ```
 
-Videos don't play on Android yet: `src-tauri/src/player_android.rs` stands in
-for the desktop player until Android has a video surface of its own.
+On Android, Media3 ExoPlayer plays the video in a `SurfaceView` under the
+transparent webview (`gen/android/.../PlayerPlugin.kt`), the way mpv sits under
+WebKitGTK on the desktop. `src-tauri/src/player_android.rs` answers the same
+mpv calls as `player.rs` by forwarding them to that plugin. The library reads
+files by path, so Beyt asks for all-files access the first time a folder is
+opened. Features built on ffmpeg (embedded subtitles, thumbnails, subtitle
+matching, vocabulary clips) aren't available on Android.
 
 ## Layout
 
