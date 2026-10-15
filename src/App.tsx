@@ -1,8 +1,9 @@
+import { onBackButtonPress } from "@tauri-apps/api/app";
 import { Button } from "primereact/button";
 import { Toast, type ToastMessage } from "primereact/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, events } from "./api";
+import { api, events, isAndroid } from "./api";
 import * as clock from "./clock";
 import { AppContextMenu } from "./components/AppContextMenu";
 import { FileInfoDialog } from "./components/FileInfoDialog";
@@ -223,6 +224,27 @@ export function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [keymap, helpOpen, settingsOpen, infoOpen, menuOpen, runAction]);
+
+  // Android's Back button does what Escape does: closes a dialog or popup,
+  // or leaves the video for the library. In the library it sends Beyt to
+  // the background. Without this, Back closed Beyt from anywhere.
+  const onAndroidBack = useRef(() => {});
+  onAndroidBack.current = () => {
+    const overlay = document.querySelector(".p-dialog-mask, .p-overlaypanel, .p-menu-overlay, .p-contextmenu");
+    if (helpOpen || settingsOpen || infoOpen || menuOpen || overlay) {
+      // They close on Escape, as on the desktop.
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    } else if (screen === "player") {
+      runAction("back");
+    } else {
+      void api.moveToBackground();
+    }
+  };
+  useEffect(() => {
+    if (!isAndroid) return;
+    const listener = onBackButtonPress(() => onAndroidBack.current());
+    return () => void listener.then((l) => l.unregister());
+  }, []);
 
   /** Opens the dictionary popup for a subtitle word element. */
   const lookUp = (e: React.MouseEvent | MouseEvent, el: HTMLElement) => {

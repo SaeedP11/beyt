@@ -177,6 +177,13 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     })
   }
 
+  /** Back in the library leaves Beyt the way Android 12+ leaves any app: in the background, still open. */
+  @Command
+  fun moveToBack(invoke: Invoke) {
+    activity.moveTaskToBack(true)
+    invoke.resolve()
+  }
+
   // ---------- storage ----------
 
   /** Beyt reads videos and the subtitle files next to them by path, which needs all-files access. */

@@ -219,8 +219,8 @@ pub fn plugin() -> TauriPlugin<Wry> {
         .build()
 }
 
-/// Runs one of the plugin's storage commands (`storageAccess`, `requestStorageAccess`).
-pub fn storage<T: DeserializeOwned>(command: &str) -> Result<T> {
+/// Runs one of the plugin's other commands (`storageAccess`, `requestStorageAccess`, `moveToBack`).
+pub fn run<T: DeserializeOwned>(command: &str) -> Result<T> {
     create_mpv()?.call(command, json!({})).map_err(|e| anyhow!("{}", e.0))
 }
 

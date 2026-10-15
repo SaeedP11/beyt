@@ -52,6 +52,8 @@ export const api = {
   /** Android: whether videos can be read by path, and where shared storage starts. */
   storageAccess: () => invoke<{ granted: boolean; root: string | null }>("storage_access"),
   requestStorageAccess: () => invoke<void>("request_storage_access"),
+  /** Android: sends Beyt to the background, as Back does in other apps. */
+  moveToBackground: () => invoke<void>("move_to_background"),
   recentFiles: () => invoke<Recent[]>("recent_files"),
   /** Path of a cached JPEG of the frame at `at` seconds (null: 15% in). */
   thumbnail: (path: string, at: number | null) => invoke<string>("thumbnail", { path, at }),

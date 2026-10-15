@@ -3,6 +3,17 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.11.1 (2026-10-15)
+
+### Fixed
+
+- Android's Back button closed Beyt from anywhere, including right after
+  coming back from the file-access screen. It now does what Esc does on the
+  desktop: it closes a dialog or popup, or leaves a video for the library.
+  In the library it puts Beyt in the background, still open.
+- On Android, videos showed a black picture, and the top of the library ran
+  under the status bar.
+
 ## 0.11.0 (2026-10-15)
 
 ### Added

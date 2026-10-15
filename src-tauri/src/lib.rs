@@ -655,7 +655,7 @@ struct StorageAccess {
 #[tauri::command]
 async fn storage_access() -> Result<StorageAccess, String> {
     #[cfg(target_os = "android")]
-    return player::storage("storageAccess").map_err(|e| format!("{e:#}"));
+    return player::run("storageAccess").map_err(|e| format!("{e:#}"));
     #[cfg(not(target_os = "android"))]
     Ok(StorageAccess { granted: true, root: None })
 }
@@ -664,7 +664,16 @@ async fn storage_access() -> Result<StorageAccess, String> {
 #[tauri::command]
 async fn request_storage_access() -> Result<(), String> {
     #[cfg(target_os = "android")]
-    player::storage::<serde_json::Value>("requestStorageAccess").map_err(|e| format!("{e:#}"))?;
+    player::run::<serde_json::Value>("requestStorageAccess").map_err(|e| format!("{e:#}"))?;
+    Ok(())
+}
+
+/// Android's Back button in the library: Beyt goes to the background, still
+/// open, rather than closing.
+#[tauri::command]
+async fn move_to_background() -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    player::run::<serde_json::Value>("moveToBack").map_err(|e| format!("{e:#}"))?;
     Ok(())
 }
 
@@ -787,6 +796,7 @@ pub fn run() {
             log_error,
             storage_access,
             request_storage_access,
+            move_to_background,
         ])
         .setup(move |app| {
             let paths = app.path();
