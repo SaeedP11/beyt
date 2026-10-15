@@ -9,7 +9,9 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -202,6 +204,52 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   fun moveToBack(invoke: Invoke) {
     activity.moveTaskToBack(true)
     invoke.resolve()
+  }
+
+  // ---------- thumbnails ----------
+
+  /** Writes a JPEG of one frame to `out`, `width` pixels wide, for library.rs.
+   *  Without `at` (seconds), or past the end, the frame comes from 15% in, and
+   *  failing that the start. Decoding is slow, so it runs off the UI thread. */
+  @Command
+  fun thumbnail(invoke: Invoke) {
+    val args = invoke.getArgs()
+    val path = args.getString("path")
+    val out = args.getString("out")
+    val width = args.optInt("width", 480)
+    val at = if (args.isNull("at")) null else args.optDouble("at")
+    Thread {
+      val retriever = MediaMetadataRetriever()
+      try {
+        retriever.setDataSource(path)
+        val length = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        val wanted = at?.let { (it * 1_000_000).toLong() }?.takeIf { length == 0L || it < length * 1000 }
+        val frame = listOf(wanted ?: length * 150, 0L).firstNotNullOfOrNull { frameAt(retriever, it, width) }
+          ?: throw IllegalStateException("no frame could be read from $path")
+        File(out).outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+        frame.recycle()
+        invoke.resolve()
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      } finally {
+        retriever.release()
+      }
+    }.start()
+  }
+
+  /** The frame nearest `us` microseconds in, scaled down to `width` pixels wide. */
+  private fun frameAt(retriever: MediaMetadataRetriever, us: Long, width: Int): Bitmap? {
+    val option = MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+    // Scaling while decoding saves holding a full 4K frame in memory.
+    val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+      retriever.getScaledFrameAtTime(us, option, width, width * 4)
+    } else {
+      retriever.getFrameAtTime(us, option)
+    } ?: return null
+    if (frame.width <= width) return frame
+    val scaled = Bitmap.createScaledBitmap(frame, width, frame.height * width / frame.width, true)
+    frame.recycle()
+    return scaled
   }
 
   // ---------- storage ----------
