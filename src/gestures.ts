@@ -39,6 +39,8 @@ export function attachGestures(el: HTMLElement, h: GestureHandlers, rtl: () => b
   let holdTimer = 0;
   let tapTimer = 0;
   let taps: { at: number; zone: Zone; count: number } | null = null;
+  /** When a touch last went down on the video. */
+  let touchedAt = -Infinity;
 
   const zoneAt = (x: number): Zone => {
     const w = el.clientWidth;
@@ -50,6 +52,7 @@ export function attachGestures(el: HTMLElement, h: GestureHandlers, rtl: () => b
     // No mouse events copied from the touch: they would wake the controls.
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
+    touchedAt = performance.now();
     touch = { id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY };
     mode = "pending";
     holdTimer = window.setTimeout(() => {
@@ -118,10 +121,20 @@ export function attachGestures(el: HTMLElement, h: GestureHandlers, rtl: () => b
     touch = null;
   };
 
+  // A long press also makes the browser send `contextmenu`, which would open
+  // the player's menu over the fast playback; on the video, holding is for
+  // that. A mouse's right-click still opens the menu.
+  const onContextMenu = (e: MouseEvent) => {
+    if (e.target !== el || performance.now() - touchedAt > 3000) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   el.addEventListener("pointerdown", onDown);
   el.addEventListener("pointermove", onMove);
   el.addEventListener("pointerup", onUp);
   el.addEventListener("pointercancel", onCancel);
+  el.addEventListener("contextmenu", onContextMenu);
   return () => {
     window.clearTimeout(holdTimer);
     window.clearTimeout(tapTimer);
@@ -129,6 +142,7 @@ export function attachGestures(el: HTMLElement, h: GestureHandlers, rtl: () => b
     el.removeEventListener("pointermove", onMove);
     el.removeEventListener("pointerup", onUp);
     el.removeEventListener("pointercancel", onCancel);
+    el.removeEventListener("contextmenu", onContextMenu);
   };
 }
 
