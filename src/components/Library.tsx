@@ -445,65 +445,65 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
 
   return (
     <main className="absolute inset-0 flex flex-col bg-ink-950">
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-4 pb-16 pt-3 sm:px-6 sm:pt-4 md:px-10 2xl:max-w-[100rem]">
-          {/* In a narrow window: the wordmark and settings on one line, the two
-              open buttons sharing the next. From `sm` up, everything on one row.
-              Android has no open buttons: the Library tab browses storage.
-              It stays pinned to the top, reaching over the side gutters so
-              scrolled cards never show beside it. */}
-          <header className="sticky top-0 z-10 -mx-4 mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 bg-ink-950/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:mb-10 sm:flex sm:flex-wrap sm:px-6 sm:py-4 md:-mx-10 md:px-10">
-            <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
-              <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
-                بیت
-              </span>
-              <span className="hidden text-zinc-400 sm:inline">{t("appTagline")}</span>
-            </div>
-            {!isAndroid && (
-              <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
-                <Button
-                  icon="pi pi-play"
-                  label={t("openFile")}
-                  className="justify-center whitespace-nowrap"
-                  onClick={() => void pickFile()}
-                />
-                <Button
-                  icon="pi pi-folder-open"
-                  label={t("openFolder")}
-                  outlined
-                  className="justify-center whitespace-nowrap"
-                  onClick={() => void pickFolder()}
-                />
-              </div>
-            )}
-            <div className="col-start-2 row-start-1 flex items-center">
-              {/* Keyboard shortcuts mean little without a keyboard. */}
-              {keyboard && (
-                <Button
-                  icon="pi pi-question-circle"
-                  rounded
-                  text
-                  severity="secondary"
-                  aria-label={t("shortcutsTitle")}
-                  tooltip={`${t("shortcutsTitle")} (?)`}
-                  tooltipOptions={{ position: "bottom" }}
-                  onClick={onHelp}
-                />
-              )}
+      {/* In a narrow window: the wordmark and settings on one line, the two
+          open buttons sharing the next. From `sm` up, everything on one row.
+          Android has no open buttons: the Library tab browses storage.
+          It sits above the scroller, so it never moves while the list scrolls. */}
+      <div className="shrink-0 border-b border-ink-800/60">
+        <header className="mx-auto grid max-w-6xl grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 px-4 py-3 sm:flex sm:flex-wrap sm:px-6 sm:py-4 md:px-10 2xl:max-w-[100rem]">
+          <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
+            <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
+              بیت
+            </span>
+            <span className="hidden text-zinc-400 sm:inline">{t("appTagline")}</span>
+          </div>
+          {!isAndroid && (
+            <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
               <Button
-                icon="pi pi-cog"
+                icon="pi pi-play"
+                label={t("openFile")}
+                className="justify-center whitespace-nowrap"
+                onClick={() => void pickFile()}
+              />
+              <Button
+                icon="pi pi-folder-open"
+                label={t("openFolder")}
+                outlined
+                className="justify-center whitespace-nowrap"
+                onClick={() => void pickFolder()}
+              />
+            </div>
+          )}
+          <div className="col-start-2 row-start-1 flex items-center">
+            {/* Keyboard shortcuts mean little without a keyboard. */}
+            {keyboard && (
+              <Button
+                icon="pi pi-question-circle"
                 rounded
                 text
                 severity="secondary"
-                className="!h-12 !w-12 [&_.p-button-icon]:!text-2xl"
-                aria-label={t("settings")}
-                tooltip={`${t("settings")} (,)`}
+                aria-label={t("shortcutsTitle")}
+                tooltip={`${t("shortcutsTitle")} (?)`}
                 tooltipOptions={{ position: "bottom" }}
-                onClick={onSettings}
+                onClick={onHelp}
               />
-            </div>
-          </header>
-  
+            )}
+            <Button
+              icon="pi pi-cog"
+              rounded
+              text
+              severity="secondary"
+              className="!h-12 !w-12 [&_.p-button-icon]:!text-2xl"
+              aria-label={t("settings")}
+              tooltip={`${t("settings")} (,)`}
+              tooltipOptions={{ position: "bottom" }}
+              onClick={onSettings}
+            />
+          </div>
+        </header>
+      </div>
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6 md:px-10 2xl:max-w-[100rem]">
           {isAndroid ? (
             <TabPage key={tab} animate={switched} forward={forward}>
               {pages[tab]?.content}

@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.17.1 (2026-10-15)
+
+### Fixed
+
+- The library header no longer slides up a little before it pins: it now
+  stays completely still while the Recent, Library and Vocabulary lists
+  scroll beneath it, and the scrollbar starts below it.
+
 ## 0.17.0 (2026-10-15)
 
 ### Added
