@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.14.1 (2026-10-15)
+
+### Changed
+
+- On Android, the library no longer shows the Open video and Open folder
+  buttons at the top. Browse your phone's videos from the Library tab
+  instead, which leaves more room for your videos.
+
 ## 0.14.0 (2026-10-15)
 
 ### Added

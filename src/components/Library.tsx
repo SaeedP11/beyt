@@ -391,7 +391,6 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   };
 
   const pickFile = async () => {
-    if (isAndroid) return browseStorage();
     const path = await open({
       multiple: false,
       directory: false,
@@ -446,8 +445,9 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     <main className="absolute inset-0 flex flex-col bg-ink-950">
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 md:px-10 2xl:max-w-[100rem]">
-          {/* On a phone: the wordmark and settings on one line, the two open
-              buttons sharing the next. From `sm` up, everything on one row. */}
+          {/* In a narrow window: the wordmark and settings on one line, the two
+              open buttons sharing the next. From `sm` up, everything on one row.
+              Android has no open buttons: the Library tab browses storage. */}
           <header className="mb-6 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-4 sm:mb-10 sm:flex sm:flex-wrap">
             <div className="flex min-w-0 items-baseline gap-3 sm:me-4 sm:gap-4">
               <span className="font-sans text-4xl font-bold text-accent sm:text-5xl" lang="fa">
@@ -455,21 +455,23 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
               </span>
               <span className="hidden text-zinc-400 sm:inline">{t("appTagline")}</span>
             </div>
-            <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
-              <Button
-                icon="pi pi-play"
-                label={t("openFile")}
-                className="justify-center whitespace-nowrap"
-                onClick={() => void pickFile()}
-              />
-              <Button
-                icon="pi pi-folder-open"
-                label={t("openFolder")}
-                outlined
-                className="justify-center whitespace-nowrap"
-                onClick={() => void pickFolder()}
-              />
-            </div>
+            {!isAndroid && (
+              <div className="col-span-2 row-start-2 grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
+                <Button
+                  icon="pi pi-play"
+                  label={t("openFile")}
+                  className="justify-center whitespace-nowrap"
+                  onClick={() => void pickFile()}
+                />
+                <Button
+                  icon="pi pi-folder-open"
+                  label={t("openFolder")}
+                  outlined
+                  className="justify-center whitespace-nowrap"
+                  onClick={() => void pickFolder()}
+                />
+              </div>
+            )}
             <div className="col-start-2 row-start-1 flex items-center">
               {/* Keyboard shortcuts mean little on a touch screen. */}
               <Button
