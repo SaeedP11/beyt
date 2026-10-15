@@ -144,7 +144,9 @@ function playerItems(
   );
   if (!line) items.push(actionRow("replayLine", t("act_replayLine"), "pi pi-replay", keymap, run));
   items.push(
-    actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run),
+    ...(player.selectedView()
+      ? [actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run)]
+      : []),
     row(
       `${t("speed")}: ${Math.abs(speed - 1) < 0.01 ? t("speedNormal") : `${speed.toFixed(2).replace(/0$/, "")}×`}`,
       "pi pi-gauge",

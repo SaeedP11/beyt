@@ -124,28 +124,31 @@ export function PlayerChrome({
             {fmtTime(time)} <span className="text-zinc-500">/ {fmtTime(p.duration)}</span>
           </span>
           <div className="flex-1" />
-          <Button
-            icon="pi pi-stopwatch"
-            rounded
-            text={!player.autoPause}
-            aria-label={t("autoPause")}
-            aria-pressed={player.autoPause}
-            tooltip={`${t("autoPause")} (P)`}
-            tooltipOptions={{ position: "top" }}
-            onClick={() => player.toggleAutoPause()}
-            className={player.autoPause ? size : plain}
-          />
+          {/* Both work on the selected subtitle track's lines. */}
           {player.selectedView() && (
-            <Button
-              icon="pi pi-align-left"
-              rounded
-              text
-              aria-label={t("transcript")}
-              tooltip={`${t("transcript")} (R)`}
-              tooltipOptions={{ position: "top" }}
-              onClick={onToggleTranscript}
-              className={plain}
-            />
+            <>
+              <Button
+                icon="pi pi-stopwatch"
+                rounded
+                text={!player.autoPause}
+                aria-label={t("autoPause")}
+                aria-pressed={player.autoPause}
+                tooltip={`${t("autoPause")} (P)`}
+                tooltipOptions={{ position: "top" }}
+                onClick={() => player.toggleAutoPause()}
+                className={player.autoPause ? size : plain}
+              />
+              <Button
+                icon="pi pi-align-left"
+                rounded
+                text
+                aria-label={t("transcript")}
+                tooltip={`${t("transcript")} (R)`}
+                tooltipOptions={{ position: "top" }}
+                onClick={onToggleTranscript}
+                className={plain}
+              />
+            </>
           )}
           <Button
             icon="pi pi-comments"

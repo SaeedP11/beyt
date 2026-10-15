@@ -268,6 +268,11 @@ export class Player {
   // ---------- auto-pause ----------
 
   toggleAutoPause(): void {
+    // It pauses at the end of the selected track's lines, so it needs one.
+    if (!this.selectedView()) {
+      toast(t("autoPauseNeedsTrack"));
+      return;
+    }
     this.autoPause = !this.autoPause;
     this.pendingLineEnd = null;
     toast(this.autoPause ? t("autoPauseOn") : t("autoPauseOff"));
