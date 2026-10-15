@@ -18,9 +18,9 @@ import { UpNextCard } from "./components/UpNextCard";
 import { LevelIndicator } from "./components/LevelIndicator";
 import { WordPopup, type WordPopupHandle } from "./components/WordPopup";
 import { attachGestures, type GestureHandlers, lineSwipe, type Zone } from "./gestures";
-import { player, useLang } from "./hooks";
-import { getLang } from "./i18n";
-import { type Action, bindingTable, eventKey } from "./keymap";
+import { hasHardKeyboard, player, useLang } from "./hooks";
+import { getLang, t } from "./i18n";
+import { type Action, bindingTable, eventKey, keyParts, keysFor } from "./keymap";
 import { popupMotions } from "./motion";
 import { getSettings, loadSettings, useSettings } from "./settings";
 import { fmtTime, setToastHandler, toast } from "./ui";
@@ -83,6 +83,10 @@ export function App() {
   const [settingsSection, setSettingsSection] = useState<Section | null>(isAndroid ? null : "general");
   const [controls, setControls] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** While locked, every key, tap and click is ignored except unlocking. */
+  const [locked, setLocked] = useState(false);
+  const lockedRef = useRef(false);
+  lockedRef.current = locked;
   const toastRef = useRef<Toast>(null);
   const wordPopup = useRef<WordPopupHandle>(null);
   const idleTimer = useRef<number | undefined>(undefined);
@@ -178,7 +182,8 @@ export function App() {
     setControls(true);
     clearTimeout(idleTimer.current);
     idleTimer.current = window.setTimeout(() => {
-      if (!clock.snapshot().paused) setControls(false);
+      // Locked controls can't be used, so they hide even while paused.
+      if (lockedRef.current || !clock.snapshot().paused) setControls(false);
     }, getSettings().controlsHideDelay * 1000);
   }, []);
 
@@ -188,12 +193,54 @@ export function App() {
     document.body.classList.toggle("idle", screen === "player" && !showControls);
   }, [showControls, screen]);
 
+  // ---------- hints over the video ----------
+
+  const [hint, setHint] = useState<Hint | null>(null);
+  const hintTimer = useRef<number | undefined>(undefined);
+  /** Shows a hint over the video; `ms` 0 keeps it until replaced. */
+  const flash = useCallback((next: Hint, ms = 700) => {
+    clearTimeout(hintTimer.current);
+    setHint(next);
+    if (ms) hintTimer.current = window.setTimeout(() => setHint(null), ms);
+  }, []);
+
+  // ---------- locking ----------
+
+  /** Answers input while locked: says so, and brings up the unlock button. */
+  const showLocked = useCallback(() => {
+    const key = keysFor("lock", getSettings().keymap)[0];
+    const shortcut = key && hasHardKeyboard() ? `  ${keyParts(key).join("+")}` : "";
+    flash({ icon: "pi pi-lock", text: t("locked") + shortcut, at: "middle" }, 1200);
+    wake();
+  }, [flash, wake]);
+
+  // A new video can't open while locked, but leaving one always unlocks.
+  useEffect(() => {
+    if (screen !== "player") setLocked(false);
+  }, [screen]);
+
   // ---------- actions (keyboard and right-click menu) ----------
 
   /** Runs an action; returns false if it doesn't apply here. */
   const runAction = useCallback(
     (action: Action): boolean => {
       const playing = screen === "player";
+      if (action === "lock") {
+        if (!playing) return false;
+        if (!locked) {
+          setPanelOpen(false);
+          setTranscriptOpen(false);
+        }
+        setLocked(!locked);
+        flash({ icon: locked ? "pi pi-lock-open" : "pi pi-lock", text: t(locked ? "unlocked" : "locked"), at: "middle" }, 1200);
+        wake();
+        return true;
+      }
+      // Handled, so the key does nothing else (Tab moving focus, say).
+      if (locked && playing) {
+        showLocked();
+        return true;
+      }
       if (!playing && !GLOBAL_ACTIONS.has(action)) return false;
       switch (action) {
         case "back":
@@ -233,7 +280,7 @@ export function App() {
       if (playing) wake();
       return true;
     },
-    [screen, panelOpen, transcriptOpen, backToLibrary, openSettings, wake],
+    [screen, locked, panelOpen, transcriptOpen, backToLibrary, openSettings, wake, flash, showLocked],
   );
 
   useEffect(() => {
@@ -279,6 +326,7 @@ export function App() {
   /** Opens the dictionary popup for a subtitle word element. */
   const lookUp = (e: React.MouseEvent | MouseEvent, el: HTMLElement) => {
     if (el.tagName !== "SPAN" || el.classList.contains("line")) return;
+    if (locked) return showLocked();
     const picked = player.wordContext(el);
     if (picked && picked.word.trim()) wordPopup.current?.open(e, el, picked);
   };
@@ -296,6 +344,7 @@ export function App() {
     const strip = window.innerWidth * EDGE;
     const edge = fromStart <= strip ? "brightness" : fromStart >= window.innerWidth - strip ? "volume" : null;
     if (!edge) return;
+    if (locked) return showLocked();
     if (wheelSum.current.edge !== edge) wheelSum.current = { edge, sum: 0 };
     wheelSum.current.sum += e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 40 : e.deltaY;
     // A wheel notch is a step; touchpads add up small deltas to one.
@@ -309,20 +358,13 @@ export function App() {
   // ---------- touch gestures (see gestures.ts) ----------
 
   const root = useRef<HTMLDivElement>(null);
-  const [hint, setHint] = useState<Hint | null>(null);
-  const hintTimer = useRef<number | undefined>(undefined);
-  /** Shows a hint over the video; `ms` 0 keeps it until replaced. */
-  const flash = (next: Hint, ms = 700) => {
-    clearTimeout(hintTimer.current);
-    setHint(next);
-    if (ms) hintTimer.current = window.setTimeout(() => setHint(null), ms);
-  };
   const gesture = useRef({ levelSum: 0, scrubFrom: null as number | null, holding: false, speed: 1 });
   // Read through a ref, so the listeners attached once see the current state.
   const gestureHandlers = useRef<GestureHandlers | null>(null);
   gestureHandlers.current = {
     tap: () => (showControls ? setControls(false) : wake()),
     multiTap: (zone, count) => {
+      if (locked) return showLocked();
       if (zone === "middle") {
         if (count === 2) runAction("togglePause");
         return;
@@ -332,6 +374,7 @@ export function App() {
       flash({ icon, text: `${getSettings().seekStep * (count - 1)}`, at: zone });
     },
     level: (kind, percent) => {
+      if (locked) return showLocked();
       // Whole steps of 2%, so a slow swipe still adds up.
       const g = gesture.current;
       g.levelSum += percent;
@@ -343,6 +386,11 @@ export function App() {
     },
     scrub: (phase, seconds) => {
       const g = gesture.current;
+      if (locked) {
+        g.scrubFrom = null;
+        if (phase !== "cancel") showLocked();
+        return;
+      }
       if (phase === "cancel") {
         g.scrubFrom = null;
         setHint(null);
@@ -363,6 +411,7 @@ export function App() {
     hold: (active) => {
       const g = gesture.current;
       if (active) {
+        if (locked) return showLocked();
         const now = clock.snapshot();
         if (now.paused) return;
         g.holding = true;
@@ -442,6 +491,8 @@ export function App() {
       {screen === "player" && (
         <PlayerChrome
           visible={showControls}
+          locked={locked}
+          onToggleLock={() => runAction("lock")}
           onBack={() => void backToLibrary()}
           onToggleSubtitles={() => setPanelOpen((o) => !o)}
           onInfo={() => setInfoOpen(true)}
@@ -454,7 +505,9 @@ export function App() {
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
       <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={closeTranscript} />
       {screen === "player" && <LevelIndicator />}
-      <UpNextCard />
+      <div className="contents" inert={locked}>
+        <UpNextCard />
+      </div>
       <WordPopup ref={wordPopup} />
 
       {screen === "library" && (
@@ -489,6 +542,7 @@ export function App() {
       )}
       <AppContextMenu
         screen={screen}
+        locked={locked}
         runAction={runAction}
         onLookUp={lookUp}
         onBack={() => void backToLibrary()}

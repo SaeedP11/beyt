@@ -21,6 +21,8 @@ const QUIET = ".p-dialog-mask, .p-sidebar, .p-overlaypanel, .p-contextmenu";
 
 interface Props {
   screen: "loading" | "library" | "player";
+  /** The player is locked: the menu offers only unlocking. */
+  locked: boolean;
   /** Runs an action the same way its keyboard shortcut does. */
   runAction: (action: Action) => void;
   /** Opens the dictionary popup for a subtitle word. */
@@ -73,7 +75,13 @@ export function AppContextMenu(props: Props) {
       if (p.screen === "loading" || target.closest(QUIET)) return;
 
       const keymap = getSettings().keymap;
-      setModel(p.screen === "player" ? playerItems(target, e, keymap, p) : libraryItems(keymap, p.runAction));
+      setModel(
+        p.screen !== "player"
+          ? libraryItems(keymap, p.runAction)
+          : p.locked
+            ? [actionRow("lock", t("unlock"), "pi pi-lock-open", keymap, p.runAction)]
+            : playerItems(target, e, keymap, p),
+      );
       menu.current?.show(e as unknown as React.SyntheticEvent);
     };
     window.addEventListener("contextmenu", onContextMenu);
@@ -170,6 +178,7 @@ function playerItems(
     ...helpRow(keymap, run),
     actionRow("settings", t("settings"), "pi pi-cog", keymap, run),
     { separator: true },
+    actionRow("lock", t("lock"), "pi pi-lock", keymap, run),
     // Not the "back" action: with a panel open that only closes the panel.
     row(t("back"), "pi pi-arrow-left rtl:rotate-180", keysFor("back", keymap)[0], onBack),
   );

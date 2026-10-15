@@ -18,6 +18,7 @@ export const ACTIONS = [
   { id: "speedReset", group: "playback", keys: ["0"] },
   { id: "fullscreen", group: "playback", keys: ["f"] },
   { id: "aspect", group: "playback", keys: ["z"] },
+  { id: "lock", group: "playback", keys: ["Ctrl+l"] },
 
   { id: "prevLine", group: "subtitles", keys: ["a"] },
   { id: "nextLine", group: "subtitles", keys: ["d"] },

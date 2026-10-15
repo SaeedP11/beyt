@@ -3,6 +3,20 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.16.0 (2026-10-15)
+
+### Added
+
+- You can lock the player so nothing you press or touch changes the video,
+  handy when a child is watching or the phone is in your pocket. Tap the
+  lock button at the top of the player, choose Lock controls from the
+  right-click menu, or press Ctrl+L. While locked, the controls stay
+  visible but dimmed, and keys, taps, swipes, scrolling, subtitle words and
+  Android's Back button do nothing; each try shows "Controls locked" so you
+  know why. To unlock, tap the lock button again, press Ctrl+L, or
+  right-click and choose Unlock controls. Like other shortcuts, Ctrl+L can
+  be changed in Settings.
+
 ## 0.15.0 (2026-10-15)
 
 ### Added
