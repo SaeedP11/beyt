@@ -23,6 +23,8 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -49,14 +51,25 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private var lastError: String? = null
 
   override fun load(webView: WebView) {
-    // Black behind the video; the surface is sized to the video's shape.
+    // Black behind the video; the surface is sized to the video's shape. It
+    // starts full size: an empty surface gets no buffers, and ExoPlayer only
+    // reports the video's size once it has drawn a frame.
     stage = FrameLayout(activity).apply { setBackgroundColor(Color.BLACK) }
     surface = SurfaceView(activity)
-    stage.addView(surface, FrameLayout.LayoutParams(0, 0, Gravity.CENTER))
+    stage.addView(surface, FrameLayout.LayoutParams(
+      ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
     stage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitSurface() }
 
     // The page shows through wherever it is transparent.
     webView.setBackgroundColor(Color.TRANSPARENT)
+    // The app draws edge to edge; keep the page clear of the status and
+    // navigation bars, while the video behind it still fills the screen.
+    ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
+      val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+      (view.layoutParams as ViewGroup.MarginLayoutParams).setMargins(bars.left, bars.top, bars.right, bars.bottom)
+      view.requestLayout()
+      insets
+    }
     val root = webView.parent as ViewGroup
     root.addView(stage, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 

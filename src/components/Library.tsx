@@ -347,15 +347,17 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
       }
       toast(t("storageAccessNeeded"), 6000);
       await api.requestStorageAccess();
-      // Android shows its own settings screen; carry on once Beyt is back.
-      const onReturn = () => {
-        if (document.visibilityState !== "visible") return;
-        document.removeEventListener("visibilitychange", onReturn);
+      // Android shows its own settings screen, and the page isn't told when
+      // Beyt is back, so check for a while and carry on once access is given.
+      const started = Date.now();
+      const check = window.setInterval(() => {
+        if (Date.now() - started > 120_000) return window.clearInterval(check);
         void api.storageAccess().then((a) => {
-          if (a.granted && a.root) void showFolder(a.root);
+          if (!a.granted) return;
+          window.clearInterval(check);
+          if (a.root) void showFolder(a.root);
         });
-      };
-      document.addEventListener("visibilitychange", onReturn);
+      }, 1000);
     } catch (e) {
       toast(String(e), 5000);
     }
