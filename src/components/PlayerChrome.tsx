@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, isAndroid } from "../api";
 import * as clock from "../clock";
-import { player, useMediaQuery, usePlayback, usePlayer } from "../hooks";
+import { player, useHardKeyboard, useMediaQuery, usePlayback, usePlayer } from "../hooks";
 import { getLang, t } from "../i18n";
 import { popupMotions } from "../motion";
 import { ASPECTS, aspectLabel } from "../player";
@@ -41,6 +41,7 @@ export function PlayerChrome({
   usePlayer();
   const p = usePlayback(8);
   const narrow = useMediaQuery(NARROW);
+  const keyboard = useHardKeyboard();
   const more = useRef<Menu>(null);
   /** The ⋯ button, which the aspect menu opens from on narrow screens. */
   const moreButton = useRef<EventTarget | null>(null);
@@ -51,7 +52,7 @@ export function PlayerChrome({
   }, [narrow, onMenuVisibleChange]);
   const moreItems: MenuItem[] = [
     { label: t("fileInfo"), icon: "pi pi-info-circle", command: onInfo },
-    { label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp },
+    ...(keyboard ? [{ label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp }] : []),
     { label: t("settings"), icon: "pi pi-cog", command: onSettings },
     { separator: true },
     {
@@ -194,16 +195,18 @@ export function PlayerChrome({
                 onClick={onInfo}
                 className={plain}
               />
-              <Button
-                icon="pi pi-question-circle"
-                rounded
-                text
-                aria-label={t("shortcutsTitle")}
-                tooltip={`${t("shortcutsTitle")} (?)`}
-                tooltipOptions={{ position: "top" }}
-                onClick={onHelp}
-                className={plain}
-              />
+              {keyboard && (
+                <Button
+                  icon="pi pi-question-circle"
+                  rounded
+                  text
+                  aria-label={t("shortcutsTitle")}
+                  tooltip={`${t("shortcutsTitle")} (?)`}
+                  tooltipOptions={{ position: "top" }}
+                  onClick={onHelp}
+                  className={plain}
+                />
+              )}
               <Button
                 icon="pi pi-cog"
                 rounded

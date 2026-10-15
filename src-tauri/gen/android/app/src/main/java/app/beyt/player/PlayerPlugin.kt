@@ -9,6 +9,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.media.MediaMetadataRetriever
@@ -219,7 +220,16 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       put("volume", volume)
       put("mute", muted)
       put("error", lastError)
+      put("keyboard", hasHardKeyboard())
     })
+  }
+
+  /** A physical keyboard is attached (USB or Bluetooth), not just the on-screen one.
+   *  The activity handles keyboard changes itself, so its configuration stays current. */
+  private fun hasHardKeyboard(): Boolean {
+    val config = activity.resources.configuration
+    return config.keyboard == Configuration.KEYBOARD_QWERTY &&
+      config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
   }
 
   /** Back in the library leaves Beyt the way Android 12+ leaves any app: in the background, still open. */

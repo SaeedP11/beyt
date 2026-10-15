@@ -21,7 +21,7 @@ use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use tauri::{
-    WebviewWindow, Wry,
+    AppHandle, Emitter, WebviewWindow, Wry,
     plugin::{Builder, PluginHandle, TauriPlugin},
 };
 
@@ -41,11 +41,23 @@ struct Remote {
     volume: f64,
     mute: bool,
     error: Option<String>,
+    /// A physical keyboard is attached.
+    keyboard: bool,
 }
 
 impl Default for Remote {
     fn default() -> Self {
-        Remote { time: 0.0, paused: true, speed: 1.0, duration: 0.0, eof: false, volume: 100.0, mute: false, error: None }
+        Remote {
+            time: 0.0,
+            paused: true,
+            speed: 1.0,
+            duration: 0.0,
+            eof: false,
+            volume: 100.0,
+            mute: false,
+            error: None,
+            keyboard: false,
+        }
     }
 }
 
@@ -142,7 +154,7 @@ impl Mpv {
             ("stop", _) => {
                 self.call::<Value>("stop", json!({}))?;
                 let mut state = self.state();
-                *state = Remote { volume: state.volume, mute: state.mute, ..Remote::default() };
+                *state = Remote { volume: state.volume, mute: state.mute, keyboard: state.keyboard, ..Remote::default() };
                 Ok(())
             }
             ("cycle", ["pause"]) => {
@@ -221,13 +233,19 @@ pub fn attach_video(_window: &WebviewWindow, _mpv: &'static Mpv) -> Result<()> {
 /// Registers `PlayerPlugin.kt` and starts keeping the local state current.
 pub fn plugin() -> TauriPlugin<Wry> {
     Builder::new("player")
-        .setup(|_app, api| {
+        .setup(|app, api| {
             let handle = api.register_android_plugin("app.beyt.player", "PlayerPlugin")?;
             let _ = PLUGIN.set(handle);
-            std::thread::spawn(poll_state);
+            let app = app.clone();
+            std::thread::spawn(move || poll_state(app));
             Ok(())
         })
         .build()
+}
+
+/// Whether a physical keyboard is attached, as last read from the plugin.
+pub fn hard_keyboard() -> bool {
+    MPV.get().is_some_and(|mpv| mpv.state().keyboard)
 }
 
 /// Runs one of the plugin's other commands (`storageAccess`, `requestStorageAccess`, `moveToBack`).
@@ -247,9 +265,11 @@ pub fn probe(video: &Path) -> Result<Value> {
     create_mpv()?.call("probe", json!({ "path": video })).map_err(|e| anyhow!("{}", e.0))
 }
 
-fn poll_state() {
+/// Also tells the page when a physical keyboard is plugged in or removed.
+fn poll_state(app: AppHandle<Wry>) {
     let Ok(mpv) = create_mpv() else { return };
     let mut last_error: Option<String> = None;
+    let mut keyboard = false;
     loop {
         match mpv.call::<Remote>("state", json!({})) {
             Ok(remote) => {
@@ -257,6 +277,10 @@ fn poll_state() {
                     eprintln!("beyt: playback failed: {}", remote.error.as_deref().unwrap_or_default());
                 }
                 last_error = remote.error.clone();
+                if remote.keyboard != keyboard {
+                    keyboard = remote.keyboard;
+                    let _ = app.emit("hard-keyboard", keyboard);
+                }
                 *mpv.state() = remote;
             }
             Err(e) => eprintln!("beyt: reading the player's state: {}", e.0),

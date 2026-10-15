@@ -10,6 +10,7 @@ import { TabPanel, TabView } from "primereact/tabview";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { api, isAndroid } from "../api";
+import { useHardKeyboard } from "../hooks";
 import { getLang, t } from "../i18n";
 import { popupMotions, slideIn, useDialogMotion } from "../motion";
 import type { Folder, FolderEntry, Recent } from "../types";
@@ -214,6 +215,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   /** Whether the tab being shown came from further left, for its slide. */
   const [forward, setForward] = useState(true);
   const [switched, setSwitched] = useState(false);
+  const keyboard = useHardKeyboard();
   const scroller = useRef<HTMLDivElement>(null);
   const showTab = useCallback((next: number) => {
     if (next === lastTab) return;
@@ -473,18 +475,19 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
               </div>
             )}
             <div className="col-start-2 row-start-1 flex items-center">
-              {/* Keyboard shortcuts mean little on a touch screen. */}
-              <Button
-                icon="pi pi-question-circle"
-                rounded
-                text
-                severity="secondary"
-                className="pointer-coarse:hidden"
-                aria-label={t("shortcutsTitle")}
-                tooltip={`${t("shortcutsTitle")} (?)`}
-                tooltipOptions={{ position: "bottom" }}
-                onClick={onHelp}
-              />
+              {/* Keyboard shortcuts mean little without a keyboard. */}
+              {keyboard && (
+                <Button
+                  icon="pi pi-question-circle"
+                  rounded
+                  text
+                  severity="secondary"
+                  aria-label={t("shortcutsTitle")}
+                  tooltip={`${t("shortcutsTitle")} (?)`}
+                  tooltipOptions={{ position: "bottom" }}
+                  onClick={onHelp}
+                />
+              )}
               <Button
                 icon="pi pi-cog"
                 rounded
