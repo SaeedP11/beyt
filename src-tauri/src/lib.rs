@@ -714,7 +714,7 @@ async fn seek_absolute(app: State<'_, App>, time: f64) -> Result<(), String> {
 }
 
 /// The picture shapes the player offers; ratios are width:height.
-const ASPECTS: &[&str] = &["original", "16:9", "4:3", "fill", "stretch"];
+const ASPECTS: &[&str] = &["auto", "original", "16:9", "4:3", "fill", "stretch"];
 
 #[tauri::command]
 async fn set_aspect(app: State<'_, App>, aspect: String) -> Result<(), String> {
@@ -810,8 +810,9 @@ fn quit(app: State<App>, handle: AppHandle) {
     handle.exit(0);
 }
 
-/// Sends the playback position to the overlay 20 times a second, checks the
-/// audio tracks 4 times a second and saves the watch position every 5 seconds.
+/// Sends the playback position to the overlay 20 times a second, keeps the
+/// `auto` aspect fitted, checks the audio tracks 4 times a second and saves
+/// the watch position every 5 seconds.
 fn spawn_clock(handle: AppHandle) {
     std::thread::spawn(move || {
         let app = handle.state::<App>();
@@ -819,6 +820,7 @@ fn spawn_clock(handle: AppHandle) {
         loop {
             tick += 1;
             let _ = handle.emit("playback", player::playback(app.mpv));
+            player::fit_auto(app.mpv);
             if tick.is_multiple_of(5) {
                 app.audio_changed(&handle);
             }

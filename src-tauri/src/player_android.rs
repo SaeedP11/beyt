@@ -267,6 +267,9 @@ pub fn set_aspect(mpv: &Mpv, aspect: &str) -> Result<()> {
     mpv.set(json!({ "aspect": aspect })).map_err(|e| anyhow!("setting the aspect ratio: {}", e.0))
 }
 
+/// `PlayerPlugin.fitSurface` fits the `auto` shape itself whenever the video or screen changes.
+pub fn fit_auto(_mpv: &Mpv) {}
+
 /// The video surface is set up by `PlayerPlugin.load`; see `plugin`.
 pub fn attach_video(_window: &WebviewWindow, _mpv: &'static Mpv) -> Result<()> {
     Ok(())

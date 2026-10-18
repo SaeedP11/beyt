@@ -24,9 +24,10 @@ import { debounce, fmtTime, toast } from "./ui";
 const MODES: Mode[] = ["show", "blur", "hide"];
 
 /** Picture shapes in the order the aspect key cycles through them. */
-export const ASPECTS: Aspect[] = ["original", "16:9", "4:3", "fill", "stretch"];
+export const ASPECTS: Aspect[] = ["auto", "original", "16:9", "4:3", "fill", "stretch"];
 
 export function aspectLabel(aspect: Aspect): string {
+  if (aspect === "auto") return t("aspectAuto");
   if (aspect === "original") return t("aspectOriginal");
   if (aspect === "fill") return t("aspectFill");
   if (aspect === "stretch") return t("aspectStretch");
@@ -81,8 +82,8 @@ export class Player {
   views: TrackView[] = [];
   /** Pause at the end of every line of the selected track (shadowing practice). */
   autoPause = false;
-  /** The picture's shape, saved with the series. */
-  aspect: Aspect = "original";
+  /** The picture's shape; every video starts on the best fit. */
+  aspect: Aspect = "auto";
   /** The video's audio tracks; empty until it has loaded. */
   audio: AudioTrack[] = [];
   /** The audio track chosen for the series, picked again in its other episodes. */
@@ -185,8 +186,7 @@ export class Player {
     this.selected = Math.max(0, this.views.findIndex((v) => v.style.enabled && v.isText));
     this.eofHandled = false;
     this.syncMpvSubtitle();
-    const saved = media.series?.aspect;
-    this.aspect = saved && ASPECTS.includes(saved) ? saved : "original";
+    this.aspect = "auto";
     void api.setAspect(this.aspect);
     this.audio = [];
     this.audioChoice = media.series?.audio;
@@ -289,14 +289,13 @@ export class Player {
     void api.setMpvSubtitle(sid);
   }
 
-  /** Changes the picture's shape for this video and the rest of its series. */
+  /** Changes the picture's shape until the next video opens. */
   setAspect(aspect: Aspect): void {
     this.aspect = aspect;
     api.setAspect(aspect).then(
       () => toast(t("aspectToast", { name: aspectLabel(aspect) })),
       (e) => toast(String(e), 5000),
     );
-    this.save();
     this.changed();
   }
 
@@ -369,13 +368,13 @@ export class Player {
   }
 
   /** Saves every track's style under its key, keeping keys from other
-      episodes, the picture's shape and the audio track. */
+      episodes, and the audio track. */
   private save = debounce(() => {
     const media = this.media;
     if (!media) return;
     const tracks = { ...(media.series?.tracks ?? {}) };
     for (const v of this.views) tracks[v.track.key] = { ...v.style };
-    media.series = { tracks, aspect: this.aspect, ...(this.audioChoice && { audio: this.audioChoice }) };
+    media.series = { tracks, ...(this.audioChoice && { audio: this.audioChoice }) };
     void api.saveSeriesSettings(media.folder, media.series);
   }, 400);
 

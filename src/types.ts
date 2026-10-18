@@ -93,15 +93,15 @@ export interface TrackStyle {
   offset: number;
 }
 
-/** The picture's shape: the video's own, a forced width:height ratio,
- *  zoomed in to fill the screen (cropping), or stretched to it. */
-export type Aspect = "original" | "16:9" | "4:3" | "fill" | "stretch";
+/** The picture's shape: the best fit for the screen (filling it when that
+ *  crops little), the video's own, a forced width:height ratio, zoomed in to
+ *  fill the screen (cropping), or stretched to it. */
+export type Aspect = "auto" | "original" | "16:9" | "4:3" | "fill" | "stretch";
 
-/** Saved per series folder: track styles keyed by track key, the picture
- *  shape, and the audio track last chosen (matched by language and title). */
+/** Saved per series folder: track styles keyed by track key and the audio
+ *  track last chosen (matched by language and title). */
 export interface SeriesSettings {
   tracks: Record<string, TrackStyle>;
-  aspect?: Aspect;
   audio?: AudioChoice;
 }
 

@@ -3,6 +3,22 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.23.0 (2026-10-18)
+
+### Added
+
+- A new Best fit aspect ratio, which every video now opens in. When the
+  video's shape is close to the screen's, such as a 16:9 video on a 16:10
+  laptop, it fills the screen and cuts off only a thin edge instead of
+  leaving black bars. When filling would cut off too much, such as a 4:3 or
+  widescreen film, it shows the whole picture. It adjusts as you resize the
+  window.
+
+### Changed
+
+- The aspect ratio you choose with Z or the menu now lasts until the next
+  video opens instead of being remembered for the whole series.
+
 ## 0.22.3 (2026-10-18)
 
 ### Changed

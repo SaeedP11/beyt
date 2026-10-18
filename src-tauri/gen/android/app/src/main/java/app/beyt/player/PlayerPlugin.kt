@@ -138,7 +138,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   }
 
   /** Sizes the surface for the picture shape in `aspect`. Letterboxed shapes
-   *  fit inside the screen; `fill` covers it, with the overflow cut off. */
+   *  fit inside the screen; `fill` covers it, with the overflow cut off;
+   *  `auto` fills when that cuts off little, as in `player.rs`. */
   private fun fitSurface() {
     val size = player.videoSize
     val (w, h) = stage.width to stage.height
@@ -146,8 +147,10 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val natural = size.width * size.pixelWidthHeightRatio / size.height
     val ratio = aspect.split(":").mapNotNull { it.toFloatOrNull() }
       .takeIf { it.size == 2 && it[1] > 0 }?.let { it[0] / it[1] }
+    val screen = w.toFloat() / h
     val (shape, cover) = when (aspect) {
       "fill" -> natural to true
+      "auto" -> natural to (1 - minOf(screen, natural) / maxOf(screen, natural) <= 0.11f)
       else -> (ratio ?: natural) to false
     }
     val (sw, sh) = when {

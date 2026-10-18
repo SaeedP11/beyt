@@ -9,7 +9,10 @@ use std::{
     cell::RefCell,
     ffi::{CString, c_char, c_void},
     rc::Rc,
-    sync::OnceLock,
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
 };
 
 use anyhow::{Result, anyhow};
@@ -119,11 +122,12 @@ pub fn remove_audio(mpv: &Mpv, id: i64) -> Result<()> {
     }
 }
 
-/// Shapes the picture: `original`, a ratio such as `16:9` (checked by the
-/// `set_aspect` command), `fill` (zoom in until the bars are gone) or `stretch`.
+/// Shapes the picture: `auto` (see `fit_auto`), `original`, a ratio such as
+/// `16:9` (checked by the `set_aspect` command), `fill` (zoom in until the
+/// bars are gone) or `stretch`.
 pub fn set_aspect(mpv: &Mpv, aspect: &str) -> Result<()> {
     let (ratio, panscan, keep) = match aspect {
-        "original" => ("no", 0.0, true),
+        "auto" | "original" => ("no", 0.0, true),
         "fill" => ("no", 1.0, true),
         "stretch" => ("no", 0.0, false),
         ratio => (ratio, 0.0, true),
@@ -133,7 +137,40 @@ pub fn set_aspect(mpv: &Mpv, aspect: &str) -> Result<()> {
         mpv.set_property("panscan", panscan)?;
         mpv.set_property("keepaspect", keep)
     };
-    set().map_err(|e| anyhow!("setting the aspect ratio: {e:?}"))
+    set().map_err(|e| anyhow!("setting the aspect ratio: {e:?}"))?;
+    AUTO_ASPECT.store(aspect == "auto", Ordering::Relaxed);
+    fit_auto(mpv);
+    Ok(())
+}
+
+/// The `auto` shape is in use.
+static AUTO_ASPECT: AtomicBool = AtomicBool::new(false);
+/// The video area's size in pixels as last drawn, width in the high half.
+static AREA_SIZE: AtomicU64 = AtomicU64::new(0);
+
+/// The most of the picture `auto` cuts off to get rid of the black bars.
+const AUTO_MAX_CROP: f64 = 0.11;
+
+/// For the `auto` shape: fills the area when that crops little of the
+/// picture (a 16:9 video on a 16:10 screen) and shows it whole otherwise
+/// (a 4:3 or 2.39:1 video on a wide screen). Runs on every clock tick, so
+/// it follows window resizes and newly loaded videos.
+pub fn fit_auto(mpv: &Mpv) {
+    if !AUTO_ASPECT.load(Ordering::Relaxed) {
+        return;
+    }
+    let size = AREA_SIZE.load(Ordering::Relaxed);
+    let (w, h) = ((size >> 32) as f64, (size & 0xffff_ffff) as f64);
+    let Ok(video) = mpv.get_property::<f64>("video-params/aspect") else { return };
+    if w == 0.0 || h == 0.0 || video <= 0.0 {
+        return;
+    }
+    let area = w / h;
+    let crop = 1.0 - area.min(video) / area.max(video);
+    let panscan = if crop <= AUTO_MAX_CROP { 1.0 } else { 0.0 };
+    if mpv.get_property::<f64>("panscan").ok() != Some(panscan) {
+        let _ = mpv.set_property("panscan", panscan);
+    }
 }
 
 /// Puts a GL area for mpv's video under the window's webview.
@@ -195,6 +232,7 @@ pub fn attach_video(window: &WebviewWindow, mpv: &'static Mpv) -> Result<()> {
         if let Some(ctx) = render.borrow().as_ref() {
             let scale = area.scale_factor();
             let (w, h) = (area.allocated_width() * scale, area.allocated_height() * scale);
+            AREA_SIZE.store(((w as u64) << 32) | h as u64, Ordering::Relaxed);
             if let Err(err) = ctx.render::<()>(current_framebuffer(), w, h, true) {
                 eprintln!("beyt: mpv render failed: {err:?}");
             }
