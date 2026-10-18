@@ -45,7 +45,7 @@ interface Props {
 
 /** Both languages line by line; follows playback, click a line to jump. */
 export function Transcript({ visible, rtl, onHide }: Props) {
-  const motion = usePanelMotion();
+  const motion = usePanelMotion(rtl ? "right" : "left");
   const player = usePlayer();
   const p = usePlayback(4);
   const listRef = useRef<HTMLDivElement>(null);
@@ -76,7 +76,6 @@ export function Transcript({ visible, rtl, onHide }: Props) {
     <Sidebar
       visible={visible && !!primary}
       onHide={onHide}
-      position={rtl ? "right" : "left"}
       modal={false}
       {...motion}
       className="panel w-[min(26rem,92vw)]"

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, events, isAndroid } from "./api";
 import * as clock from "./clock";
 import { AppContextMenu } from "./components/AppContextMenu";
+import { ConfirmHost } from "./components/Confirm";
 import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
 import { PlayerChrome } from "./components/PlayerChrome";
@@ -291,8 +292,8 @@ export function App() {
       // them). The mask is still there while a dialog closes, so the Escape
       // that closed it stops here too.
       if (helpOpen || settingsOpen || infoOpen || menuOpen || document.querySelector(".p-dialog-mask")) return;
-      // Escape closes the word popup; it mustn't also leave the video.
-      if (e.key === "Escape" && document.querySelector(".p-overlaypanel, .word-sheet")) return;
+      // Escape closes the word popup or a sheet; it mustn't also leave the video.
+      if (e.key === "Escape" && document.querySelector(".p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay")) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
       const key = eventKey(e);
@@ -308,7 +309,9 @@ export function App() {
   // the background. Without this, Back closed Beyt from anywhere.
   const onAndroidBack = useRef(() => {});
   onAndroidBack.current = () => {
-    const overlay = document.querySelector(".p-dialog-mask, .p-overlaypanel, .word-sheet, .p-menu-overlay, .p-contextmenu");
+    const overlay = document.querySelector(
+      ".p-dialog-mask, .p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay, .p-menu-overlay, .p-contextmenu",
+    );
     if (helpOpen || settingsOpen || infoOpen || menuOpen || overlay) {
       // They close on Escape, as on the desktop.
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
@@ -549,6 +552,7 @@ export function App() {
         onBack={() => void backToLibrary()}
         onVisibleChange={setMenuOpen}
       />
+      <ConfirmHost />
       <Toast ref={toastRef} position={rtl ? "top-left" : "top-right"} transitionOptions={popupMotions.toast} />
     </div>
   );

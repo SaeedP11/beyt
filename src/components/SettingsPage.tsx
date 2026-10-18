@@ -3,7 +3,6 @@
 // bar's arrow, Android's Back button or Escape) goes up a level at a time.
 
 import { getVersion } from "@tauri-apps/api/app";
-import { ConfirmPopup } from "primereact/confirmpopup";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -90,7 +89,6 @@ export function SettingsPage({ visible, section, onSection, onHide }: Props) {
       aria-label={t("settings")}
       className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-zinc-100"
     >
-      <ConfirmPopup />
       <header className="flex h-14 shrink-0 items-center gap-1 border-b border-ink-700/60 px-1">
         <button
           type="button"

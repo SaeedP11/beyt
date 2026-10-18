@@ -1,7 +1,6 @@
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { ColorPicker } from "primereact/colorpicker";
-import { ConfirmPopup, confirmPopup } from "primereact/confirmpopup";
 import { Dialog } from "primereact/dialog";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
@@ -21,6 +20,7 @@ import { popupMotions, useDialogMotion } from "../motion";
 import type { Position } from "../types";
 import { toast } from "../ui";
 import { DictionaryStatus } from "./DictionaryInstall";
+import { confirm as ask } from "./Confirm";
 import { KeyCaps } from "./KeyCaps";
 
 export type Section = "general" | "playback" | "subtitles" | "learning" | "anki" | "shortcuts" | "data";
@@ -49,36 +49,53 @@ interface Props {
 
 export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
   const motion = useDialogMotion();
+  // A sheet is too narrow for the side menu, so the sections become a row of tabs.
+  const sheet = motion.maskClassName ? motion.position : null;
   return (
     <Dialog
       header={t("settings")}
       visible={visible}
       onHide={onHide}
-      className="h-[min(44rem,90dvh)] w-[min(60rem,96vw)]"
-      contentClassName="flex min-h-0 flex-col p-0"
+      className={sheet ? "w-[min(60rem,96vw)]" : "h-[min(44rem,90dvh)] w-[min(60rem,96vw)]"}
+      contentClassName={sheet === "bottom" ? "p-0" : "flex min-h-0 flex-col p-0"}
       dismissableMask
       draggable={false}
       {...motion}
     >
-      <ConfirmPopup />
       {/* On narrow windows the section list becomes a scrolling strip on top. */}
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-ink-700 p-2 md:block md:w-52 md:border-e md:border-b-0">
+      <div
+        className={
+          sheet === "bottom"
+            ? "flex h-[72dvh] flex-col"
+            : sheet
+              ? "flex min-h-0 flex-1 flex-col"
+              : "flex min-h-0 flex-1 flex-col md:flex-row"
+        }
+      >
+        <nav
+          className={
+            sheet
+              ? "flex shrink-0 gap-1 overflow-x-auto border-b border-ink-700 px-3 pb-2"
+              : "flex shrink-0 gap-1 overflow-x-auto border-b border-ink-700 p-2 md:block md:w-52 md:border-e md:border-b-0"
+          }
+        >
           {SECTIONS.map((s) => (
             <button
               type="button"
               key={s.id}
+              // Keep the open section's tab in view in the row of tabs.
+              ref={sheet && section === s.id ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
               onClick={() => onSection(s.id)}
-              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-start text-sm transition md:mb-0.5 md:w-full md:gap-3 ${
-                section === s.id ? "bg-accent/15 font-semibold text-accent" : "text-zinc-300 hover:bg-ink-800"
-              }`}
+              className={`flex shrink-0 items-center whitespace-nowrap px-3 py-2 text-start text-sm transition ${
+                sheet ? "gap-3 rounded-full" : "gap-2 rounded-lg md:mb-0.5 md:w-full md:gap-3"
+              } ${section === s.id ? "bg-accent/15 font-semibold text-accent" : "text-zinc-300 hover:bg-ink-800"}`}
             >
               <i className={s.icon} />
               {t(s.label)}
             </button>
           ))}
         </nav>
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <div className={`min-h-0 min-w-0 flex-1 overflow-y-auto py-4 ${sheet ? "px-5" : "px-4 sm:px-6"}`}>
           <h2 className="mb-2 text-lg font-semibold">{t(SECTIONS.find((s) => s.id === section)!.label)}</h2>
           <SectionContent section={section} />
         </div>
@@ -623,12 +640,9 @@ function Data() {
   useEffect(() => void api.dataInfo().then((d) => setDataDir(d.dataDir)), []);
 
   const confirm = (event: React.MouseEvent<HTMLButtonElement>, run: () => Promise<void> | void) =>
-    confirmPopup({
-      transitionOptions: popupMotions.connected,
-      target: event.currentTarget,
+    ask(event.currentTarget, {
       message: t("confirmAction"),
       icon: "pi pi-exclamation-triangle",
-      acceptClassName: "p-button-danger",
       accept: async () => {
         try {
           await run();

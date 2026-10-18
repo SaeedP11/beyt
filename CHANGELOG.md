@@ -3,6 +3,32 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.20.0 (2026-10-18)
+
+### Added
+
+- On small screens (a window under 640 px wide or 500 px tall, or a phone),
+  dialogs and popups with actions open as sheets. They slide up from the
+  bottom when the window is taller than wide, and in from the end edge (right
+  in English, left in Persian) when it's wider than tall. This covers
+  Keyboard shortcuts, File details, Match subtitles, the right-click menu (a
+  long press on touch) and confirmations, and Settings on the desktop. Drag a
+  sheet's header toward its edge to close it.
+- In a small desktop window, tapping a subtitle word opens its translation
+  in the same sheet as on Android, instead of a small popup over the word.
+- Settings shows its sections as a row of tabs when it opens as a sheet.
+- The Subtitles and Transcript panels rise from the bottom on narrow
+  portrait screens.
+
+### Fixed
+
+- Dialogs and side panels play their open and close animation again. It
+  looked for the dialog through a ref that wasn't set yet when the animation
+  started.
+- In Persian, the Subtitles and Transcript panels now sit on the sides they
+  were meant for (Subtitles on the left, Transcript on the right) and slide
+  in from those edges.
+
 ## 0.19.0 (2026-10-15)
 
 ### Added

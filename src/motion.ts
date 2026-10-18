@@ -7,9 +7,8 @@
 // opacity and transform once a frame. The CSS side is in index.css.
 
 import type { CSSTransitionProps } from "primereact/csstransition";
-import type { Dialog } from "primereact/dialog";
-import type { Sidebar } from "primereact/sidebar";
-import { type RefObject, useMemo, useRef } from "react";
+
+import { type Edge, dialogSheetProps, useSheetEdge } from "./sheet";
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -36,7 +35,9 @@ function animate(el: HTMLElement, draw: Draw, closing: boolean, ms: number): voi
 function motionOptions(find: () => HTMLElement | null | undefined, draw: Draw, enterMs: number, exitMs: number) {
   const run = (closing: boolean) => {
     const el = find();
-    if (el) animate(el, draw, closing, closing ? exitMs : enterMs);
+    if (!el) return;
+    animate(el, draw, closing, closing ? exitMs : enterMs);
+    if (!closing && sheetEdgeOf(el)) swipeToClose(el);
   };
   return {
     // A little longer than the exit, so its last frame shows before unmounting.
@@ -50,21 +51,90 @@ function motionOptions(find: () => HTMLElement | null | undefined, draw: Draw, e
   } as CSSTransitionProps;
 }
 
-interface Overlay {
-  getElement(): HTMLElement | null;
+/** The edge a sheet (see sheet.ts) sits on, read off its mask's classes; null if `el` isn't one. */
+function sheetEdgeOf(el: HTMLElement): Edge | null {
+  const mask = el.parentElement?.classList;
+  if (!mask?.contains("beyt-sheet")) return null;
+  return (["bottom", "left", "right"] as const).find((e) => mask.contains(`p-dialog-${e}`) || mask.contains(`p-sidebar-${e}`)) ?? null;
 }
 
-function useMotion<T extends Overlay>(draw: Draw, enterMs: number, exitMs: number) {
-  const ref = useRef<T>(null);
-  const transitionOptions = useMemo(
-    () => motionOptions(() => ref.current?.getElement(), draw, enterMs, exitMs),
-    [draw, enterMs, exitMs],
-  );
-  return { ref, transitionOptions };
+/** Moves a sheet `off` of the way out past its edge: 0 is in place, 1 fully off screen. */
+function slide(el: HTMLElement, edge: Edge, off: number) {
+  const pct = off * 100;
+  el.style.transform =
+    off === 0 ? "" : edge === "bottom" ? `translateY(${pct}%)` : `translateX(${edge === "left" ? -pct : pct}%)`;
 }
 
-/** A dialog fades and rises in, and fades out with a smaller drop. */
+/** How far a swipe had pulled a sheet out when it let go and closed it. */
+const pulled = new WeakMap<HTMLElement, number>();
+
+/** A sheet slides in from its edge. A modal one carries its dim (see index.css), so it also fades,
+    in the first half of opening and the second half of closing. */
+const drawSheet = (el: HTMLElement, edge: Edge, shown: number, closing: boolean) => {
+  const from = closing ? (pulled.get(el) ?? 0) : 0;
+  slide(el, edge, 1 - shown * (1 - from));
+  if (el.parentElement?.classList.contains("p-component-overlay")) {
+    el.style.opacity = shown === 1 ? "" : String(Math.min(1, shown * 2));
+  }
+};
+
+/** Sheets already listening for swipes. */
+const swipeable = new WeakSet<HTMLElement>();
+
+/**
+ * Dragging a sheet's header toward its edge pulls the sheet along; letting go
+ * far enough out, or with a flick, closes it through its close button, so
+ * the owner's `onHide` runs as usual.
+ */
+function swipeToClose(sheet: HTMLElement) {
+  if (swipeable.has(sheet)) return;
+  swipeable.add(sheet);
+  let start: { x: number; y: number; time: number; edge: Edge } | null = null;
+  let off = 0;
+
+  const distance = (e: PointerEvent) => {
+    if (!start) return 0;
+    if (start.edge === "bottom") return e.clientY - start.y;
+    return start.edge === "left" ? start.x - e.clientX : e.clientX - start.x;
+  };
+  const size = (edge: Edge) => (edge === "bottom" ? sheet.offsetHeight : sheet.offsetWidth) || 1;
+
+  sheet.addEventListener("pointerdown", (e) => {
+    const target = e.target as HTMLElement;
+    const edge = sheetEdgeOf(sheet);
+    // Only the header starts a swipe, so lists, sliders and text inside keep their own drags.
+    if (!edge || e.button !== 0 || !target.closest(".p-dialog-header, .p-sidebar-header")) return;
+    if (target.closest("button, a, input")) return;
+    start = { x: e.clientX, y: e.clientY, time: e.timeStamp, edge };
+    off = 0;
+    sheet.setPointerCapture(e.pointerId);
+  });
+  sheet.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    off = Math.min(1, Math.max(0, distance(e) / size(start.edge)));
+    slide(sheet, start.edge, off);
+  });
+  const end = (e: PointerEvent) => {
+    if (!start) return;
+    const { edge, time } = start;
+    const speed = distance(e) / Math.max(1, e.timeStamp - time); // px per ms
+    start = null;
+    if (off > 0.3 || (off > 0.05 && speed > 0.5)) {
+      pulled.set(sheet, off);
+      sheet.querySelector<HTMLElement>(".p-dialog-header-close, .p-sidebar-close")?.click();
+      return;
+    }
+    const from = off;
+    animate(sheet, (el, shown) => slide(el, edge, from * (1 - shown)), false, 180);
+  };
+  sheet.addEventListener("pointerup", end);
+  sheet.addEventListener("pointercancel", end);
+}
+
+/** A dialog fades and rises in, and fades out with a smaller drop. As a sheet, it slides instead. */
 const drawDialog: Draw = (el, shown, closing) => {
+  const edge = sheetEdgeOf(el);
+  if (edge) return drawSheet(el, edge, shown, closing);
   const lift = closing ? 6 : 12;
   const shrink = closing ? 0.02 : 0.04;
   el.style.opacity = String(shown);
@@ -72,20 +142,12 @@ const drawDialog: Draw = (el, shown, closing) => {
 };
 
 /** A side panel slides in from its edge of the window. */
-const drawPanel: Draw = (el, shown) => {
-  const fromLeft = el.parentElement?.classList.contains("p-sidebar-left");
-  el.style.transform = shown === 1 ? "" : `translateX(${(1 - shown) * (fromLeft ? -100 : 100)}%)`;
+const drawPanel: Draw = (el, shown, closing) => {
+  const edge = sheetEdgeOf(el);
+  if (edge) return drawSheet(el, edge, shown, closing);
+  const mask = el.parentElement?.classList;
+  slide(el, mask?.contains("p-sidebar-bottom") ? "bottom" : mask?.contains("p-sidebar-left") ? "left" : "right", 1 - shown);
 };
-
-/** Spread into a `<Dialog>` to give it Beyt's open and close animation. */
-export function useDialogMotion(): { ref: RefObject<Dialog | null>; transitionOptions: CSSTransitionProps } {
-  return useMotion<Dialog>(drawDialog, 220, 150);
-}
-
-/** Spread into a `<Sidebar>` to give it Beyt's open and close animation. */
-export function usePanelMotion(): { ref: RefObject<Sidebar | null>; transitionOptions: CSSTransitionProps } {
-  return useMotion<Sidebar>(drawPanel, 280, 200);
-}
 
 /** A popup unfolds from the side it opens on, and fades out. */
 const drawPopup: Draw = (el, shown, closing) => {
@@ -144,7 +206,7 @@ export const popupMotions = {
 };
 
 /** The window edge a sheet slides from. */
-export type SheetEdge = "bottom" | "left" | "right";
+export type SheetEdge = Edge;
 
 /** How far `sheet` is pushed off its edge, from 0 (fully out) to 1 (hidden). */
 export function sheetOffset(sheet: HTMLElement, edge: SheetEdge): number {
@@ -210,4 +272,29 @@ export function slideOut(el: HTMLElement, ms = 200): void {
     true,
     ms,
   );
+}
+
+// Dialogs and side panels are found by their transition classes too: a ref's
+// handle isn't attached yet when PrimeReact starts the opening transition.
+const dialogMotion = popupMotion("p-dialog", drawDialog, 220, 150);
+const sheetMotion = popupMotion("p-dialog", drawDialog, 280, 200);
+const panelMotion = popupMotion("p-sidebar", drawPanel, 280, 200);
+
+/** Spread into a `<Dialog>` (or ConfirmDialog) to give it Beyt's open and
+    close animation, and to make it a sheet on small screens (see sheet.ts). */
+export function useDialogMotion() {
+  const edge = useSheetEdge();
+  return { transitionOptions: edge ? sheetMotion : dialogMotion, ...dialogSheetProps(edge) };
+}
+
+/** Spread into a `<Sidebar>` to give it Beyt's open and close animation. It
+    sits on `side`; on small screens it becomes a sheet, from the bottom when
+    the window is taller than wide (see sheet.ts). */
+export function usePanelMotion(side: "left" | "right") {
+  const edge = useSheetEdge();
+  return {
+    transitionOptions: panelMotion,
+    position: edge === "bottom" ? ("bottom" as const) : side,
+    maskClassName: edge ? "beyt-sheet" : undefined,
+  };
 }

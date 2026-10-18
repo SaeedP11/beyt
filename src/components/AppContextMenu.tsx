@@ -1,4 +1,5 @@
 import { ContextMenu } from "primereact/contextmenu";
+import { Sidebar } from "primereact/sidebar";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
@@ -8,9 +9,10 @@ import * as clock from "../clock";
 import { hasHardKeyboard, player } from "../hooks";
 import { t } from "../i18n";
 import { type Action, type Keymap, keyParts, keysFor } from "../keymap";
-import { popupMotions } from "../motion";
+import { popupMotions, usePanelMotion } from "../motion";
 import { ASPECTS, aspectLabel } from "../player";
 import { getSettings } from "../settings";
+import { sheetEdge, useSheetEdge } from "../sheet";
 import { toast } from "../ui";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -18,7 +20,7 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 /** Right-clicks here keep the browser's menu (copy and paste). */
 const NATIVE = "input, textarea, [contenteditable='true']";
 /** Right-clicks here show no menu at all: an app menu over a dialog or panel would be out of place. */
-const QUIET = ".p-dialog-mask, .p-sidebar, .p-overlaypanel, .p-contextmenu";
+const QUIET = ".p-dialog-mask, .p-sidebar-mask.p-component-overlay, .p-sidebar, .p-overlaypanel, .p-contextmenu";
 
 interface Props {
   screen: "loading" | "library" | "player";
@@ -41,6 +43,8 @@ function row(label: string, icon: string | null, end: string | MenuItem[] | unde
   const keys = typeof end === "string" ? end : undefined;
   return {
     label,
+    // For the sheet menu; the context menu draws rows with the template.
+    icon: icon ?? undefined,
     command,
     items,
     template: (_item: MenuItem, o: MenuItemOptions) => (
@@ -58,10 +62,14 @@ function row(label: string, icon: string | null, end: string | MenuItem[] | unde
   };
 }
 
-/** Beyt's own right-click menu, in place of the webview's browser menu. */
+/** Beyt's own right-click menu, in place of the webview's browser menu. On
+    small screens (a long press on touch) it opens as a sheet instead. */
 export function AppContextMenu(props: Props) {
   const menu = useRef<ContextMenu>(null);
   const [model, setModel] = useState<MenuItem[]>([]);
+  const edge = useSheetEdge();
+  const sheetMotion = usePanelMotion(edge === "left" ? "left" : "right");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const latest = useRef(props);
   latest.current = props;
 
@@ -83,21 +91,76 @@ export function AppContextMenu(props: Props) {
             ? [actionRow("lock", t("unlock"), "pi pi-lock-open", keymap, p.runAction)]
             : playerItems(target, e, keymap, p),
       );
-      menu.current?.show(e as unknown as React.SyntheticEvent);
+      if (sheetEdge()) {
+        setSheetOpen(true);
+        p.onVisibleChange(true);
+      } else {
+        menu.current?.show(e as unknown as React.SyntheticEvent);
+      }
     };
     window.addEventListener("contextmenu", onContextMenu);
     return () => window.removeEventListener("contextmenu", onContextMenu);
   }, []);
 
+  const hideSheet = () => {
+    setSheetOpen(false);
+    props.onVisibleChange(false);
+  };
+
   return (
-    <ContextMenu
-      transitionOptions={popupMotions.contextMenu}
-      ref={menu}
-      model={model}
-      className="min-w-60"
-      onShow={() => props.onVisibleChange(true)}
-      onHide={() => props.onVisibleChange(false)}
-    />
+    <>
+      <ContextMenu
+        transitionOptions={popupMotions.contextMenu}
+        ref={menu}
+        model={model}
+        className="min-w-60"
+        onShow={() => props.onVisibleChange(true)}
+        onHide={() => props.onVisibleChange(false)}
+      />
+      {(edge || sheetOpen) && (
+        <Sidebar visible={sheetOpen} onHide={hideSheet} {...sheetMotion} pt={{ content: { className: "px-2 pb-3 pt-0" } }}>
+          <SheetMenu items={model} onPick={hideSheet} />
+        </Sidebar>
+      )}
+    </>
+  );
+}
+
+/** The menu as a list of large rows for a sheet; a submenu opens in place. */
+function SheetMenu({ items, onPick }: { items: MenuItem[]; onPick: () => void }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  return (
+    <ul className="flex flex-col">
+      {items.map((item, i) => {
+        if (item.separator) return <li key={i} role="separator" className="mx-3 my-1 border-t border-ink-700" />;
+        const sub = item.items as MenuItem[] | undefined;
+        const open = expanded === i;
+        return (
+          <li key={i}>
+            <button
+              type="button"
+              aria-expanded={sub ? open : undefined}
+              disabled={item.disabled === true}
+              onClick={(e) => {
+                if (sub) return setExpanded(open ? null : i);
+                onPick();
+                item.command?.({ originalEvent: e, item });
+              }}
+              className="flex w-full items-center gap-4 rounded-lg px-3 py-3 text-start text-zinc-100 transition hover:bg-ink-800 active:bg-ink-700 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <span className={`w-4 shrink-0 text-zinc-400 ${typeof item.icon === "string" ? item.icon : ""}`} />
+              <span className="flex-1">{item.label}</span>
+              {sub && <span className={`pi pi-angle-down text-xs text-zinc-500 transition ${open ? "rotate-180" : ""}`} />}
+            </button>
+            {sub && open && (
+              <div className="ps-8">
+                <SheetMenu items={sub} onPick={onPick} />
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

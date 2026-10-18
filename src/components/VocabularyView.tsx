@@ -1,16 +1,15 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Button } from "primereact/button";
-import { ConfirmPopup, confirmPopup } from "primereact/confirmpopup";
 import { Tag } from "primereact/tag";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
 import { t } from "../i18n";
-import { popupMotions } from "../motion";
 import { getSettings } from "../settings";
 import type { VocabItem } from "../types";
 import { toast } from "../ui";
+import { confirm } from "./Confirm";
 
 /** The sentence with the saved word highlighted. */
 function Highlighted({ text, word }: { text: string; word: string | null }) {
@@ -55,12 +54,9 @@ export function VocabularyView({ onCount }: { onCount?: (n: number) => void }) {
   };
 
   const remove = (event: React.MouseEvent<HTMLButtonElement>, item: VocabItem) =>
-    confirmPopup({
-      transitionOptions: popupMotions.connected,
-      target: event.currentTarget,
+    confirm(event.currentTarget, {
       message: `${t("delete")}?`,
       icon: "pi pi-trash",
-      acceptClassName: "p-button-danger",
       accept: async () => {
         await api.deleteVocab(item.id);
         await reload();
@@ -106,7 +102,6 @@ export function VocabularyView({ onCount }: { onCount?: (n: number) => void }) {
 
   return (
     <section>
-      <ConfirmPopup />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="flex-1 text-sm text-zinc-400">
           {items.length} · {items.filter((i) => i.exported).length} {t("inAnki")}

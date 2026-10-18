@@ -9,6 +9,7 @@ import { markDictionaryMissing, useDictionary } from "../dictionary";
 import { popupMotions } from "../motion";
 import { captureOptions } from "../player";
 import { getSettings } from "../settings";
+import { sheetEdge, useSheetEdge } from "../sheet";
 import { player } from "../hooks";
 import { type StringKey, t } from "../i18n";
 import type { Lookup, PickedWord } from "../types";
@@ -68,12 +69,15 @@ function posLabel(pos: string): string {
   return label === key ? pos : label;
 }
 
-/** Dictionary popup for a clicked subtitle word (a sheet on phones). Pauses while open. */
+/** Dictionary popup for a clicked subtitle word, or a sheet on phones and small screens. Pauses while open. */
 export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   const panel = useRef<OverlayPanel>(null);
   const target = useRef<HTMLElement | null>(null);
   const resumeOnClose = useRef(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // A phone always gets the sheet; a desktop window does when it is small (see sheet.ts).
+  const smallScreen = useSheetEdge() !== null;
+  const asSheet = isAndroid || smallScreen;
   const [picked, setPicked] = useState<PickedWord | null>(null);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [saved, setSaved] = useState(false);
@@ -112,7 +116,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
       setPicked(word);
       setState({ kind: "loading" });
       setSaved(false);
-      if (isAndroid) {
+      if (isAndroid || sheetEdge()) {
         // Already open on another word: the sheet stays and shows this one.
         setSheetOpen(true);
       } else {
@@ -166,6 +170,12 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
     onHide();
   }, []);
 
+  // Resizing the window across the small-screen line swaps the popup and the
+  // sheet; the one that was open unmounts without closing, so close it here.
+  useEffect(() => {
+    if (target.current) closeSheet();
+  }, [asSheet]);
+
   const lookup = state.kind === "done" ? state.lookup : null;
   const showsPersian = picked?.lang !== "fa";
 
@@ -191,14 +201,14 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   };
 
   const body = picked && (
-    <div ref={isAndroid ? undefined : watchSize} className="flex min-h-0 flex-1 flex-col">
+    <div ref={asSheet ? undefined : watchSize} className="flex min-h-0 flex-1 flex-col">
       {/* On a phone, the header is also where the sheet is dragged closed. */}
       <div
-        className={`flex items-start gap-2 border-b border-ink-700 ${isAndroid ? "px-5 pt-1 pb-3" : "px-4 py-3"}`}
+        className={`flex items-start gap-2 border-b border-ink-700 ${asSheet ? "px-5 pt-1 pb-3" : "px-4 py-3"}`}
         data-sheet-drag
       >
         <div className="min-w-0 flex-1">
-          <div className={`font-semibold break-words ${isAndroid ? "text-2xl" : "text-xl"}`} dir="auto">
+          <div className={`font-semibold break-words ${asSheet ? "text-2xl" : "text-xl"}`} dir="auto">
             {lookup?.word ?? picked.word}
           </div>
           {lookup?.matched && lookup.matched !== lookup.word.toLowerCase() && (
@@ -207,7 +217,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
             </div>
           )}
         </div>
-        {isAndroid && (
+        {asSheet && (
           <Button
             icon="pi pi-times"
             rounded
@@ -221,14 +231,14 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
       </div>
 
       <div
-        className={`overflow-y-auto overscroll-contain ${isAndroid ? "min-h-0 flex-1 px-5 py-4" : "max-h-[min(18rem,calc(100dvh-12rem))] px-4 py-3"}`}
+        className={`overflow-y-auto overscroll-contain ${asSheet ? "min-h-0 flex-1 px-5 py-4" : "max-h-[min(18rem,calc(100dvh-12rem))] px-4 py-3"}`}
       >
         {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
         {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
         {state.kind === "missing" && <DictionaryInstallCard />}
         {lookup && lookup.entries.length === 0 && <p className="text-sm text-zinc-400">{t("noMatch")}</p>}
         {lookup && lookup.entries.length > 0 && (
-          <ul className={`flex flex-col ${isAndroid ? "gap-4" : "gap-3"}`}>
+          <ul className={`flex flex-col ${asSheet ? "gap-4" : "gap-3"}`}>
             {lookup.entries.map((e, i) => (
               <li key={i} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -251,12 +261,12 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
         )}
       </div>
 
-      <div className={`flex items-center gap-3 border-t border-ink-700 ${isAndroid ? "px-5 py-3" : "px-4 py-2"}`}>
+      <div className={`flex items-center gap-3 border-t border-ink-700 ${asSheet ? "px-5 py-3" : "px-4 py-2"}`}>
         <span className="flex-1 text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
         <Button
           icon={saved ? "pi pi-check" : "pi pi-bookmark"}
           label={saved ? t("saved") : t("saveWord")}
-          size={isAndroid ? undefined : "small"}
+          size={asSheet ? undefined : "small"}
           severity={saved ? "success" : undefined}
           disabled={saved || state.kind === "loading"}
           onClick={() => void save()}
@@ -267,7 +277,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
 
   // A phone gets a sheet from the screen's edge instead: a popup next to a
   // fingertip-sized word sits under the finger and leaves little room.
-  if (isAndroid) {
+  if (asSheet) {
     return (
       <WordSheet open={sheetOpen} onClose={closeSheet}>
         {body}
