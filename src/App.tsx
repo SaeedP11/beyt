@@ -293,7 +293,7 @@ export function App() {
       // that closed it stops here too.
       if (helpOpen || settingsOpen || infoOpen || menuOpen || document.querySelector(".p-dialog-mask")) return;
       // Escape closes the word popup or a sheet; it mustn't also leave the video.
-      if (e.key === "Escape" && document.querySelector(".p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay")) return;
+      if (e.key === "Escape" && document.querySelector(".p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay, .beyt-scrim")) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=slider], .p-dropdown, .p-colorpicker")) return;
       const key = eventKey(e);
@@ -310,7 +310,7 @@ export function App() {
   const onAndroidBack = useRef(() => {});
   onAndroidBack.current = () => {
     const overlay = document.querySelector(
-      ".p-dialog-mask, .p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay, .p-menu-overlay, .p-contextmenu",
+      ".p-dialog-mask, .p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay, .beyt-scrim, .p-menu-overlay, .p-contextmenu",
     );
     if (helpOpen || settingsOpen || infoOpen || menuOpen || overlay) {
       // They close on Escape, as on the desktop.

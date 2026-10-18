@@ -1,5 +1,4 @@
 import { ContextMenu } from "primereact/contextmenu";
-import { Sidebar } from "primereact/sidebar";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,12 +8,13 @@ import * as clock from "../clock";
 import { hasHardKeyboard, player } from "../hooks";
 import { t } from "../i18n";
 import { type Action, type Keymap, keyParts, keysFor } from "../keymap";
-import { popupMotions, usePanelMotion } from "../motion";
+import { popupMotions } from "../motion";
 import { ASPECTS, aspectLabel } from "../player";
 import { getSettings } from "../settings";
-import { sheetEdge, useSheetEdge } from "../sheet";
+import { sheetEdge } from "../sheet";
 import { translateExternally } from "../translate";
 import { toast } from "../ui";
+import { MenuSheet } from "./SheetMenu";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -68,8 +68,6 @@ function row(label: string, icon: string | null, end: string | MenuItem[] | unde
 export function AppContextMenu(props: Props) {
   const menu = useRef<ContextMenu>(null);
   const [model, setModel] = useState<MenuItem[]>([]);
-  const edge = useSheetEdge();
-  const sheetMotion = usePanelMotion(edge === "left" ? "left" : "right");
   const [sheetOpen, setSheetOpen] = useState(false);
   const latest = useRef(props);
   latest.current = props;
@@ -118,50 +116,8 @@ export function AppContextMenu(props: Props) {
         onShow={() => props.onVisibleChange(true)}
         onHide={() => props.onVisibleChange(false)}
       />
-      {(edge || sheetOpen) && (
-        <Sidebar visible={sheetOpen} onHide={hideSheet} {...sheetMotion} pt={{ content: { className: "px-2 pb-3 pt-0" } }}>
-          <SheetMenu items={model} onPick={hideSheet} />
-        </Sidebar>
-      )}
+      <MenuSheet visible={sheetOpen} items={model} onHide={hideSheet} />
     </>
-  );
-}
-
-/** The menu as a list of large rows for a sheet; a submenu opens in place. */
-function SheetMenu({ items, onPick }: { items: MenuItem[]; onPick: () => void }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
-  return (
-    <ul className="flex flex-col">
-      {items.map((item, i) => {
-        if (item.separator) return <li key={i} role="separator" className="mx-3 my-1 border-t border-ink-700" />;
-        const sub = item.items as MenuItem[] | undefined;
-        const open = expanded === i;
-        return (
-          <li key={i}>
-            <button
-              type="button"
-              aria-expanded={sub ? open : undefined}
-              disabled={item.disabled === true}
-              onClick={(e) => {
-                if (sub) return setExpanded(open ? null : i);
-                onPick();
-                item.command?.({ originalEvent: e, item });
-              }}
-              className="flex w-full items-center gap-4 rounded-lg px-3 py-3 text-start text-zinc-100 transition hover:bg-ink-800 active:bg-ink-700 disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              <span className={`w-4 shrink-0 text-zinc-400 ${typeof item.icon === "string" ? item.icon : ""}`} />
-              <span className="flex-1">{item.label}</span>
-              {sub && <span className={`pi pi-angle-down text-xs text-zinc-500 transition ${open ? "rotate-180" : ""}`} />}
-            </button>
-            {sub && open && (
-              <div className="ps-8">
-                <SheetMenu items={sub} onPick={onPick} />
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

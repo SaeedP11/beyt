@@ -3,6 +3,18 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.22.0 (2026-10-18)
+
+### Added
+
+- On phones and small windows, every menu and picker now opens as a sheet
+  from the edge of the screen, like dialogs already do: the player's ⋯,
+  audio track and aspect ratio menus, a video's ⋯ menu in the library (with
+  the video's name at the top), and the choice lists, language list and
+  colour picker in Settings and the subtitle panel. Rows are large enough to
+  tap, a tap on the dimmed area or Back closes the sheet, and that tap no
+  longer reaches whatever was underneath.
+
 ## 0.21.0 (2026-10-18)
 
 ### Added

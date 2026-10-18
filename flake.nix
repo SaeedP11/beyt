@@ -72,7 +72,7 @@
 
         beyt = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "beyt";
-          version = "0.21.0";
+          version = "0.22.0";
           # Flakes only see files tracked by git, so samples/, data/ and
           # build output stay out of the build.
           src = ./.;

@@ -1,5 +1,4 @@
 import { Button } from "primereact/button";
-import { Menu } from "primereact/menu";
 import type { MenuItem } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
@@ -7,13 +6,13 @@ import { api, isAndroid } from "../api";
 import { audioItems, audioMenuLabel } from "../audio";
 import * as clock from "../clock";
 import { player, useHardKeyboard, useMediaQuery, usePlayback, usePlayer } from "../hooks";
-import { getLang, t } from "../i18n";
+import { t } from "../i18n";
 import { keyParts, keysFor } from "../keymap";
-import { popupMotions } from "../motion";
 import { ASPECTS, aspectLabel } from "../player";
 import { useSettings } from "../settings";
 import { fmtTime } from "../ui";
 import { SeekBar } from "./SeekBar";
+import { PopupMenu, type PopupMenuHandle } from "./SheetMenu";
 
 /** Below this width the less used buttons move into the ⋯ menu. */
 const NARROW = "(max-width: 767px)";
@@ -54,11 +53,11 @@ export function PlayerChrome({
   const lockKey = keysFor("lock", keymap)[0];
   const audioKey = keysFor("cycleAudio", keymap)[0];
   const lockLabel = locked ? t("unlock") : t("lock");
-  const more = useRef<Menu>(null);
+  const more = useRef<PopupMenuHandle>(null);
   /** The ⋯ button, which the aspect menu opens from on narrow screens. */
   const moreButton = useRef<EventTarget | null>(null);
-  const aspectMenu = useRef<Menu>(null);
-  const audioMenu = useRef<Menu>(null);
+  const aspectMenu = useRef<PopupMenuHandle>(null);
+  const audioMenu = useRef<PopupMenuHandle>(null);
   // Widening the window unmounts the menu without an onHide.
   useEffect(() => {
     if (!narrow) onMenuVisibleChange(false);
@@ -104,7 +103,6 @@ export function PlayerChrome({
   // Smaller buttons on phones, so the whole bar fits a 320px-wide screen.
   const size = narrow ? "size-10" : "";
   const plain = `${size} text-white`;
-  const popupAlignment = getLang() === "fa" ? "left" : "right";
   // Locked controls stay in view, dimmed, so it's clear why they don't respond.
   const disabled = `transition-opacity duration-200 ${locked ? "opacity-35" : ""}`;
 
@@ -218,12 +216,9 @@ export function PlayerChrome({
                   }}
                   className={plain}
                 />
-                <Menu
+                <PopupMenu
                   ref={more}
                   model={moreItems}
-                  popup
-                  popupAlignment={popupAlignment}
-                  transitionOptions={popupMotions.connected}
                   onShow={() => onMenuVisibleChange(true)}
                   onHide={() => onMenuVisibleChange(false)}
                 />
@@ -299,22 +294,16 @@ export function PlayerChrome({
                 )}
               </>
             )}
-            <Menu
+            <PopupMenu
               ref={audioMenu}
               model={audioMenuItems}
-              popup
-              popupAlignment={popupAlignment}
-              transitionOptions={popupMotions.connected}
               className="max-w-[min(24rem,92vw)]"
               onShow={() => onMenuVisibleChange(true)}
               onHide={() => onMenuVisibleChange(false)}
             />
-            <Menu
+            <PopupMenu
               ref={aspectMenu}
               model={aspectItems}
-              popup
-              popupAlignment={popupAlignment}
-              transitionOptions={popupMotions.connected}
               onShow={() => onMenuVisibleChange(true)}
               onHide={() => onMenuVisibleChange(false)}
             />

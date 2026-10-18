@@ -399,6 +399,91 @@ body.idle {
   margin: 0;
 }
 
+/* Dropdown, MultiSelect and ColorPicker panels as sheets (see motion.ts):
+   PrimeReact places the panel by its field with inline styles, which these
+   override. */
+.beyt-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--maskbg);
+  will-change: opacity;
+}
+.beyt-panel-sheet {
+  position: fixed !important;
+  display: flex;
+  flex-direction: column;
+  min-width: 0 !important;
+  margin: 0 !important;
+  border: 0;
+  overflow: hidden;
+  transform-origin: center !important;
+  box-shadow: 0 0 32px rgb(0 0 0 / 0.4);
+}
+.beyt-panel-sheet-bottom {
+  inset: auto 0 0 0 !important;
+  width: 100% !important;
+  max-height: 70dvh;
+  padding-top: 1.25rem;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: 1rem 1rem 0 0;
+}
+/* A grab handle, like the other sheets', so it reads as one. */
+.beyt-panel-sheet-bottom::before {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  inset-inline: 0;
+  width: 2.25rem;
+  height: 0.25rem;
+  margin-inline: auto;
+  border-radius: 9999px;
+  background: var(--color-ink-600);
+}
+.beyt-panel-sheet-left,
+.beyt-panel-sheet-right {
+  top: 0 !important;
+  bottom: 0;
+  width: min(22rem, 80vw) !important;
+  padding-block: 0.75rem;
+}
+.beyt-panel-sheet-right {
+  left: auto !important;
+  right: 0;
+  border-radius: 1rem 0 0 1rem;
+}
+.beyt-panel-sheet-left {
+  left: 0 !important;
+  border-radius: 0 1rem 1rem 0;
+}
+.beyt-panel-sheet .p-dropdown-items-wrapper,
+.beyt-panel-sheet .p-multiselect-items-wrapper {
+  flex: 1;
+  max-height: none !important;
+  overscroll-behavior: contain;
+}
+/* Rows big enough to tap. */
+.beyt-panel-sheet .p-dropdown-item,
+.beyt-panel-sheet .p-multiselect-item {
+  padding: 0.875rem 1.25rem;
+}
+.beyt-panel-sheet .p-multiselect-header {
+  padding: 0.5rem 1.25rem 0.75rem;
+}
+/* The picker keeps its size, centred. */
+.beyt-panel-sheet.p-colorpicker-panel {
+  height: auto;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0;
+}
+.beyt-panel-sheet-bottom.p-colorpicker-panel {
+  padding-block: 1.75rem max(1.25rem, env(safe-area-inset-bottom));
+}
+.beyt-panel-sheet .p-colorpicker-content {
+  width: 193px;
+  height: 166px;
+}
+
 /* PrimeReact places left and right dialogs and panels with flexbox, which
    swaps them in Persian; auto margins hold them to the edge they name. */
 .p-dialog-left .p-dialog,

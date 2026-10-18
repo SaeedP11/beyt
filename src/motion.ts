@@ -8,7 +8,7 @@
 
 import type { CSSTransitionProps } from "primereact/csstransition";
 
-import { type Edge, dialogSheetProps, useSheetEdge } from "./sheet";
+import { type Edge, dialogSheetProps, sheetEdge, useSheetEdge } from "./sheet";
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -155,6 +155,82 @@ const drawPopup: Draw = (el, shown, closing) => {
   el.style.transform = shown === 1 || closing ? "" : `scaleY(${0.9 + 0.1 * shown})`;
 };
 
+/** Popups that pick a value and become sheets on small screens; ConfirmPopup has its own (see Confirm.tsx). */
+const PANELS = ".p-dropdown-panel, .p-multiselect-panel, .p-colorpicker-panel";
+
+/** The dim behind each panel sheet. */
+const scrims = new WeakMap<HTMLElement, HTMLElement>();
+
+/**
+ * Makes a value panel that's opening a sheet from `edge` (index.css places
+ * it) over a dim. A tap on the dim is a click outside the panel, so the panel
+ * closes as usual and the tap doesn't reach whatever is under it. Escape
+ * (and so Android's Back button) closes it the same way.
+ */
+function panelSheet(el: HTMLElement, edge: Edge) {
+  el.classList.add("beyt-panel-sheet", `beyt-panel-sheet-${edge}`);
+  const scrim = document.createElement("div");
+  scrim.className = "beyt-scrim";
+  scrim.style.zIndex = String((parseInt(el.style.zIndex) || 1100) - 1);
+  scrim.style.opacity = "0";
+  el.before(scrim);
+  scrims.set(el, scrim);
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    e.stopImmediatePropagation();
+    scrim.click();
+  };
+  document.addEventListener("keydown", onKey, true);
+  // Gone with the panel, however it went (a closing dialog can take it along).
+  const gone = new MutationObserver(() => {
+    if (el.isConnected) return;
+    scrim.remove();
+    document.removeEventListener("keydown", onKey, true);
+    gone.disconnect();
+  });
+  gone.observe(el.parentElement ?? document.body, { childList: true });
+}
+
+/** Where a panel sheet sits, or null for a popup by its field. */
+function panelEdge(el: HTMLElement): Edge | null {
+  if (!el.classList.contains("beyt-panel-sheet")) return null;
+  return (["bottom", "left", "right"] as const).find((e) => el.classList.contains(`beyt-panel-sheet-${e}`)) ?? null;
+}
+
+/** A value popup unfolds by its field, or as a sheet slides in from its edge as its dim fades in. */
+const drawConnected: Draw = (el, shown, closing) => {
+  const edge = panelEdge(el);
+  if (!edge) return drawPopup(el, shown, closing);
+  slide(el, edge, 1 - shown);
+  const scrim = scrims.get(el);
+  if (scrim) scrim.style.opacity = String(shown);
+};
+
+/** `transitionOptions` for Dropdown, MultiSelect, ColorPicker and ConfirmPopup. */
+function connectedMotion(): CSSTransitionProps {
+  const base = popupMotion("p-connected-overlay", drawConnected);
+  const sheet = popupMotion("p-connected-overlay", drawConnected, 280, 200);
+  return {
+    ...base,
+    onEnter: (node, appearing) => {
+      const el = newest("p-connected-overlay-enter");
+      const edge = sheetEdge();
+      if (el && edge && el.matches(PANELS)) panelSheet(el, edge);
+      base.onEnter?.(node, appearing);
+    },
+    // Sheets travel further, so they take longer.
+    onEntering: (node, appearing) => {
+      const el = newest("p-connected-overlay-enter");
+      (el && panelEdge(el) ? sheet : base).onEntering?.(node, appearing);
+    },
+    onExiting: (node) => {
+      const el = newest("p-connected-overlay-exit-active");
+      (el && panelEdge(el) ? sheet : base).onExiting?.(node);
+    },
+    timeout: sheet.timeout,
+  } as CSSTransitionProps;
+}
+
 /** The newest element with `className`: the popup PrimeReact just marked
     as entering or leaving. */
 function newest(className: string): HTMLElement | null {
@@ -198,8 +274,8 @@ const drawToast: Draw = (el, shown, closing) => {
     class to the popup just before each callback, so one shared object can
     find the right element without a ref. */
 export const popupMotions = {
-  /** Dropdown, MultiSelect, ColorPicker and ConfirmPopup. */
-  connected: popupMotion("p-connected-overlay"),
+  /** Dropdown, MultiSelect, ColorPicker and ConfirmPopup; the first three are sheets on small screens. */
+  connected: connectedMotion(),
   overlayPanel: popupMotion("p-overlaypanel"),
   contextMenu: popupMotion("p-contextmenu"),
   toast: popupMotion("p-toast-message", drawToast, 250, 200),

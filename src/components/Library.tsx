@@ -4,7 +4,6 @@ import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { ContextMenu } from "primereact/contextmenu";
 import { Dialog } from "primereact/dialog";
-import { Menu } from "primereact/menu";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { TabPanel, TabView } from "primereact/tabview";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -13,8 +12,10 @@ import { api, isAndroid } from "../api";
 import { useHardKeyboard } from "../hooks";
 import { getLang, t } from "../i18n";
 import { popupMotions, slideIn, useDialogMotion } from "../motion";
+import { sheetEdge } from "../sheet";
 import type { Folder, FolderEntry, Recent } from "../types";
 import { toast } from "../ui";
+import { PopupMenu, type PopupMenuHandle } from "./SheetMenu";
 import { VocabularyView } from "./VocabularyView";
 
 const VIDEO_EXTENSIONS = ["mkv", "mp4", "m4v", "webm", "avi", "mov", "ts", "m2ts", "wmv", "flv", "ogv"];
@@ -172,6 +173,8 @@ function Thumbnail({ video, small, children }: { video: Video; small?: boolean; 
 function menuRow(label: string, icon: string, keys: string | undefined, command: () => void, danger = false): MenuItem {
   return {
     label,
+    // For the sheet on small screens; the popups draw rows with the template.
+    icon,
     command,
     className: danger ? "danger" : undefined,
     template: (_item: MenuItem, o: MenuItemOptions) => {
@@ -211,6 +214,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   const [trashing, setTrashing] = useState<Video | null>(null);
   const [menuModel, setMenuModel] = useState<MenuItem[]>([]);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [menuTitle, setMenuTitle] = useState("");
   const [tab, setTab] = useState(lastTab);
   /** Whether the tab being shown came from further left, for its slide. */
   const [forward, setForward] = useState(true);
@@ -225,7 +229,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     lastTab = next;
     scroller.current?.scrollTo({ top: 0 });
   }, []);
-  const menu = useRef<Menu>(null);
+  const menu = useRef<PopupMenuHandle>(null);
   const contextMenu = useRef<ContextMenu>(null);
   const folderPath = useRef<string | null>(null);
   const pending = useRef(new Map<string, { timer: number; finish: () => Promise<void> }>());
@@ -346,7 +350,9 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     onMenu: (v, e, atPointer) => {
       setMenuModel(actions(v));
       setMenuFor(v.path);
-      if (atPointer) contextMenu.current?.show(e);
+      setMenuTitle(v.name);
+      // On small screens both become the same sheet.
+      if (atPointer && !sheetEdge()) contextMenu.current?.show(e);
       else menu.current?.show(e);
     },
     onKey: (v, e) => {
@@ -523,15 +529,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
       </div>
       {isAndroid && <BottomNav pages={pages} active={tab} onChange={showTab} />}
 
-      <Menu
-        ref={menu}
-        model={menuModel}
-        popup
-        popupAlignment={getLang() === "fa" ? "left" : "right"}
-        className="min-w-64"
-        transitionOptions={popupMotions.connected}
-        onHide={() => setMenuFor(null)}
-      />
+      <PopupMenu ref={menu} model={menuModel} title={menuTitle} className="min-w-64" onHide={() => setMenuFor(null)} />
       <ContextMenu
         ref={contextMenu}
         model={menuModel}
