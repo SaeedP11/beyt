@@ -1,7 +1,6 @@
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { ColorPicker } from "primereact/colorpicker";
-import { ConfirmPopup, confirmPopup } from "primereact/confirmpopup";
 import { Dialog } from "primereact/dialog";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
@@ -19,6 +18,7 @@ import { type Settings, type SubtitleDefault, resetSettings, updateSettings, use
 import { popupMotions, useDialogMotion } from "../motion";
 import type { Position } from "../types";
 import { toast } from "../ui";
+import { confirm as ask } from "./Confirm";
 import { KeyCaps } from "./KeyCaps";
 
 export type Section = "general" | "playback" | "subtitles" | "learning" | "anki" | "shortcuts" | "data";
@@ -47,35 +47,49 @@ interface Props {
 
 export function SettingsDialog({ visible, section, onSection, onHide }: Props) {
   const motion = useDialogMotion();
+  // A sheet is too narrow for the side menu, so the sections become a row of tabs.
+  const sheet = motion.maskClassName ? motion.position : null;
+  const side = sheet === "left" || sheet === "right";
   return (
     <Dialog
       header={t("settings")}
       visible={visible}
       onHide={onHide}
       className="w-[min(60rem,96vw)]"
-      contentClassName="p-0"
+      contentClassName={side ? "flex flex-col p-0" : "p-0"}
       dismissableMask
       draggable={false}
       {...motion}
     >
-      <ConfirmPopup />
-      <div className="flex h-[min(38rem,75vh)] min-h-0">
-        <nav className="w-52 shrink-0 border-e border-ink-700 p-2">
+      <div
+        className={
+          sheet === "bottom" ? "flex h-[72dvh] flex-col" : side ? "flex min-h-0 flex-1 flex-col" : "flex h-[min(38rem,75vh)] min-h-0"
+        }
+      >
+        <nav
+          className={
+            sheet
+              ? "flex shrink-0 gap-1 overflow-x-auto border-b border-ink-700 px-3 pb-2"
+              : "w-52 shrink-0 border-e border-ink-700 p-2"
+          }
+        >
           {SECTIONS.map((s) => (
             <button
               type="button"
               key={s.id}
+              // Keep the open section's tab in view in the row of tabs.
+              ref={sheet && section === s.id ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
               onClick={() => onSection(s.id)}
-              className={`mb-0.5 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start text-sm transition ${
-                section === s.id ? "bg-accent/15 font-semibold text-accent" : "text-zinc-300 hover:bg-ink-800"
-              }`}
+              className={`flex items-center gap-3 px-3 py-2 text-start text-sm transition ${
+                sheet ? "shrink-0 rounded-full whitespace-nowrap" : "mb-0.5 w-full rounded-lg"
+              } ${section === s.id ? "bg-accent/15 font-semibold text-accent" : "text-zinc-300 hover:bg-ink-800"}`}
             >
               <i className={s.icon} />
               {t(s.label)}
             </button>
           ))}
         </nav>
-        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className={`min-h-0 min-w-0 flex-1 overflow-y-auto py-4 ${sheet ? "px-5" : "px-6"}`}>
           <h2 className="mb-2 text-lg font-semibold">{t(SECTIONS.find((s) => s.id === section)!.label)}</h2>
           {section === "general" && <General />}
           {section === "playback" && <Playback />}
@@ -486,12 +500,9 @@ function Data() {
   useEffect(() => void api.dataInfo().then((d) => setDataDir(d.dataDir)), []);
 
   const confirm = (event: React.MouseEvent<HTMLButtonElement>, run: () => Promise<void> | void) =>
-    confirmPopup({
-      transitionOptions: popupMotions.connected,
-      target: event.currentTarget,
+    ask(event.currentTarget, {
       message: t("confirmAction"),
       icon: "pi pi-exclamation-triangle",
-      acceptClassName: "p-button-danger",
       accept: async () => {
         try {
           await run();

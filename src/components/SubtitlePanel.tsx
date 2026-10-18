@@ -26,7 +26,7 @@ interface Props {
 }
 
 export function SubtitlePanel({ visible, rtl, onHide }: Props) {
-  const motion = usePanelMotion();
+  const motion = usePanelMotion(rtl ? "left" : "right");
   const player = usePlayer();
   const [matching, setMatching] = useState<string[]>([]);
 
@@ -61,7 +61,6 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
       <Sidebar
         visible={visible}
         onHide={onHide}
-        position={rtl ? "left" : "right"}
         modal={false}
         {...motion}
         className="panel w-[min(24rem,92vw)]"

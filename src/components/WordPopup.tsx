@@ -1,13 +1,15 @@
 import { Button } from "primereact/button";
 import { OverlayPanel } from "primereact/overlaypanel";
+import { Sidebar } from "primereact/sidebar";
 import { Tag } from "primereact/tag";
 import { type Ref, useCallback, useImperativeHandle, useRef, useState } from "react";
 
 import { api } from "../api";
 import * as clock from "../clock";
-import { popupMotions } from "../motion";
+import { popupMotions, usePanelMotion } from "../motion";
 import { captureOptions } from "../player";
 import { getSettings } from "../settings";
+import { sheetEdge, useSheetEdge } from "../sheet";
 import { player } from "../hooks";
 import { type StringKey, t } from "../i18n";
 import type { Lookup, PickedWord } from "../types";
@@ -63,9 +65,12 @@ function posLabel(pos: string): string {
   return label === key ? pos : label;
 }
 
-/** Dictionary popup for a clicked subtitle word. Pauses while open. */
+/** Dictionary popup for a clicked subtitle word, or a sheet on small screens. Pauses while open. */
 export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   const panel = useRef<OverlayPanel>(null);
+  const edge = useSheetEdge();
+  const sheetMotion = usePanelMotion(edge === "left" ? "left" : "right");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const target = useRef<HTMLElement | null>(null);
   const resumeOnClose = useRef(false);
   const [picked, setPicked] = useState<PickedWord | null>(null);
@@ -103,9 +108,13 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
       setPicked(word);
       setState({ kind: "loading" });
       setSaved(false);
-      panel.current?.show(event as unknown as React.SyntheticEvent, el);
-      // Already open on another word: PrimeReact just re-aligned it below.
-      reposition();
+      if (sheetEdge()) {
+        setSheetOpen(true);
+      } else {
+        panel.current?.show(event as unknown as React.SyntheticEvent, el);
+        // Already open on another word: PrimeReact just re-aligned it below.
+        reposition();
+      }
       api.lookupWord(word.word, word.lang).then(
         (lookup) => setState({ kind: "done", lookup }),
         (e) => setState({ kind: "error", message: String(e) }),
@@ -114,6 +123,7 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
   }));
 
   const onHide = () => {
+    setSheetOpen(false);
     target.current?.classList.remove("picked");
     target.current = null;
     if (resumeOnClose.current) {
@@ -146,62 +156,85 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
     }
   };
 
-  return (
-    <OverlayPanel ref={panel} transitionOptions={popupMotions.overlayPanel} onHide={onHide} className="w-[min(22rem,90vw)]" pt={{ content: { className: "p-0" } }}>
-      {picked && (
-        <div ref={watchSize} className="flex flex-col">
-          <div className="border-b border-ink-700 px-4 py-3">
-            <div className="text-xl font-semibold" dir="auto">
-              {lookup?.word ?? picked.word}
-            </div>
-            {lookup?.matched && lookup.matched !== lookup.word.toLowerCase() && (
-              <div className="text-xs text-zinc-400" dir="ltr">
-                → {lookup.matched}
-              </div>
-            )}
-          </div>
-
-          <div className="max-h-72 overflow-y-auto px-4 py-3">
-            {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
-            {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
-            {lookup && lookup.entries.length === 0 && <p className="text-sm text-zinc-400">{t("noMatch")}</p>}
-            {lookup && lookup.entries.length > 0 && (
-              <ul className="flex flex-col gap-3">
-                {lookup.entries.map((e, i) => (
-                  <li key={i} className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={showsPersian ? "text-2xl font-semibold text-accent" : "text-lg font-semibold"}
-                        dir={showsPersian ? "rtl" : "auto"}
-                        lang={showsPersian ? "fa" : undefined}
-                      >
-                        {showsPersian ? e.fa : e.glosses[0]}
-                      </span>
-                      <Tag value={posLabel(e.pos)} severity="secondary" className="text-[0.65rem]" />
-                    </div>
-                    <div className="text-sm text-zinc-400" dir="ltr">
-                      {e.roman && <span className="me-2 italic text-zinc-500">{e.roman}</span>}
-                      {(showsPersian ? e.glosses : e.glosses.slice(1)).slice(0, 3).join(" · ")}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 border-t border-ink-700 px-4 py-2">
-            <span className="flex-1 text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
-            <Button
-              icon={saved ? "pi pi-check" : "pi pi-bookmark"}
-              label={saved ? t("saved") : t("saveWord")}
-              size="small"
-              severity={saved ? "success" : undefined}
-              disabled={saved || state.kind === "loading"}
-              onClick={() => void save()}
-            />
-          </div>
+  const title = (
+    <div>
+      <div className="text-xl font-semibold" dir="auto">
+        {lookup?.word ?? picked?.word}
+      </div>
+      {lookup?.matched && lookup.matched !== lookup.word.toLowerCase() && (
+        <div className="text-xs text-zinc-400" dir="ltr">
+          → {lookup.matched}
         </div>
       )}
-    </OverlayPanel>
+    </div>
+  );
+
+  const entries = (
+    <>
+      {state.kind === "loading" && <i className="pi pi-spin pi-spinner text-zinc-400" />}
+      {state.kind === "error" && <p className="text-sm text-amber-300">{state.message}</p>}
+      {lookup && lookup.entries.length === 0 && <p className="text-sm text-zinc-400">{t("noMatch")}</p>}
+      {lookup && lookup.entries.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {lookup.entries.map((e, i) => (
+            <li key={i} className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className={showsPersian ? "text-2xl font-semibold text-accent" : "text-lg font-semibold"}
+                  dir={showsPersian ? "rtl" : "auto"}
+                  lang={showsPersian ? "fa" : undefined}
+                >
+                  {showsPersian ? e.fa : e.glosses[0]}
+                </span>
+                <Tag value={posLabel(e.pos)} severity="secondary" className="text-[0.65rem]" />
+              </div>
+              <div className="text-sm text-zinc-400" dir="ltr">
+                {e.roman && <span className="me-2 italic text-zinc-500">{e.roman}</span>}
+                {(showsPersian ? e.glosses : e.glosses.slice(1)).slice(0, 3).join(" · ")}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
+  const saveButton = (
+    <Button
+      icon={saved ? "pi pi-check" : "pi pi-bookmark"}
+      label={saved ? t("saved") : t("saveWord")}
+      size={edge ? undefined : "small"}
+      severity={saved ? "success" : undefined}
+      disabled={saved || state.kind === "loading"}
+      onClick={() => void save()}
+    />
+  );
+
+  return (
+    <>
+      <OverlayPanel ref={panel} transitionOptions={popupMotions.overlayPanel} onHide={onHide} className="w-[min(22rem,90vw)]" pt={{ content: { className: "p-0" } }}>
+        {picked && (
+          <div ref={watchSize} className="flex flex-col">
+            <div className="border-b border-ink-700 px-4 py-3">{title}</div>
+            <div className="max-h-72 overflow-y-auto px-4 py-3">{entries}</div>
+            <div className="flex items-center gap-3 border-t border-ink-700 px-4 py-2">
+              <span className="flex-1 text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
+              {saveButton}
+            </div>
+          </div>
+        )}
+      </OverlayPanel>
+      {(edge || sheetOpen) && (
+        <Sidebar visible={sheetOpen} onHide={onHide} {...sheetMotion} header={title} pt={{ content: { className: "p-0" } }}>
+          <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto border-t border-ink-700 px-5 py-4">{entries}</div>
+            <div className="flex flex-col gap-2 border-t border-ink-700 px-5 py-3">
+              {saveButton}
+              <span className="text-center text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
+            </div>
+          </div>
+        </Sidebar>
+      )}
+    </>
   );
 }

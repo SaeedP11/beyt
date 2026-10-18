@@ -175,3 +175,103 @@ body.idle {
 .p-toast-message {
   will-change: transform, opacity;
 }
+
+/* ---------- sheets (small screens, see sheet.ts) ----------
+   A modal sheet carries its dim as a wide shadow, like a dialog, so the dim
+   fades with the sheet's opacity. */
+.beyt-sheet.p-component-overlay {
+  background-color: transparent;
+  animation: none;
+}
+.beyt-sheet .p-dialog,
+.beyt-sheet .p-sidebar {
+  margin: 0;
+  border: 0;
+  overflow: hidden;
+  will-change: transform, opacity;
+  box-shadow: 0 0 32px rgb(0 0 0 / 0.4);
+}
+.beyt-sheet.p-component-overlay .p-dialog,
+.beyt-sheet.p-component-overlay .p-sidebar {
+  box-shadow:
+    0 0 32px rgb(0 0 0 / 0.4),
+    0 0 0 100vmax var(--maskbg);
+}
+
+/* Up from the bottom, with a grab handle: dragging the header down closes it. */
+.beyt-sheet.p-dialog-bottom .p-dialog,
+.beyt-sheet.p-sidebar-bottom .p-sidebar {
+  width: 100%;
+  height: auto;
+  max-height: 88dvh;
+  border-radius: 1rem 1rem 0 0;
+}
+.beyt-sheet.p-sidebar-bottom .p-sidebar.panel {
+  height: 60dvh;
+}
+.beyt-sheet.p-dialog-bottom .p-dialog::before,
+.beyt-sheet.p-sidebar-bottom .p-sidebar::before {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  inset-inline: 0;
+  z-index: 1;
+  width: 2.25rem;
+  height: 0.25rem;
+  margin-inline: auto;
+  border-radius: 9999px;
+  background: var(--color-ink-600);
+  pointer-events: none;
+}
+.beyt-sheet.p-dialog-bottom .p-dialog-header,
+.beyt-sheet.p-sidebar-bottom .p-sidebar-header {
+  padding-top: 1.5rem;
+}
+
+/* In from the end edge, full height. */
+.beyt-sheet.p-dialog-left .p-dialog,
+.beyt-sheet.p-dialog-right .p-dialog,
+.beyt-sheet.p-sidebar-left .p-sidebar,
+.beyt-sheet.p-sidebar-right .p-sidebar {
+  width: min(32rem, 80vw);
+  height: 100%;
+  max-height: 100%;
+}
+.beyt-sheet.p-dialog-right .p-dialog,
+.beyt-sheet.p-sidebar-right .p-sidebar {
+  border-radius: 1rem 0 0 1rem;
+}
+.beyt-sheet.p-dialog-left .p-dialog,
+.beyt-sheet.p-sidebar-left .p-sidebar {
+  border-radius: 0 1rem 1rem 0;
+}
+
+/* The header is the swipe handle, so the browser mustn't scroll on it. */
+.beyt-sheet .p-dialog-header,
+.beyt-sheet .p-sidebar-header {
+  touch-action: none;
+}
+/* Clear of a phone's home indicator. */
+.beyt-sheet .p-dialog-footer {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+/* Confirmations: two large buttons sharing the width. */
+.beyt-sheet .p-confirm-dialog .p-dialog-footer {
+  display: flex;
+  gap: 0.75rem;
+}
+.beyt-sheet .p-confirm-dialog .p-dialog-footer .p-button {
+  flex: 1;
+  margin: 0;
+}
+
+/* PrimeReact places left and right dialogs and panels with flexbox, which
+   swaps them in Persian; auto margins hold them to the edge they name. */
+.p-dialog-left .p-dialog,
+.p-sidebar-left .p-sidebar {
+  margin-right: auto;
+}
+.p-dialog-right .p-dialog,
+.p-sidebar-right .p-sidebar {
+  margin-left: auto;
+}
