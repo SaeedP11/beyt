@@ -15,7 +15,7 @@ import { type Brightness, api } from "../api";
 import { player } from "../hooks";
 import { type StringKey, languageName, t } from "../i18n";
 import { ACTIONS, type Action, DEFAULT_KEYS, GROUPS, eventKey, keysFor } from "../keymap";
-import { type Settings, type SubtitleDefault, resetSettings, updateSettings, useSettings } from "../settings";
+import { MAX_MARGIN, type Settings, type SubtitleDefault, resetSettings, updateSettings, useSettings } from "../settings";
 import { popupMotions, useDialogMotion } from "../motion";
 import type { Position } from "../types";
 import { toast } from "../ui";
@@ -450,8 +450,11 @@ function Subtitles() {
         <Row label={t("trackGap")} stack>
           <SliderValue value={s.trackGap} min={0} max={1.5} step={0.05} format={(v) => `${v.toFixed(2)}em`} onChange={(v) => updateSettings({ trackGap: v })} />
         </Row>
-        <Row label={t("bottomMargin")} stack>
-          <SliderValue value={s.bottomMargin} min={0} max={30} step={1} format={(v) => `${v}%`} onChange={(v) => updateSettings({ bottomMargin: v })} />
+        <Row label={t("bottomMargin")} hint={t("marginHint")} stack>
+          <SliderValue value={s.bottomMargin} min={0} max={MAX_MARGIN} step={0.5} format={(v) => `${v}%`} onChange={(v) => updateSettings({ bottomMargin: v })} />
+        </Row>
+        <Row label={t("topMargin")} stack>
+          <SliderValue value={s.topMargin} min={0} max={MAX_MARGIN} step={0.5} format={(v) => `${v}%`} onChange={(v) => updateSettings({ topMargin: v })} />
         </Row>
       </Group>
       <div className={compact ? "" : "pt-4"}>

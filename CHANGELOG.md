@@ -3,6 +3,22 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.25.0 (2026-10-18)
+
+### Added
+
+- Move the subtitles up or down by dragging them on the video, with the
+  mouse or a finger. Each stack moves on its own: drag a bottom line to
+  raise or lower the bottom subtitles, a top line for the top ones. A tap
+  or click without moving still looks up the word, and a sideways swipe
+  still goes to the next or previous line.
+- Alt+↑ and Alt+↓ move the selected track's subtitles up or down a step,
+  with a message showing the new distance from the edge. Both can be
+  changed under Settings → Shortcuts.
+- A "Distance from the top" setting under Settings → Subtitles, next to
+  "Distance from the bottom". Both now go up to 40% of the screen in half
+  steps, and the distance you drag to is saved there.
+
 ## 0.24.0 (2026-10-18)
 
 ### Added

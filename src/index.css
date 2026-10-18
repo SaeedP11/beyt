@@ -128,14 +128,24 @@ body.idle {
   align-items: center;
   gap: var(--sub-gap, 0.35em);
   pointer-events: none;
-  transition: bottom 200ms ease;
+  transition:
+    bottom 200ms ease,
+    top 200ms ease;
+}
+/* Following the pointer while the subtitles are dragged up or down. */
+.sub-stack.dragging {
+  transition: none;
+}
+.sub-stack.dragging .track,
+.sub-stack.dragging .track .word {
+  cursor: ns-resize;
 }
 .sub-stack.bottom {
   bottom: calc(var(--sub-bottom, 6%) + var(--controls-offset));
   flex-direction: column-reverse;
 }
 .sub-stack.top {
-  top: 5%;
+  top: var(--sub-top, 5%);
   flex-direction: column;
 }
 

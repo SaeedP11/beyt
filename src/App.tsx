@@ -23,7 +23,7 @@ import { hasHardKeyboard, player, useLang } from "./hooks";
 import { getLang, t } from "./i18n";
 import { type Action, bindingTable, eventKey, keyParts, keysFor } from "./keymap";
 import { popupMotions } from "./motion";
-import { getSettings, loadSettings, useSettings } from "./settings";
+import { clampMargin, getSettings, loadSettings, marginKey, updateSettings, useSettings } from "./settings";
 import { fmtTime, setToastHandler, toast } from "./ui";
 
 type Screen = "loading" | "library" | "player";
@@ -54,6 +54,9 @@ function GestureHint({ hint }: { hint: Hint }) {
 }
 
 /** Actions that work on the library screen too. */
+/** Distance a pointer moves on a subtitle line before it drags the stack, in CSS pixels. */
+const SUB_DRAG = 6;
+
 const GLOBAL_ACTIONS = new Set<Action>(["help", "settings", "fullscreen", "quit", "back"]);
 /** Width of the strips at the edges where scrolling sets the brightness
  *  (start edge) and the volume (end edge). */
@@ -446,22 +449,87 @@ export function App() {
     );
   }, [screen]);
 
-  /** A sideways swipe on a subtitle line moves to the previous or next line. */
+  /** A sideways swipe on a subtitle line moves to the previous or next line;
+   *  dragging a line up or down moves its whole stack. */
   const swipeStart = useRef<{ x: number; y: number; at: number } | null>(null);
+  const drag = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    key: "topMargin" | "bottomMargin";
+    from: number;
+    percent: number;
+    stack: HTMLElement;
+    track: Element;
+    moving: boolean;
+  } | null>(null);
   const swiped = useRef(false);
+  // The swipe or drag isn't also a tap on a word.
+  const suppressTap = () => {
+    swiped.current = true;
+    window.setTimeout(() => (swiped.current = false), 400);
+  };
   const onSubDown = (e: React.PointerEvent) => {
     swipeStart.current = e.pointerType === "mouse" ? null : { x: e.clientX, y: e.clientY, at: performance.now() };
+    const track = (e.target as Element).closest(".track");
+    if (!track || locked || (e.pointerType === "mouse" && e.button !== 0)) {
+      drag.current = null;
+      return;
+    }
+    const stack = e.currentTarget as HTMLElement;
+    const key = marginKey(stack.id === "subs-top" ? "top" : "bottom");
+    const from = getSettings()[key];
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, key, from, percent: from, stack, track, moving: false };
+  };
+  const onSubMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.moving) {
+      if (Math.hypot(dx, dy) < SUB_DRAG) return;
+      // Mostly sideways: a line swipe, not a drag.
+      if (Math.abs(dx) > Math.abs(dy)) {
+        drag.current = null;
+        return;
+      }
+      d.moving = true;
+      swipeStart.current = null;
+      // On the track, which stays put while its lines change underneath.
+      d.track.setPointerCapture(e.pointerId);
+      d.stack.classList.add("dragging");
+    }
+    const delta = (dy / (root.current?.clientHeight || window.innerHeight)) * 100;
+    d.percent = clampMargin(d.key === "bottomMargin" ? d.from - delta : d.from + delta);
+    // Straight to the CSS variable while dragging; saved once on release.
+    document.documentElement.style.setProperty(d.key === "bottomMargin" ? "--sub-bottom" : "--sub-top", `${d.percent}%`);
+  };
+  /** Ends a drag, keeping where it went or going back; true if there was one. */
+  const endDrag = (keep: boolean): boolean => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.moving) return false;
+    d.stack.classList.remove("dragging");
+    updateSettings({ [d.key]: keep ? d.percent : d.from });
+    return true;
   };
   const onSubUp = (e: React.PointerEvent) => {
+    if (endDrag(true)) {
+      swipeStart.current = null;
+      suppressTap();
+      return;
+    }
     const start = swipeStart.current;
     swipeStart.current = null;
     if (!start) return;
     const next = lineSwipe(start, { x: e.clientX, y: e.clientY, at: performance.now() }, rtl);
     if (next === null) return;
-    // The swipe isn't also a tap on a word.
-    swiped.current = true;
-    window.setTimeout(() => (swiped.current = false), 400);
+    suppressTap();
     runAction(next ? "nextLine" : "prevLine");
+  };
+  const onSubCancel = () => {
+    endDrag(false);
+    swipeStart.current = null;
   };
   const pickWordUnlessSwiped = (e: React.MouseEvent) => {
     if (!swiped.current) pickWord(e);
@@ -481,14 +549,18 @@ export function App() {
         className="sub-stack top"
         onClick={pickWordUnlessSwiped}
         onPointerDown={onSubDown}
+        onPointerMove={onSubMove}
         onPointerUp={onSubUp}
+        onPointerCancel={onSubCancel}
       />
       <div
         id="subs-bottom"
         className="sub-stack bottom"
         onClick={pickWordUnlessSwiped}
         onPointerDown={onSubDown}
+        onPointerMove={onSubMove}
         onPointerUp={onSubUp}
+        onPointerCancel={onSubCancel}
       />
       {hint && screen === "player" && <GestureHint hint={hint} />}
 

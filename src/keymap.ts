@@ -29,6 +29,8 @@ export const ACTIONS = [
   { id: "offsetPlus", group: "subtitles", keys: ["]"] },
   { id: "cycleMode", group: "subtitles", keys: ["b"] },
   { id: "togglePosition", group: "subtitles", keys: ["t"] },
+  { id: "subsUp", group: "subtitles", keys: ["Alt+ArrowUp"] },
+  { id: "subsDown", group: "subtitles", keys: ["Alt+ArrowDown"] },
 
   { id: "autoPause", group: "learning", keys: ["p"] },
   { id: "saveLine", group: "learning", keys: ["w"] },

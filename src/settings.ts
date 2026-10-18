@@ -42,6 +42,8 @@ export interface Settings {
   trackGap: number;
   /** Distance of the bottom stack from the bottom edge, in % of height. */
   bottomMargin: number;
+  /** Distance of the top stack from the top edge, in % of height. */
+  topMargin: number;
   subtitleDefaults: { fa: SubtitleDefault; en: SubtitleDefault; other: SubtitleDefault };
   // Learning
   autoPauseDefault: boolean;
@@ -73,6 +75,7 @@ export const DEFAULTS: Settings = {
   outline: 2,
   trackGap: 0.35,
   bottomMargin: 6,
+  topMargin: 5,
   subtitleDefaults: {
     fa: { position: "bottom", size: 34, color: "#ffffff", boxed: false },
     en: { position: "bottom", size: 30, color: "#ffe9a8", boxed: false },
@@ -111,6 +114,19 @@ export function updateSettings(patch: Partial<Settings>): void {
   apply(current, prev);
   persist(current);
   for (const fn of listeners) fn();
+}
+
+/** Furthest a subtitle stack can sit from its edge, in % of height. */
+export const MAX_MARGIN = 40;
+
+/** A stack's distance from its edge, rounded to half a percent and kept on screen. */
+export function clampMargin(percent: number): number {
+  return Math.min(MAX_MARGIN, Math.max(0, Math.round(percent * 2) / 2));
+}
+
+/** The setting that places the stack at `position`. */
+export function marginKey(position: Position): "topMargin" | "bottomMargin" {
+  return position === "top" ? "topMargin" : "bottomMargin";
 }
 
 export function resetSettings(): void {
@@ -156,6 +172,7 @@ function apply(s: Settings, prev: Settings | null): void {
   root.setProperty("--sub-outline", outlineShadow(s.outline));
   root.setProperty("--sub-gap", `${s.trackGap}em`);
   root.setProperty("--sub-bottom", `${s.bottomMargin}%`);
+  root.setProperty("--sub-top", `${s.topMargin}%`);
 
   if (!prev || prev.uiLanguage !== s.uiLanguage) setLang(s.uiLanguage ?? defaultLang());
   if (!prev || prev.theme !== s.theme) setTheme(s.theme);

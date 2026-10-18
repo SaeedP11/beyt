@@ -18,7 +18,7 @@ import type {
   TrackUpdate,
 } from "./types";
 import type { Action } from "./keymap";
-import { getSettings } from "./settings";
+import { clampMargin, getSettings, marginKey, updateSettings } from "./settings";
 import { debounce, fmtTime, toast } from "./ui";
 
 const MODES: Mode[] = ["show", "blur", "hide"];
@@ -628,6 +628,17 @@ export class Player {
         this.updateStyle(v, { position: v.style.position === "top" ? "bottom" : "top" });
         toast(`${trackLabel(v.track)}: ${t(v.style.position)}`);
         break;
+      case "subsUp":
+      case "subsDown": {
+        const position = v?.style.position ?? "bottom";
+        const key = marginKey(position);
+        // Up is further from the bottom edge but closer to the top one.
+        const step = (action === "subsUp") === (position === "bottom") ? 1 : -1;
+        const n = clampMargin(getSettings()[key] + step);
+        updateSettings({ [key]: n });
+        toast(t(position === "top" ? "topMarginToast" : "bottomMarginToast", { n }));
+        break;
+      }
       default:
         return false;
     }
