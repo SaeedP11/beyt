@@ -3,23 +3,96 @@
 @layer theme, base, primereact, components, utilities;
 
 @import "tailwindcss";
-@import "primereact/resources/themes/lara-dark-blue/theme.css" layer(primereact);
+/* PrimeReact's light or dark theme is added to its layer by theme.ts. */
 @import "primeicons/primeicons.css";
 @import "vazirmatn/Vazirmatn-font-face.css";
 
 @theme {
   --font-sans: "Vazirmatn", "Inter", "Noto Sans", sans-serif;
-  --color-ink-950: #0b0c0f;
-  --color-ink-900: #111318;
-  --color-ink-850: #171a20;
-  --color-ink-800: #1d2027;
-  --color-ink-700: #2a2e37;
-  --color-ink-600: #3a3f4b;
-  --color-accent: #60a5fa;
+}
+
+/* ---------- light and dark themes ----------
+   Colours come from variables that the theme swaps (see theme.ts). The ink
+   scale runs from the page background (950) up to raised surfaces (800) and
+   borders (700, 600); the zinc scale is text, from strongest (50) to
+   faintest (600). The light theme turns both around, so the same classes
+   read the right way in either. `.dark` keeps a part dark in the light
+   theme, such as the controls over the video. */
+@theme inline {
+  --color-ink-950: var(--ink-950);
+  --color-ink-900: var(--ink-900);
+  --color-ink-850: var(--ink-850);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+  --color-ink-600: var(--ink-600);
+  --color-zinc-50: var(--zinc-50);
+  --color-zinc-100: var(--zinc-100);
+  --color-zinc-200: var(--zinc-200);
+  --color-zinc-300: var(--zinc-300);
+  --color-zinc-400: var(--zinc-400);
+  --color-zinc-500: var(--zinc-500);
+  --color-zinc-600: var(--zinc-600);
+  --color-accent: var(--accent);
+  --color-red-300: var(--red-300);
+  --color-red-400: var(--red-400);
+  --color-amber-300: var(--amber-300);
+  --color-amber-400: var(--amber-400);
+  --color-emerald-300: var(--emerald-300);
+  --color-green-400: var(--green-400);
+}
+
+:root,
+.dark {
+  color-scheme: dark;
+  --ink-950: #0b0c0f;
+  --ink-900: #111318;
+  --ink-850: #171a20;
+  --ink-800: #1d2027;
+  --ink-700: #2a2e37;
+  --ink-600: #3a3f4b;
+  --zinc-50: #ffffff;
+  --zinc-100: #f4f4f5;
+  --zinc-200: #e4e4e7;
+  --zinc-300: #d4d4d8;
+  --zinc-400: #a1a1aa;
+  --zinc-500: #71717a;
+  --zinc-600: #52525b;
+  --accent: #60a5fa;
+  --red-300: #fca5a5;
+  --red-400: #f87171;
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --emerald-300: #6ee7b7;
+  --green-400: #4ade80;
+  --shadow-color: rgb(0 0 0 / 0.55);
+}
+
+:root.light {
+  color-scheme: light;
+  --ink-950: #eef0f3;
+  --ink-900: #f7f8fa;
+  --ink-850: #fbfcfd;
+  --ink-800: #ffffff;
+  --ink-700: #e1e4e9;
+  --ink-600: #cdd2da;
+  --zinc-50: #09090b;
+  --zinc-100: #18181b;
+  --zinc-200: #27272a;
+  --zinc-300: #3f3f46;
+  --zinc-400: #52525b;
+  --zinc-500: #71717a;
+  --zinc-600: #a1a1aa;
+  --accent: #2563eb;
+  --red-300: #dc2626;
+  --red-400: #dc2626;
+  --amber-300: #b45309;
+  --amber-400: #d97706;
+  --emerald-300: #047857;
+  --green-400: #16a34a;
+  --shadow-color: rgb(15 23 42 / 0.16);
 }
 
 :root {
-  color-scheme: dark;
   /* PrimeReact reads its font from here. */
   --font-family: var(--font-sans);
   --sub-font-latin: "Inter", "Noto Sans", sans-serif;
@@ -160,7 +233,7 @@ body.idle {
 /* ---------- PrimeReact touches ---------- */
 
 .p-sidebar.panel {
-  background: rgb(17 19 24 / 0.94);
+  background: color-mix(in srgb, var(--ink-900) 94%, transparent);
   backdrop-filter: blur(10px);
 }
 .p-progressbar.thin {
@@ -179,7 +252,7 @@ body.idle {
   background: var(--color-ink-800);
   border: 1px solid var(--color-ink-600);
   border-radius: 10px;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
+  box-shadow: 0 16px 40px var(--shadow-color);
 }
 .p-menu .p-menuitem-content,
 .p-contextmenu .p-menuitem-content {
@@ -191,11 +264,11 @@ body.idle {
 }
 .p-menu .p-menuitem-text,
 .p-contextmenu .p-menuitem-text {
-  color: #e4e4e7;
+  color: var(--zinc-200);
 }
 .p-menu .p-menuitem-icon,
 .p-contextmenu .p-menuitem-icon {
-  color: #a1a1aa;
+  color: var(--zinc-400);
 }
 .p-menu .p-menuitem-content:hover,
 .p-menu .p-menuitem.p-focus > .p-menuitem-content,
@@ -212,11 +285,11 @@ body.idle {
 /* Destructive entries, such as Move to Trash. */
 .p-menuitem.danger .p-menuitem-text,
 .p-menuitem.danger .p-menuitem-icon {
-  color: #f87171;
+  color: var(--red-400);
 }
 .p-menuitem.danger > .p-menuitem-content:hover,
 .p-menuitem.danger.p-focus > .p-menuitem-content {
-  background: rgb(248 113 113 / 0.12);
+  background: color-mix(in srgb, var(--red-400) 12%, transparent);
 }
 
 /* ---------- small and short screens ----------

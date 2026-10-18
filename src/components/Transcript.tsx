@@ -112,7 +112,7 @@ export function Transcript({ visible, rtl, onHide }: Props) {
                 {fmtTime(row.cue.start)}
               </span>
               <span className="flex flex-col gap-0.5">
-                <span dir="auto" className={i === current ? "text-white" : "text-zinc-200"}>
+                <span dir="auto" className={i === current ? "text-zinc-50" : "text-zinc-200"}>
                   {row.cue.text}
                 </span>
                 {row.other && (

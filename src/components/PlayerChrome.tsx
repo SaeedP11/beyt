@@ -113,7 +113,7 @@ export function PlayerChrome({
 
   return (
     <>
-      <div className={`absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/75 to-transparent px-2 pb-10 pt-2 sm:gap-3 sm:px-4 sm:pt-3 ${fade}`}>
+      <div className={`dark absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/75 to-transparent px-2 pb-10 pt-2 sm:gap-3 sm:px-4 sm:pt-3 ${fade}`}>
         <div inert={locked} className={`flex min-w-0 flex-1 items-center gap-2 sm:gap-3 ${disabled}`}>
           <Button
             icon="pi pi-arrow-left rtl:rotate-180"
@@ -145,7 +145,7 @@ export function PlayerChrome({
 
       <div
         inert={locked}
-        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pb-2 pt-12 sm:px-5 sm:pb-3 ${fade}`}
+        className={`dark absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pb-2 pt-12 sm:px-5 sm:pb-3 ${fade}`}
       >
         <div className={disabled}>
           <div dir="ltr" className="px-2 sm:px-1">

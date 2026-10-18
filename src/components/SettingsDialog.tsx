@@ -237,6 +237,7 @@ function Seconds({ value, min, max, step, onChange, disabled }: { value: number;
 function General() {
   const s = useSettings();
   const wide = useWide();
+  const compact = useContext(Compact);
   return (
     <>
       <Group>
@@ -251,6 +252,26 @@ function General() {
             ]}
             onChange={(e) => updateSettings({ uiLanguage: e.value === "system" ? null : e.value })}
             className={wide("w-48")}
+          />
+        </Row>
+        <Row label={t("theme")} hint={t("themeHint")} stack>
+          <SelectButton
+            value={s.theme ?? "system"}
+            options={[
+              { label: t("themeSystem"), value: "system", icon: "pi pi-desktop" },
+              { label: t("themeLight"), value: "light", icon: "pi pi-sun" },
+              { label: t("themeDark"), value: "dark", icon: "pi pi-moon" },
+            ]}
+            itemTemplate={(o: { label: string; icon: string }) => (
+              <span className="flex items-center justify-center gap-2">
+                <i className={`${o.icon} text-sm`} />
+                {o.label}
+              </span>
+            )}
+            onChange={(e) => e.value && updateSettings({ theme: e.value === "system" ? null : e.value })}
+            allowEmpty={false}
+            className={compact ? "flex w-full" : ""}
+            pt={{ button: { className: `py-2 px-3 text-sm ${compact ? "flex-1" : ""}` } }}
           />
         </Row>
       </Group>

@@ -1,4 +1,5 @@
 import "./index.css";
+import "./theme";
 
 import { PrimeReactProvider } from "primereact/api";
 import { StrictMode } from "react";

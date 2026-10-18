@@ -44,7 +44,7 @@ export function LevelIndicator() {
       ref={el}
       role="status"
       aria-label={label}
-      className="pointer-events-none absolute inset-x-0 top-20 mx-auto flex w-fit items-center gap-3 rounded-full border border-ink-600 bg-ink-900/85 px-4 py-2 shadow-xl backdrop-blur"
+      className="dark pointer-events-none absolute inset-x-0 top-20 mx-auto flex w-fit items-center gap-3 rounded-full border border-ink-600 bg-ink-900/85 px-4 py-2 shadow-xl backdrop-blur"
       style={{ opacity: 0 }}
     >
       <i className={`pi ${change ? icon(change) : ""} w-4 text-sm ${muted ? "text-zinc-500" : "text-zinc-100"}`} />

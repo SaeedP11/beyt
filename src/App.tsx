@@ -43,7 +43,7 @@ function GestureHint({ hint }: { hint: Hint }) {
   return (
     <div className={`pointer-events-none absolute top-1/2 z-30 -translate-y-1/2 ${place}`}>
       <div
-        className="flex items-center gap-2 rounded-full bg-ink-950/70 px-4 py-2 text-lg font-semibold whitespace-pre text-white tabular-nums"
+        className="dark flex items-center gap-2 rounded-full bg-ink-950/70 px-4 py-2 text-lg font-semibold whitespace-pre text-white tabular-nums"
         dir="ltr"
       >
         {hint.icon && <i className={hint.icon} />}

@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.24.0 (2026-10-18)
+
+### Added
+
+- A light theme. Choose System, Light or Dark under Settings → General.
+  System is the default and follows your desktop, switching as soon as it
+  changes. The controls over the video stay dark in either theme, so they
+  are still easy to read over the picture.
+
 ## 0.23.0 (2026-10-18)
 
 ### Added

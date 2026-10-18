@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { api } from "./api";
 import { type Lang, defaultLang, setLang } from "./i18n";
 import type { Keymap } from "./keymap";
+import { type Theme, setTheme } from "./theme";
 import type { Position } from "./types";
 import { debounce } from "./ui";
 
@@ -20,6 +21,8 @@ export interface Settings {
   // General
   /** null follows the system language. */
   uiLanguage: Lang | null;
+  /** null follows the system theme. */
+  theme: Theme | null;
   resumePlayback: boolean;
   autoplayNext: boolean;
   autoplayDelay: number;
@@ -55,6 +58,7 @@ export interface Settings {
 
 export const DEFAULTS: Settings = {
   uiLanguage: null,
+  theme: null,
   resumePlayback: true,
   autoplayNext: true,
   autoplayDelay: 5,
@@ -154,6 +158,7 @@ function apply(s: Settings, prev: Settings | null): void {
   root.setProperty("--sub-bottom", `${s.bottomMargin}%`);
 
   if (!prev || prev.uiLanguage !== s.uiLanguage) setLang(s.uiLanguage ?? defaultLang());
+  if (!prev || prev.theme !== s.theme) setTheme(s.theme);
   if (!prev || prev.hwdec !== s.hwdec) void api.setMpvOption("hwdec", s.hwdec);
   if (!prev || prev.defaultSpeed !== s.defaultSpeed) void api.setMpvOption("speed", String(s.defaultSpeed));
   if (!prev || prev.defaultVolume !== s.defaultVolume) void api.setMpvOption("volume", String(s.defaultVolume));
