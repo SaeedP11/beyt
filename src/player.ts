@@ -24,7 +24,7 @@ import { debounce, fmtTime, toast } from "./ui";
 const MODES: Mode[] = ["show", "blur", "hide"];
 
 /** Picture shapes in the order the aspect key cycles through them. */
-export const ASPECTS: Aspect[] = ["original", "16:9", "4:3", "1.85:1", "2.35:1", "fill", "stretch"];
+export const ASPECTS: Aspect[] = ["original", "16:9", "4:3", "fill", "stretch"];
 
 export function aspectLabel(aspect: Aspect): string {
   if (aspect === "original") return t("aspectOriginal");

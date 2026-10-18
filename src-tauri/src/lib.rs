@@ -714,7 +714,7 @@ async fn seek_absolute(app: State<'_, App>, time: f64) -> Result<(), String> {
 }
 
 /// The picture shapes the player offers; ratios are width:height.
-const ASPECTS: &[&str] = &["original", "16:9", "4:3", "1.85:1", "2.35:1", "fill", "stretch"];
+const ASPECTS: &[&str] = &["original", "16:9", "4:3", "fill", "stretch"];
 
 #[tauri::command]
 async fn set_aspect(app: State<'_, App>, aspect: String) -> Result<(), String> {

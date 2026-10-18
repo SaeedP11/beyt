@@ -95,7 +95,7 @@ export interface TrackStyle {
 
 /** The picture's shape: the video's own, a forced width:height ratio,
  *  zoomed in to fill the screen (cropping), or stretched to it. */
-export type Aspect = "original" | "16:9" | "4:3" | "1.85:1" | "2.35:1" | "fill" | "stretch";
+export type Aspect = "original" | "16:9" | "4:3" | "fill" | "stretch";
 
 /** Saved per series folder: track styles keyed by track key, the picture
  *  shape, and the audio track last chosen (matched by language and title). */

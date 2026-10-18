@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.22.3 (2026-10-18)
+
+### Changed
+
+- The aspect ratio list in the player no longer offers 1.85:1 and 2.35:1;
+  it now has Original, 16:9, 4:3, Fill screen and Stretch. Videos saved with
+  one of the removed shapes open in their original shape.
+
 ## 0.22.2 (2026-10-18)
 
 ### Changed
