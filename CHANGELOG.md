@@ -3,6 +3,22 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.21.0 (2026-10-18)
+
+### Added
+
+- On Android, the word sheet has **Translate word** and **Translate line**
+  buttons, and long-pressing a subtitle line offers **Translate line**. They
+  open the Google Translate app's popup over Beyt, so words the offline
+  dictionary doesn't know and whole sentences can be translated online, with
+  no key or account. Without the app, translate.google.com opens in the
+  browser instead.
+
+### Changed
+
+- On Android, buttons no longer show tooltips. A tap left them hanging over
+  the screen, and phones have no pointer to hover with.
+
 ## 0.20.0 (2026-10-18)
 
 ### Added

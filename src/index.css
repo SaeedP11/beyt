@@ -409,3 +409,9 @@ body.idle {
 .p-sidebar-right .p-sidebar {
   margin-left: auto;
 }
+
+/* Phones have no hover: a tap on a button would leave its tooltip showing
+   over the screen until the next tap elsewhere. */
+.android .p-tooltip {
+  display: none !important;
+}

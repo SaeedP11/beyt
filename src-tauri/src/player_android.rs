@@ -295,6 +295,13 @@ pub fn run<T: DeserializeOwned>(command: &str) -> Result<T> {
     create_mpv()?.call(command, json!({})).map_err(|e| anyhow!("{}", e.0))
 }
 
+/// Shows `text` in the Google Translate app, or on its website, translated
+/// into `to`; see `PlayerPlugin.translate`.
+pub fn translate(text: &str, to: &str) -> Result<()> {
+    let args = json!({ "text": text, "to": to });
+    create_mpv()?.call::<Value>("translate", args).map(drop).map_err(|e| anyhow!("{}", e.0))
+}
+
 /// Writes a JPEG of one frame of `video` to `out`, `width` pixels wide; see
 /// `PlayerPlugin.thumbnail`. Without `at` (seconds) the frame is 15% in.
 pub fn thumbnail(video: &Path, at: Option<f64>, width: u32, out: &Path) -> Result<()> {

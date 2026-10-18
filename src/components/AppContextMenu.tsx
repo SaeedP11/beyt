@@ -3,7 +3,7 @@ import { Sidebar } from "primereact/sidebar";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { useEffect, useRef, useState } from "react";
 
-import { api } from "../api";
+import { api, isAndroid } from "../api";
 import { audioItems, audioMenuLabel } from "../audio";
 import * as clock from "../clock";
 import { hasHardKeyboard, player } from "../hooks";
@@ -13,6 +13,7 @@ import { popupMotions, usePanelMotion } from "../motion";
 import { ASPECTS, aspectLabel } from "../player";
 import { getSettings } from "../settings";
 import { sheetEdge, useSheetEdge } from "../sheet";
+import { translateExternally } from "../translate";
 import { toast } from "../ui";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -214,6 +215,9 @@ function playerItems(
       row(t("copyLine"), "pi pi-copy", undefined, () => {
         void navigator.clipboard.writeText(line.cue.text).then(() => toast(t("copied")));
       }),
+      ...(isAndroid
+        ? [row(t("translateLine"), "pi pi-language", undefined, () => translateExternally(line.cue.text, line.view.track.lang))]
+        : []),
       row(t("saveThisLine"), "pi pi-bookmark", undefined, () => void player.saveLine(line)),
       { separator: true },
     );

@@ -781,6 +781,19 @@ async fn move_to_background() -> Result<(), String> {
     Ok(())
 }
 
+/// Android: shows `text` in the Google Translate app (or on its website),
+/// translated into `to`.
+#[tauri::command]
+async fn translate_externally(text: String, to: String) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    return player::translate(&text, &to).map_err(|e| format!("{e:#}"));
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (text, to);
+        Err("Translating with Google Translate is only on Android".into())
+    }
+}
+
 /// Whether a physical keyboard is attached; the `hard-keyboard` event follows
 /// changes. Desktops are taken to always have one.
 #[tauri::command]
@@ -921,6 +934,7 @@ pub fn run() {
             request_storage_access,
             move_to_background,
             hard_keyboard,
+            translate_externally,
         ])
         .setup(move |app| {
             let paths = app.path();

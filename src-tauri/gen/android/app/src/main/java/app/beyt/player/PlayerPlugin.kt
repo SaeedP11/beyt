@@ -7,6 +7,7 @@ package app.beyt.player
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -384,6 +385,40 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun moveToBack(invoke: Invoke) {
     activity.moveTaskToBack(true)
+    invoke.resolve()
+  }
+
+  // ---------- translation ----------
+
+  /** Hands `text` to the Google Translate app, which translates it in a popup
+   *  over Beyt. Without the app, translate.google.com opens in the browser,
+   *  translating into `to` (a language code). */
+  @Command
+  fun translate(invoke: Invoke) {
+    val args = invoke.getArgs()
+    val text = args.getString("text")
+    val app = Intent(Intent.ACTION_PROCESS_TEXT).apply {
+      type = "text/plain"
+      setPackage("com.google.android.apps.translate")
+      putExtra(Intent.EXTRA_PROCESS_TEXT, text)
+      putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+    }
+    val web = Uri.parse("https://translate.google.com/").buildUpon()
+      .appendQueryParameter("sl", "auto")
+      .appendQueryParameter("tl", args.getString("to", "fa"))
+      .appendQueryParameter("text", text)
+      .appendQueryParameter("op", "translate")
+      .build()
+    try {
+      activity.startActivity(app)
+    } catch (e: ActivityNotFoundException) {
+      try {
+        activity.startActivity(Intent(Intent.ACTION_VIEW, web))
+      } catch (e: ActivityNotFoundException) {
+        invoke.reject("no-translator")
+        return
+      }
+    }
     invoke.resolve()
   }
 

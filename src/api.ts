@@ -59,6 +59,8 @@ export const api = {
   requestStorageAccess: () => invoke<void>("request_storage_access"),
   /** Android: sends Beyt to the background, as Back does in other apps. */
   moveToBackground: () => invoke<void>("move_to_background"),
+  /** Android: shows `text` in the Google Translate app's popup (or on its website), translated into `to`. */
+  translateExternally: (text: string, to: string) => invoke<void>("translate_externally", { text, to }),
   /** A physical keyboard is attached (always true on the desktop). */
   hardKeyboard: () => invoke<boolean>("hard_keyboard"),
   recentFiles: () => invoke<Recent[]>("recent_files"),

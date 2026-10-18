@@ -9,6 +9,7 @@ import { markDictionaryMissing, useDictionary } from "../dictionary";
 import { popupMotions } from "../motion";
 import { captureOptions } from "../player";
 import { getSettings } from "../settings";
+import { translateExternally } from "../translate";
 import { sheetEdge, useSheetEdge } from "../sheet";
 import { player } from "../hooks";
 import { type StringKey, t } from "../i18n";
@@ -261,7 +262,30 @@ export function WordPopup({ ref }: { ref: Ref<WordPopupHandle> }) {
         )}
       </div>
 
-      <div className={`flex items-center gap-3 border-t border-ink-700 ${asSheet ? "px-5 py-3" : "px-4 py-2"}`}>
+      {isAndroid && (
+        <div className="flex gap-2 border-t border-ink-700 px-5 pt-3">
+          <Button
+            icon="pi pi-language"
+            label={t("translateWord")}
+            outlined
+            severity="secondary"
+            className="flex-1"
+            onClick={() => translateExternally(picked.word, picked.lang)}
+          />
+          <Button
+            icon="pi pi-language"
+            label={t("translateLine")}
+            outlined
+            severity="secondary"
+            className="flex-1"
+            onClick={() => translateExternally(picked.sentence, picked.lang)}
+          />
+        </div>
+      )}
+
+      <div
+        className={`flex items-center gap-3 ${isAndroid ? "" : "border-t border-ink-700"} ${asSheet ? "px-5 py-3" : "px-4 py-2"}`}
+      >
         <span className="flex-1 text-[0.7rem] text-zinc-500">{t("dictionarySource")}</span>
         <Button
           icon={saved ? "pi pi-check" : "pi pi-bookmark"}
