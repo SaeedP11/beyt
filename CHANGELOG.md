@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.22.1 (2026-10-18)
+
+### Fixed
+
+- When a video picks up where you left off, the message no longer tells
+  you to press Home, which meant nothing on a phone. It now has a
+  Start over button that jumps back to the beginning, and the player's
+  ⋯ menu has a Start over item too.
+
 ## 0.22.0 (2026-10-18)
 
 ### Added

@@ -195,7 +195,12 @@ export class Player {
     // In case `audio-tracks` came before this file was set; later changes come as events.
     void api.audioTracks().then((tracks) => this.onAudioTracks({ path: media.path, tracks }), () => {});
     document.title = `${media.title} · Beyt`;
-    if (media.resumedAt) toast(t("resumed", { time: fmtTime(media.resumedAt) }), 4000);
+    if (media.resumedAt) {
+      toast(t("resumed", { time: fmtTime(media.resumedAt) }), 6000, {
+        label: t("act_restart"),
+        run: () => this.seekTo(0),
+      });
+    }
     this.changed();
     return media;
   }

@@ -1,6 +1,6 @@
 [package]
 name = "beyt"
-version = "0.22.0"
+version = "0.22.1"
 description = "A dual-subtitle video player for language learning"
 license = "GPL-3.0-or-later"
 edition = "2024"

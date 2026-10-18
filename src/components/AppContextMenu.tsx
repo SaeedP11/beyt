@@ -184,6 +184,7 @@ function playerItems(
     actionRow("togglePause", paused ? t("play") : t("pause"), paused ? "pi pi-play" : "pi pi-pause", keymap, run),
   );
   if (!line) items.push(actionRow("replayLine", t("act_replayLine"), "pi pi-replay", keymap, run));
+  items.push(actionRow("restart", t("act_restart"), "pi pi-step-backward-alt", keymap, run));
   items.push(
     ...(player.selectedView()
       ? [actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run)]
