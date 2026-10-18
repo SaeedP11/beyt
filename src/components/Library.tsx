@@ -760,7 +760,11 @@ function FolderView({ folder, hidden, onOpen, handlers }: FolderProps) {
   const videos = folder.entries.filter((e) => !e.isDir && !hidden.has(e.path));
   return (
     <section className="flex flex-col gap-8">
-      <PathBar folder={folder} onOpen={onOpen} />
+      {/* The path stays pinned to the top while the folder scrolls under it;
+          the band of page colour hides cards passing its rounded corners. */}
+      <div className="sticky top-0 z-10 -my-2 bg-ink-950 py-2">
+        <PathBar folder={folder} onOpen={onOpen} />
+      </div>
 
       {dirs.length > 0 && (
         <div>

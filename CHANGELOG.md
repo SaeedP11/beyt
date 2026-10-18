@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.22.2 (2026-10-18)
+
+### Changed
+
+- In the library's Folder tab, the folder path stays pinned to the top while
+  you scroll through a long folder, so the Up button and the steps back to
+  parent folders are always in reach.
+
 ## 0.22.1 (2026-10-18)
 
 ### Fixed
