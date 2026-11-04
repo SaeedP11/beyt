@@ -1,5 +1,4 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
+import { fileSrc, pickSavePath } from "../platform";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -45,7 +44,7 @@ export function VocabularyView({ onCount }: { onCount?: (n: number) => void }) {
     void reload();
   }, [reload]);
 
-  const src = (name: string) => convertFileSrc(`${mediaDir}/${name}`);
+  const src = (name: string) => fileSrc(name.startsWith("data:") ? name : `${mediaDir}/${name}`);
 
   const play = (name: string) => {
     audio.current?.pause();
@@ -78,7 +77,7 @@ export function VocabularyView({ onCount }: { onCount?: (n: number) => void }) {
   };
 
   const exportCsv = async () => {
-    const path = await save({ defaultPath: "beyt-vocabulary.csv", filters: [{ name: "CSV", extensions: ["csv"] }] });
+    const path = await pickSavePath("beyt-vocabulary.csv", "csv", "CSV");
     if (!path) return;
     setBusy("csv");
     try {

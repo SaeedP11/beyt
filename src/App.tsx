@@ -1,14 +1,16 @@
-import { onBackButtonPress } from "@tauri-apps/api/app";
+
 import { Button } from "primereact/button";
 import { Toast, type ToastMessage } from "primereact/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, events, isAndroid } from "./api";
+import { api, events, isAndroid, isTauri } from "./api";
+import { onBackButton } from "./platform";
 import * as clock from "./clock";
 import { AppContextMenu } from "./components/AppContextMenu";
 import { ConfirmHost } from "./components/Confirm";
 import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
+import { VideoSurface } from "./components/VideoSurface";
 import { PlayerChrome } from "./components/PlayerChrome";
 import { type Section, SettingsDialog } from "./components/SettingsDialog";
 import { SettingsPage } from "./components/SettingsPage";
@@ -326,8 +328,7 @@ export function App() {
   };
   useEffect(() => {
     if (!isAndroid) return;
-    const listener = onBackButtonPress(() => onAndroidBack.current());
-    return () => void listener.then((l) => l.unregister());
+    return onBackButton(() => onAndroidBack.current());
   }, []);
 
   /** Opens the dictionary popup for a subtitle word element. */
@@ -543,6 +544,7 @@ export function App() {
       onMouseMove={screen === "player" ? wake : undefined}
       onWheel={screen === "player" ? onWheel : undefined}
     >
+      {!isTauri && <VideoSurface visible={screen === "player"} />}
       {/* TrackView draws subtitle lines into these two stacks. */}
       <div
         id="subs-top"

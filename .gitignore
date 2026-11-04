@@ -11,3 +11,4 @@ result
 .code-review-graph/
 .claude/settings.local.json
 .claude/worktrees/
+dist-lib/

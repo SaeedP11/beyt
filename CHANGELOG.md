@@ -3,6 +3,24 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.27.0 (2026-11-05)
+
+### Added
+
+- Beyt now runs in a web browser as well as on the desktop and Android. Pick a
+  video, or a whole folder, and the library, the two-track subtitles, the
+  transcript, word saving, vocabulary and settings all work, with everything
+  kept in the browser's own storage.
+- Other apps can embed Beyt as a package: `import { Beyt, mountBeyt } from
+  "beyt"` and `import "beyt/style.css"`. Build it with `pnpm build:lib`.
+
+### Changed
+
+- In the browser, subtitles come from SRT and WebVTT files next to the video.
+  Subtitles inside the video, extra audio tracks, matching subtitles to the
+  soundtrack, the offline dictionary, and renaming or trashing files need the
+  desktop app.
+
 ## 0.26.1 (2026-11-05)
 
 ### Fixed

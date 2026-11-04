@@ -1,5 +1,4 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { fileSrc, pickFolder as pickFolderDialog, pickVideo } from "../platform";
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { ContextMenu } from "primereact/contextmenu";
@@ -19,7 +18,6 @@ import { toast } from "../ui";
 import { PopupMenu, type PopupMenuHandle } from "./SheetMenu";
 import { VocabularyView } from "./VocabularyView";
 
-const VIDEO_EXTENSIONS = ["mkv", "mp4", "m4v", "webm", "avi", "mov", "ts", "m2ts", "wmv", "flv", "ogv"];
 const WATCHED = 0.92;
 /** How long Undo is offered before a removal or move to the Trash happens. */
 const UNDO_MS = 6000;
@@ -112,7 +110,7 @@ function thumbnailUrl(path: string, at: number | null): Promise<string | null> {
     })
       .then(() => api.thumbnail(path, at))
       .then(
-        (file) => convertFileSrc(file),
+        (file) => fileSrc(file),
         () => null,
       )
       .finally(() => {
@@ -400,19 +398,14 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   };
 
   const pickFile = async () => {
-    const path = await open({
-      multiple: false,
-      directory: false,
-      defaultPath: folder?.path,
-      filters: [{ name: "Video", extensions: VIDEO_EXTENSIONS }],
-    });
-    if (typeof path === "string") onPlay(path);
+    const path = await pickVideo(folder?.path);
+    if (path) onPlay(path);
   };
 
   const pickFolder = async () => {
     if (isAndroid) return browseStorage();
-    const path = await open({ multiple: false, directory: true, defaultPath: folder?.path });
-    if (typeof path !== "string") return;
+    const path = await pickFolderDialog(folder?.path);
+    if (!path) return;
     await showFolder(path);
     showTab(TAB_FOLDER);
   };

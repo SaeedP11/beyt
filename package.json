@@ -1,13 +1,14 @@
 {
   "name": "beyt",
   "private": true,
-  "version": "0.26.1",
+  "version": "0.27.0",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "build:lib": "tsc --noEmit && vite build -c vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -27,5 +28,25 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^5",
     "vite": "^8.3.4"
+  },
+  "main": "./dist-lib/beyt.js",
+  "module": "./dist-lib/beyt.js",
+  "types": "./dist-lib/types/lib.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/types/lib.d.ts",
+      "import": "./dist-lib/beyt.js"
+    },
+    "./style.css": "./dist-lib/style.css"
+  },
+  "files": [
+    "dist-lib"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "peerDependencies": {
+    "react": "^19",
+    "react-dom": "^19"
   }
 }

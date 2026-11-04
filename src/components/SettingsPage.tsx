@@ -2,7 +2,7 @@
 // list of sections; each section is a page of its own, and Back (the app
 // bar's arrow, Android's Back button or Escape) goes up a level at a time.
 
-import { getVersion } from "@tauri-apps/api/app";
+import { appVersion } from "../platform";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -131,7 +131,7 @@ function Body({ animate, forward, children }: { animate: boolean; forward: boole
 
 function SectionList({ keyboard, onPick }: { keyboard: boolean; onPick: (s: Section) => void }) {
   const [version, setVersion] = useState("");
-  useEffect(() => void getVersion().then(setVersion, () => {}), []);
+  useEffect(() => void appVersion().then(setVersion, () => {}), []);
 
   return (
     <>

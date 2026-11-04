@@ -1,6 +1,6 @@
 // The audio track menu, shared by the control bar and the right-click menu.
 
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickAudio } from "./platform";
 import type { MenuItem } from "primereact/menuitem";
 
 import { player } from "./hooks";
@@ -13,13 +13,8 @@ const EXTENSIONS = ["mka", "mp3", "m4a", "aac", "ac3", "eac3", "dts", "flac", "o
 
 /** Asks for an audio file and plays it alongside the video, e.g. a dub kept next to it. */
 export async function addAudioFile(): Promise<void> {
-  const path = await open({
-    multiple: false,
-    directory: false,
-    defaultPath: player.media?.folder,
-    filters: [{ name: t("audioFiles"), extensions: EXTENSIONS }],
-  });
-  if (typeof path !== "string") return;
+  const path = await pickAudio(t("audioFiles"), EXTENSIONS, player.media?.folder);
+  if (!path) return;
   await player.addAudio(path).catch((e) => toast(String(e), 5000));
 }
 

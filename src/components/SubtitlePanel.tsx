@@ -1,4 +1,4 @@
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickSubtitles } from "../platform";
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { ColorPicker } from "primereact/colorpicker";
@@ -48,24 +48,14 @@ export function SubtitlePanel({ visible, rtl, onHide }: Props) {
   // Several files: rank them against the soundtrack.
   const findMatch = async () => {
     if (isAndroid) return setBrowsing("match");
-    const picked = await open({
-      multiple: true,
-      directory: false,
-      defaultPath: player.media?.folder,
-      filters: [{ name: t("tracks"), extensions: ["srt", "vtt"] }],
-    });
-    if (Array.isArray(picked) && picked.length) setMatching(picked);
+    const picked = await pickSubtitles(true, t("tracks"), player.media?.folder);
+    if (picked.length) setMatching(picked);
   };
 
   const addFile = async () => {
     if (isAndroid) return setBrowsing("add");
-    const path = await open({
-      multiple: false,
-      directory: false,
-      defaultPath: player.media?.folder,
-      filters: [{ name: t("tracks"), extensions: ["srt", "vtt"] }],
-    });
-    if (typeof path === "string") await add(path);
+    const [path] = await pickSubtitles(false, t("tracks"), player.media?.folder);
+    if (path) await add(path);
   };
 
   const onBrowsed = (paths: string[]) => {
