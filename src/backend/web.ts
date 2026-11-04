@@ -24,6 +24,7 @@ import {
   baseName,
   folderTitle,
   getFile,
+  getPlayable,
   isKnownRoot,
   restored,
   listDir,
@@ -141,8 +142,8 @@ async function folderOf(path: string, wanted: (name: string) => boolean, withPro
 // ---------- thumbnails ----------
 
 async function thumbnail(path: string, at: number | null): Promise<string> {
-  const file = await getFile(path);
-  const url = URL.createObjectURL(file);
+  const media = await getPlayable(path);
+  const url = media.url;
   const v = document.createElement("video");
   v.muted = true;
   v.preload = "metadata";
@@ -159,7 +160,7 @@ async function thumbnail(path: string, at: number | null): Promise<string> {
     });
     return engine.frame(v, 480);
   } finally {
-    URL.revokeObjectURL(url);
+    media.release();
     v.removeAttribute("src");
     v.load();
   }
@@ -204,8 +205,11 @@ export const webApi = {
   initialFile: async (): Promise<string | null> => null,
 
   async openMedia(path: string, options: { preferredLanguages: string[]; resume: boolean }): Promise<Media> {
-    const file = await getFile(path);
-    if (!isVideoName(file.name)) throw new Error(`not a video: ${file.name}`);
+    const media = await getPlayable(path);
+    if (!isVideoName(media.name)) {
+      media.release();
+      throw new Error(`not a video: ${media.name}`);
+    }
     savePosition();
 
     const w = store.watchState(path);
@@ -218,7 +222,7 @@ export const webApi = {
         : null;
 
     const folder = parentOf(path) ?? path;
-    const stem = stemOf(file.name);
+    const stem = stemOf(media.name);
     const sidecars = (await listDir(folder, isSubtitleName).catch(() => []))
       .filter((e) => !e.isDir && e.name.startsWith(stem))
       .map((e) => e.path);
@@ -232,7 +236,12 @@ export const webApi = {
     assignKeys(tracks);
     pickDefaults(tracks, options.preferredLanguages);
 
-    await engine.load(file, resumedAt);
+    try {
+      await engine.load(media, resumedAt);
+    } catch (e) {
+      media.release();
+      throw e;
+    }
     current = { path, tracks };
 
     return {
@@ -273,16 +282,17 @@ export const webApi = {
   },
 
   async fileInfo(path: string): Promise<FileInfo> {
-    const file = await getFile(path);
+    const media = await getPlayable(path);
+    media.release();
     const playing = current?.path === path;
     const v = engine.video;
     return {
-      name: file.name,
+      name: media.name,
       folder: parentOf(path) ?? "",
-      size: file.size,
-      container: file.name.split(".").pop()?.toLowerCase() ?? null,
+      size: media.size ?? 0,
+      container: media.name.split(".").pop()?.toLowerCase() ?? null,
       duration: playing ? engine.duration : null,
-      bitrate: playing && engine.duration ? Math.round((file.size * 8) / engine.duration) : null,
+      bitrate: playing && engine.duration && media.size ? Math.round((media.size * 8) / engine.duration) : null,
       titleTag: null,
       release: { title: null, year: null, season: null, episode: null, resolution: null, source: null, group: null },
       hash: null,

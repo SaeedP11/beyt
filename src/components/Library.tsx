@@ -12,6 +12,7 @@ import { api, isAndroid } from "../api";
 import { useHardKeyboard } from "../hooks";
 import { getLang, t } from "../i18n";
 import { popupMotions, slideIn, useDialogMotion } from "../motion";
+import { listSources, onSourcesChanged, type MountedSource } from "../backend/sources";
 import { sheetEdge } from "../sheet";
 import type { Folder, FolderEntry, Recent } from "../types";
 import { toast } from "../ui";
@@ -206,6 +207,8 @@ interface Props {
 
 export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: Props) {
   const [recent, setRecent] = useState<Recent[]>([]);
+  const [sources, setSources] = useState<MountedSource[]>(listSources);
+  useEffect(() => onSourcesChanged(() => setSources(listSources())), []);
   const [folder, setFolder] = useState<Folder | null>(null);
   /** Videos waiting out their Undo before they are removed. */
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
@@ -432,12 +435,31 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
       id: "folder",
       label: t("libraryTab"),
       icon: "pi pi-folder",
-      content: folder ? (
-        <FolderView folder={folder} hidden={hidden} onOpen={(p) => void showFolder(p)} handlers={handlers} />
-      ) : (
-        <EmptyState icon="pi pi-folder-open" title={t("noFolder")}>
-          <Button icon="pi pi-folder-open" label={t("openFolder")} outlined onClick={() => void pickFolder()} />
-        </EmptyState>
+      content: (
+        <>
+          {sources.length > 0 && (
+            <nav aria-label={t("remoteSources")} className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="me-1 text-sm text-zinc-400">{t("remoteSources")}</span>
+              {sources.map((s) => (
+                <Button
+                  key={s.id}
+                  icon="pi pi-server"
+                  label={s.label}
+                  size="small"
+                  outlined={folder?.path.split("/")[1] !== s.id}
+                  onClick={() => void showFolder(s.path)}
+                />
+              ))}
+            </nav>
+          )}
+          {folder ? (
+            <FolderView folder={folder} hidden={hidden} onOpen={(p) => void showFolder(p)} handlers={handlers} />
+          ) : (
+            <EmptyState icon="pi pi-folder-open" title={t("noFolder")}>
+              <Button icon="pi pi-folder-open" label={t("openFolder")} outlined onClick={() => void pickFolder()} />
+            </EmptyState>
+          )}
+        </>
       ),
     },
     { id: "vocabulary", label: t("vocabulary"), icon: "pi pi-bookmark", content: <VocabularyView /> },

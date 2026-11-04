@@ -1,0 +1,21 @@
+{
+  "port": 8787,
+  "host": "127.0.0.1",
+  "token": "change-me-to-a-long-random-string",
+  "dataDir": "./data",
+  "allowOrigin": "https://your-app.example.com",
+  "allowWrite": false,
+  "sources": [
+    {
+      "id": "home-nas",
+      "label": "Home NAS",
+      "protocol": "ftp",
+      "host": "192.168.1.20",
+      "port": 21,
+      "user": "media",
+      "password": "secret",
+      "secure": false,
+      "root": "/Videos"
+    }
+  ]
+}

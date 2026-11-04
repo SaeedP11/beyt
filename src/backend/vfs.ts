@@ -16,6 +16,9 @@ export interface VEntry {
 interface FileNode {
   name: string;
   file: () => Promise<File>;
+  /** Remote files: a URL the <video> streams from, so nothing is downloaded up front. */
+  url?: () => Promise<string>;
+  size?: number;
 }
 interface DirNode {
   name: string;
@@ -136,6 +139,33 @@ export function addFileList(files: File[]): string {
 export function addLooseFile(file: File): string {
   const dir = register({ name: "", list: async () => [{ name: file.name, file: async () => file }] });
   return `${dir}/${file.name}`;
+}
+
+/** Mounts a folder tree that lives somewhere else (see sources.ts) under a stable
+ *  path, so watch history and settings still match after a reload. */
+export function mountNode(id: string, node: DirNode): string {
+  if (!/^[a-z][a-z0-9-]*$/.test(id)) throw new Error(`invalid source id: ${id}`);
+  roots.set(id, node);
+  return `${PREFIX}${id}`;
+}
+
+export type { FileNode as VFileNode, DirNode as VDirNode };
+
+/** What the player needs to open a file: a URL, and a way to give it back. */
+export interface Playable {
+  name: string;
+  size: number | null;
+  url: string;
+  release: () => void;
+}
+
+export async function getPlayable(path: string): Promise<Playable> {
+  const node = await resolve(path);
+  if (isDirNode(node)) throw new Error(`not a file: ${path}`);
+  if (node.url) return { name: node.name, size: node.size ?? null, url: await node.url(), release: () => {} };
+  const file = await node.file();
+  const url = URL.createObjectURL(file);
+  return { name: file.name, size: file.size, url, release: () => URL.revokeObjectURL(url) };
 }
 
 /** Puts back the folders remembered from earlier visits (they may still need permission). */

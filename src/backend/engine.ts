@@ -30,6 +30,7 @@ export const VIDEO_BRIGHTNESS = { min: 50, max: 115 };
 class Engine {
   readonly video: HTMLVideoElement;
   private objectUrl: string | null = null;
+  private releaseUrl: (() => void) | null = null;
   private brightness = 100;
   private aspect: Aspect = "auto";
   private volumeLevel = 100;
@@ -68,15 +69,16 @@ class Engine {
   }
 
   /** Loads a file and starts playing at `start` seconds. Resolves once the headers are read. */
-  async load(file: File, start: number | null): Promise<void> {
+  async load(media: { name: string; url: string; release: () => void }, start: number | null): Promise<void> {
     this.unload();
-    this.objectUrl = URL.createObjectURL(file);
+    this.objectUrl = media.url;
+    this.releaseUrl = media.release;
     const v = this.video;
-    v.src = this.objectUrl;
+    v.src = media.url;
     this.applyAspect();
     await new Promise<void>((resolve, reject) => {
       const ok = () => (cleanup(), resolve());
-      const bad = () => (cleanup(), reject(new Error(`This browser can't play ${file.name}. Try an MP4 or WebM file.`)));
+      const bad = () => (cleanup(), reject(new Error(`This browser can't play ${media.name}. Try an MP4 or WebM file.`)));
       const cleanup = () => {
         v.removeEventListener("loadedmetadata", ok);
         v.removeEventListener("error", bad);
@@ -93,7 +95,8 @@ class Engine {
     this.video.pause();
     this.video.removeAttribute("src");
     this.video.load();
-    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+    this.releaseUrl?.();
+    this.releaseUrl = null;
     this.objectUrl = null;
   }
 

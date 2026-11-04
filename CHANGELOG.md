@@ -3,6 +3,23 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.28.0 (2026-11-05)
+
+### Added
+
+- Apps that embed Beyt in the browser can now connect it to file servers such
+  as FTP, SFTP, WebDAV or cloud storage. Their folders show up in the library
+  under "Servers", and videos stream from there without being downloaded
+  first. Because a web page can't speak FTP itself, the app's own server
+  provides the connection; docs/BACKEND_API.md explains how.
+- Beyt can also keep your watch history, series settings, app settings and
+  saved words on a server, and hand the dictionary, subtitle matching,
+  renaming and deleting to it. If the server can't be reached, Beyt keeps
+  working from the browser's own storage.
+- A ready-to-run example server in the `server/` folder connects Beyt to an
+  FTP server and stores your history and words in a file. It is meant to be
+  copied or adapted, and has its own tests.
+
 ## 0.27.2 (2026-11-05)
 
 ### Changed

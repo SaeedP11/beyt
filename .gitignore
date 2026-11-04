@@ -12,3 +12,7 @@ result
 .claude/settings.local.json
 .claude/worktrees/
 dist-lib/
+
+# Reference gateway: local config, secrets and stored data
+server/gateway.config.json
+server/data/

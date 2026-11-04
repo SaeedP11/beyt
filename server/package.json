@@ -1,0 +1,18 @@
+{
+  "name": "beyt-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "Reference gateway for Beyt: serves FTP folders over HTTP and stores Beyt's data.",
+  "scripts": {
+    "start": "node src/main.mjs",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5"
+  },
+  "devDependencies": {
+    "ftp-srv": "^4.6.3"
+  }
+}
