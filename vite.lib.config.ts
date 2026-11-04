@@ -39,6 +39,8 @@ const trimFonts = {
 // `pnpm build:lib`: Beyt as an npm package for the browser (dist-lib/).
 export default defineConfig({
   plugins: [trimFonts, react(), tailwindcss()],
+  // Libraries are not given this by the host build, so dev-only checks (prop-types) would stay in.
+  define: { "process.env.NODE_ENV": JSON.stringify("production") },
   build: {
     target: "es2022",
     outDir: "dist-lib",

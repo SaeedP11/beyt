@@ -1,7 +1,7 @@
 
 import { Button } from "primereact/button";
 import { Toast, type ToastMessage } from "primereact/toast";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { api, events, isAndroid, isTauri } from "./api";
 import { onBackButton } from "./platform";
@@ -12,8 +12,7 @@ import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
 import { VideoSurface } from "./components/VideoSurface";
 import { PlayerChrome } from "./components/PlayerChrome";
-import { type Section, SettingsDialog } from "./components/SettingsDialog";
-import { SettingsPage } from "./components/SettingsPage";
+import type { Section } from "./components/SettingsDialog";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SubtitlePanel } from "./components/SubtitlePanel";
 import { Transcript } from "./components/Transcript";
@@ -75,6 +74,10 @@ function updateSubScale() {
   document.documentElement.style.setProperty("--sub-scale", clamped.toFixed(3));
 }
 
+// Settings are rarely opened, so their code loads on first use.
+const SettingsDialog = lazy(() => import("./components/SettingsDialog").then((m) => ({ default: m.SettingsDialog })));
+const SettingsPage = lazy(() => import("./components/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+
 export function App() {
   const lang = useLang();
   const { keymap } = useSettings();
@@ -85,6 +88,8 @@ export function App() {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsSeen = useRef(false);
+  if (settingsOpen) settingsSeen.current = true;
   // Null only on Android: its settings page then shows the list of sections.
   const [settingsSection, setSettingsSection] = useState<Section | null>(isAndroid ? null : "general");
   const [controls, setControls] = useState(true);
@@ -603,6 +608,8 @@ export function App() {
         onHide={() => setInfoOpen(false)}
       />
       <ShortcutsDialog visible={helpOpen} onHide={() => setHelpOpen(false)} onCustomise={() => openSettings("shortcuts")} />
+      {settingsSeen.current && (
+        <Suspense fallback={null}>
       {isAndroid ? (
         <SettingsPage
           visible={settingsOpen}
@@ -617,6 +624,8 @@ export function App() {
           onSection={setSettingsSection}
           onHide={() => setSettingsOpen(false)}
         />
+      )}
+        </Suspense>
       )}
       <AppContextMenu
         screen={screen}

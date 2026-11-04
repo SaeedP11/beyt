@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.27.2 (2026-11-05)
+
+### Changed
+
+- The browser package starts with 0.24 MB of code instead of 0.8 MB, because
+  the settings load only when they are first opened. Development-only checks
+  are no longer shipped in it.
+
 ## 0.27.1 (2026-11-05)
 
 ### Changed
