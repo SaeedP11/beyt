@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.27.1 (2026-11-05)
+
+### Changed
+
+- The Beyt package for the browser is about 70% smaller: 1.5 MB instead of
+  4.6 MB, or 0.4 MB instead of 1.7 MB compressed. It carries one variable
+  Vazirmatn font instead of nine files, only the modern icon font, and loads
+  the light or dark theme only when it is shown.
+
 ## 0.27.0 (2026-11-05)
 
 ### Added

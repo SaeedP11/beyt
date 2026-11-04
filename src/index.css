@@ -5,7 +5,7 @@
 @import "tailwindcss";
 /* PrimeReact's light or dark theme is added to its layer by theme.ts. */
 @import "primeicons/primeicons.css";
-@import "vazirmatn/Vazirmatn-font-face.css";
+@import "vazirmatn/Vazirmatn-Variable-font-face.css";
 
 @theme {
   --font-sans: "Vazirmatn", "Inter", "Noto Sans", sans-serif;

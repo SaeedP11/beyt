@@ -2,8 +2,11 @@
 // which swaps Beyt's colour variables (index.css), and loads the matching
 // PrimeReact theme into the `primereact` layer.
 
-import darkCss from "primereact/resources/themes/lara-dark-blue/theme.css?inline";
-import lightCss from "primereact/resources/themes/lara-light-blue/theme.css?inline";
+/** Each theme is its own chunk, fetched only when shown. */
+const themeCss = {
+  dark: () => import("primereact/resources/themes/lara-dark-blue/theme.css?inline"),
+  light: () => import("primereact/resources/themes/lara-light-blue/theme.css?inline"),
+};
 
 export type Theme = "light" | "dark";
 
@@ -30,11 +33,14 @@ function show(): void {
   const theme: Theme = choice ?? (systemDark.matches ? "dark" : "light");
   if (theme === shown) return;
   shown = theme;
-  // The layer order again, in case this sheet comes before index.css's.
-  sheet.textContent = `@layer theme, base, primereact, components, utilities;\n@layer primereact {\n${theme === "dark" ? darkCss : lightCss}\n}`;
   const root = document.documentElement;
   root.classList.toggle("dark", theme === "dark");
   root.classList.toggle("light", theme === "light");
+  void themeCss[theme]().then(({ default: css }) => {
+    if (shown !== theme) return; // Switched again while this one loaded.
+    // The layer order again, in case this sheet comes before index.css's.
+    sheet.textContent = `@layer theme, base, primereact, components, utilities;\n@layer primereact {\n${css}\n}`;
+  });
 }
 
 /** Shows `theme`, or follows the system's when null. */
