@@ -3,6 +3,13 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.26.1 (2026-11-05)
+
+### Fixed
+
+- On Android, the screen rotates again after the phone has been locked and
+  unlocked. It used to stay stuck in the orientation of the lock screen.
+
 ## 0.26.0 (2026-11-05)
 
 ### Added

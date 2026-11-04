@@ -1,5 +1,6 @@
 package app.beyt.player
 
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
@@ -11,6 +12,15 @@ class MainActivity : TauriActivity() {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     hideSystemBars()
+  }
+
+  // After the screen has been off, Android can keep the orientation it had on
+  // the lock screen. Asking again makes it follow the sensor and the phone's
+  // auto-rotate setting once more.
+  override fun onResume() {
+    super.onResume()
+    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
   }
 
   // The bars come back after dialogs, the file picker or switching apps.
