@@ -7,7 +7,8 @@
   "description": "Reference gateway for Beyt: serves FTP folders over HTTP and stores Beyt's data.",
   "scripts": {
     "start": "node src/main.mjs",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "dev": "node dev.mjs"
   },
   "dependencies": {
     "basic-ftp": "^5.0.5"

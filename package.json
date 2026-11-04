@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "build:lib": "tsc --noEmit && vite build -c vite.lib.config.ts && tsc -p tsconfig.lib.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "dev:gateway": "VITE_BEYT_GATEWAY=http://127.0.0.1:8787/beyt/v1 VITE_BEYT_TOKEN=beyt-dev-token-0000 VITE_BEYT_SOURCES=demo:Demo\\ FTP vite"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
