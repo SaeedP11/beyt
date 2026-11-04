@@ -4,6 +4,7 @@ import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { ContextMenu } from "primereact/contextmenu";
 import { Dialog } from "primereact/dialog";
+import { Dropdown } from "primereact/dropdown";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { TabPanel, TabView } from "primereact/tabview";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -754,16 +755,132 @@ interface FolderProps {
   handlers: ItemHandlers;
 }
 
+type SortKey = "nameAsc" | "nameDesc" | "unwatched" | "watched";
+const SORT_LABELS = {
+  nameAsc: "sort_nameAsc",
+  nameDesc: "sort_nameDesc",
+  unwatched: "sort_unwatched",
+  watched: "sort_watched",
+} as const;
+const SORT_KEYS = Object.keys(SORT_LABELS) as SortKey[];
+/** The order last chosen, so it holds across folders and visits. */
+let lastSort: SortKey = "nameAsc";
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+function watchedFraction(e: FolderEntry): number {
+  return e.duration ? (e.position ?? 0) / e.duration : 0;
+}
+
+/** Sorts a copy of `entries`. Names compare ignoring case, with 2 before 10. */
+function sortEntries(entries: FolderEntry[], by: SortKey): FolderEntry[] {
+  const byName = (a: FolderEntry, b: FolderEntry) => collator.compare(a.name, b.name);
+  const cmp: Record<SortKey, (a: FolderEntry, b: FolderEntry) => number> = {
+    nameAsc: byName,
+    nameDesc: (a, b) => byName(b, a),
+    unwatched: (a, b) => watchedFraction(a) - watchedFraction(b) || byName(a, b),
+    watched: (a, b) => watchedFraction(b) - watchedFraction(a) || byName(a, b),
+  };
+  return [...entries].sort(cmp[by]);
+}
+
+/** Whether `name` contains every word of `query`, ignoring case. */
+function matches(name: string, query: string): boolean {
+  const hay = name.toLocaleLowerCase();
+  return query
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => hay.includes(w));
+}
+
+/** A search box and the sort order for the open folder's items. */
+function FolderTools({
+  query,
+  onQuery,
+  sort,
+  onSort,
+}: {
+  query: string;
+  onQuery: (q: string) => void;
+  sort: SortKey;
+  onSort: (s: SortKey) => void;
+}) {
+  const options = SORT_KEYS.map((k) => ({ value: k, label: t(SORT_LABELS[k]) }));
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="flex h-11 min-w-0 flex-1 items-center rounded-xl border border-ink-700 bg-ink-900 focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/25 sm:w-56 sm:flex-none">
+        <i className="pi pi-search ps-3 text-sm text-zinc-500" />
+        <input
+          type="search"
+          value={query}
+          dir="auto"
+          spellCheck={false}
+          placeholder={t("searchFiles")}
+          aria-label={t("searchFiles")}
+          onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Escape" && query) {
+              onQuery("");
+              e.preventDefault();
+            }
+          }}
+          className="h-full min-w-0 flex-1 appearance-none bg-transparent px-2.5 text-zinc-100 outline-none placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:hidden"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label={t("clearSearch")}
+            onClick={() => onQuery("")}
+            className="me-1 grid size-8 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-ink-700"
+          >
+            <i className="pi pi-times" />
+          </button>
+        )}
+      </div>
+      <Dropdown
+        value={sort}
+        options={options}
+        onChange={(e) => onSort(e.value)}
+        aria-label={t("sortBy")}
+        tooltip={t("sortBy")}
+        tooltipOptions={{ position: "bottom" }}
+        className="h-11 w-44 shrink-0"
+        transitionOptions={popupMotions.connected}
+      />
+    </div>
+  );
+}
+
 /** The open folder: where it is, its subfolders, then its videos. */
 function FolderView({ folder, hidden, onOpen, handlers }: FolderProps) {
-  const dirs = folder.entries.filter((e) => e.isDir);
-  const videos = folder.entries.filter((e) => !e.isDir && !hidden.has(e.path));
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState(lastSort);
+  // A search belongs to the folder it was typed in.
+  useEffect(() => setQuery(""), [folder.path]);
+  const chooseSort = (s: SortKey) => {
+    lastSort = s;
+    setSort(s);
+  };
+  const searching = query.trim() !== "";
+  const visible = sortEntries(folder.entries, sort).filter(
+    (e) => (e.isDir || !hidden.has(e.path)) && (!searching || matches(e.name, query)),
+  );
+  const dirs = visible.filter((e) => e.isDir);
+  const videos = visible.filter((e) => !e.isDir);
+  const hasItems = folder.entries.some((e) => e.isDir || !hidden.has(e.path));
   return (
     <section className="flex flex-col gap-8">
       {/* The path stays pinned to the top while the folder scrolls under it;
           the band of page colour hides cards passing its rounded corners. */}
       <div className="sticky top-0 z-10 -my-2 bg-ink-950 py-2">
-        <PathBar folder={folder} onOpen={onOpen} />
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="min-w-0 lg:flex-1">
+            <PathBar folder={folder} onOpen={onOpen} />
+          </div>
+          {hasItems && <FolderTools query={query} onQuery={setQuery} sort={sort} onSort={chooseSort} />}
+        </div>
       </div>
 
       {dirs.length > 0 && (
@@ -788,7 +905,14 @@ function FolderView({ folder, hidden, onOpen, handlers }: FolderProps) {
         </div>
       )}
 
-      {!dirs.length && !videos.length && <EmptyState icon="pi pi-inbox" title={t("emptyFolder")} />}
+      {!dirs.length && !videos.length && (
+        <EmptyState
+          icon={searching ? "pi pi-search" : "pi pi-inbox"}
+          title={searching ? t("noSearchResults", { q: query.trim() }) : t("emptyFolder")}
+        >
+          {searching && <Button label={t("clearSearch")} outlined onClick={() => setQuery("")} />}
+        </EmptyState>
+      )}
     </section>
   );
 }

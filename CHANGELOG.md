@@ -3,6 +3,17 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.26.0 (2026-11-05)
+
+### Added
+
+- Search the open folder in the library. Type in the new search box above
+  the list to show only the folders and videos whose names contain every
+  word you typed, ignoring upper and lower case. Press Esc to clear it.
+- Sort the folder by name (A–Z or Z–A), by unwatched first, or by most
+  watched first. Numbers in names sort naturally, so episode 2 comes
+  before episode 10, and your choice is remembered.
+
 ## 0.25.0 (2026-10-18)
 
 ### Added
