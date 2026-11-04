@@ -1,7 +1,25 @@
 {
   "name": "beyt",
-  "private": true,
-  "version": "0.28.0",
+  "version": "0.28.1",
+  "description": "Beyt: a video player for language learning that shows two subtitle tracks at once. React component for the browser.",
+  "keywords": [
+    "video",
+    "player",
+    "subtitles",
+    "language-learning",
+    "react",
+    "persian",
+    "rtl",
+    "ftp"
+  ],
+  "homepage": "https://github.com/saeedp11/beyt#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/saeedp11/beyt.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saeedp11/beyt/issues"
+  },
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
@@ -10,24 +28,25 @@
     "typecheck": "tsc --noEmit",
     "build:lib": "tsc --noEmit && vite build -c vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "tauri": "tauri",
-    "dev:gateway": "VITE_BEYT_GATEWAY=http://127.0.0.1:8787/beyt/v1 VITE_BEYT_TOKEN=beyt-dev-token-0000 VITE_BEYT_SOURCES=demo:Demo\\ FTP vite"
+    "dev:gateway": "VITE_BEYT_GATEWAY=http://127.0.0.1:8787/beyt/v1 VITE_BEYT_TOKEN=beyt-dev-token-0000 VITE_BEYT_SOURCES=demo:Demo\\ FTP vite",
+    "prepublishOnly": "pnpm build:lib"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2.8.2",
-    "primeicons": "^7.0.0",
-    "primereact": "^10.9.9",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "vazirmatn": "^33.0.3"
+    "@tauri-apps/plugin-dialog": "^2.8.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "primeicons": "^7.0.0",
+    "primereact": "^10.9.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5",
+    "vazirmatn": "^33.0.3",
     "vite": "^8.3.4"
   },
   "main": "./dist-lib/beyt.js",
@@ -49,5 +68,8 @@
   "peerDependencies": {
     "react": "^19",
     "react-dom": "^19"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

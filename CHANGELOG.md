@@ -3,6 +3,20 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.28.1 (2026-11-05)
+
+### Fixed
+
+- The Beyt package's type definitions no longer refer to a file outside the
+  package, which made TypeScript projects that install it report an error.
+
+### Changed
+
+- The package can now be published to npm: it has a description, repository
+  link and keywords, and its README explains how to use it in a web page.
+  Installing it no longer pulls in React, PrimeReact, the icon font and the
+  Persian font a second time, as they are already inside the package.
+
 ## 0.28.0 (2026-11-05)
 
 ### Added

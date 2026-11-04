@@ -14,21 +14,6 @@ importers:
       '@tauri-apps/plugin-dialog':
         specifier: ^2.8.2
         version: 2.8.2
-      primeicons:
-        specifier: ^7.0.0
-        version: 7.0.0
-      primereact:
-        specifier: ^10.9.9
-        version: 10.9.9(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.3.0
-        version: 19.3.0(react@19.3.0)
-      vazirmatn:
-        specifier: ^33.0.3
-        version: 33.0.3
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.3.3
@@ -42,12 +27,27 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.1.2
         version: 6.1.2(vite@8.3.4(jiti@2.7.0))
+      primeicons:
+        specifier: ^7.0.0
+        version: 7.0.0
+      primereact:
+        specifier: ^10.9.9
+        version: 10.9.9(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
       typescript:
         specifier: ^5
         version: 5.9.3
+      vazirmatn:
+        specifier: ^33.0.3
+        version: 33.0.3
       vite:
         specifier: ^8.3.4
         version: 8.3.4(jiti@2.7.0)

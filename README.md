@@ -98,6 +98,29 @@ On a touch screen (`src/gestures.ts`):
 | Swipe sideways on a subtitle line | Previous / next line |
 | Tap a word | Dictionary popup |
 
+## Use Beyt in a web page (npm package)
+
+The player and library also run in a browser, as a React component:
+
+```sh
+npm install beyt react react-dom
+```
+
+```tsx
+import { Beyt } from "beyt";
+import "beyt/style.css";
+
+// Give the parent a size: Beyt fills it.
+<div style={{ height: "100vh" }}><Beyt /></div>;
+// Without React in your app: mountBeyt(element) returns a function that removes it.
+```
+
+Browsers play MP4 and WebM; embedded subtitle tracks, the offline dictionary and
+subtitle matching need the desktop app. To browse videos on FTP, SFTP, WebDAV or
+cloud storage, and to keep history and saved words on a server, pass `sources`
+and `server`: see [docs/BACKEND_API.md](docs/BACKEND_API.md) and the example
+gateway in [server/](server/README.md).
+
 ## Android (in progress)
 
 ```sh
