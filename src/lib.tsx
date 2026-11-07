@@ -12,6 +12,8 @@ import { App } from "./App";
 import { connectServer, type BeytServer } from "./backend/remote";
 import { mountSource, type FileSource } from "./backend/sources";
 import { CrashScreen } from "./components/CrashScreen";
+import { type Lang, defaultLang, setLang } from "./i18n";
+import { type Theme, defaultTheme, setTheme } from "./theme";
 import { VERSION } from "./version";
 
 export interface BeytOptions {
@@ -21,6 +23,18 @@ export interface BeytOptions {
   server?: BeytServer;
   /** Called when the server can't be reached or a write fails. */
   onError?: (error: Error) => void;
+  /** Virtual path or file path to play immediately when opened */
+  initialFile?: string;
+  /** Callback when the user closes or exits the player */
+  onClose?: () => void;
+  /** Heartbeat progress callback (seconds, duration) */
+  onProgress?: (pos: number, dur: number) => void;
+  /** Theme to apply ("dark" | "light" | "auto"). If omitted or "auto", follows host application theme. */
+  theme?: Theme | "auto";
+  /** Locale / language to apply ("fa" | "en" | "auto"). If omitted or "auto", follows host application locale. */
+  locale?: Lang | "auto";
+  /** Alias for locale */
+  lang?: Lang | "auto";
 }
 
 /** Mounts the sources and connects the server. Safe to call more than once. */
@@ -33,6 +47,40 @@ function setup({ sources = [], server, onError }: BeytOptions): Promise<void> {
  *  it fills it. */
 export function Beyt(options: BeytOptions = {}) {
   const [ready, setReady] = useState(!options.server);
+
+  const effectiveTheme = options.theme && options.theme !== "auto" ? options.theme : undefined;
+  const effectiveLocale =
+    (options.locale && options.locale !== "auto" ? options.locale : undefined) ??
+    (options.lang && options.lang !== "auto" ? options.lang : undefined);
+
+  useEffect(() => {
+    // Save host application's initial language, direction, and theme classes
+    const initialLang = document.documentElement.lang;
+    const initialDir = document.documentElement.dir;
+    const initialDark = document.documentElement.classList.contains("dark");
+    const initialLight = document.documentElement.classList.contains("light");
+
+    if (effectiveTheme) {
+      setTheme(effectiveTheme, false);
+    } else {
+      setTheme(defaultTheme(), false);
+    }
+
+    if (effectiveLocale) {
+      setLang(effectiveLocale);
+    } else {
+      setLang(defaultLang());
+    }
+
+    return () => {
+      // Restore host application theme and locale upon unmount
+      if (initialLang) document.documentElement.lang = initialLang;
+      if (initialDir) document.documentElement.dir = initialDir;
+      document.documentElement.classList.toggle("dark", initialDark);
+      document.documentElement.classList.toggle("light", initialLight);
+    };
+  }, [effectiveTheme, effectiveLocale]);
+
   useEffect(() => {
     let alive = true;
     void setup(options).then(
@@ -48,12 +96,19 @@ export function Beyt(options: BeytOptions = {}) {
     // The options are read once: sources and server are fixed for the page's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   if (!ready) return null;
   return (
     <StrictMode>
       <PrimeReactProvider value={{ ripple: true }}>
         <CrashScreen>
-          <App />
+          <App
+            initialFile={options.initialFile}
+            onClose={options.onClose}
+            onProgress={options.onProgress}
+            theme={effectiveTheme}
+            locale={effectiveLocale}
+          />
         </CrashScreen>
       </PrimeReactProvider>
     </StrictMode>
@@ -69,6 +124,8 @@ export function mountBeyt(element: HTMLElement, options: BeytOptions = {}): () =
 }
 
 export { VERSION };
+export type { Theme } from "./theme";
+export type { Lang } from "./i18n";
 export { httpFileSource, mountSource, unmountSource } from "./backend/sources";
 export type { FileSource, HttpFileSourceOptions, RemoteEntry } from "./backend/sources";
 export { httpServer } from "./backend/remote";

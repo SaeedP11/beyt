@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from "react";
 
 import { api } from "./api";
-import { type Lang, defaultLang, setLang } from "./i18n";
+import { type Lang, defaultLang, setFollowsApp, setLang } from "./i18n";
 import type { Keymap } from "./keymap";
 import { type Theme, setTheme } from "./theme";
 import type { Position } from "./types";
@@ -134,7 +134,10 @@ export function resetSettings(): void {
 }
 
 /** Loads saved settings (merged over defaults, so new settings get their default). */
-export function loadSettings(saved: Record<string, unknown>): Settings {
+export function loadSettings(
+  saved: Record<string, unknown>,
+  overrides?: { theme?: Theme; locale?: Lang },
+): Settings {
   const stored = (saved.settings ?? {}) as Partial<Settings>;
   // Settings from before this screen existed.
   if (saved.settings === undefined) {
@@ -146,6 +149,8 @@ export function loadSettings(saved: Record<string, unknown>): Settings {
     ...stored,
     subtitleDefaults: { ...DEFAULTS.subtitleDefaults, ...stored.subtitleDefaults },
   };
+  if (overrides?.theme) current.theme = overrides.theme;
+  if (overrides?.locale) current.uiLanguage = overrides.locale;
   apply(current, null);
   for (const fn of listeners) fn();
   return current;
@@ -174,7 +179,10 @@ function apply(s: Settings, prev: Settings | null): void {
   root.setProperty("--sub-bottom", `${s.bottomMargin}%`);
   root.setProperty("--sub-top", `${s.topMargin}%`);
 
-  if (!prev || prev.uiLanguage !== s.uiLanguage) setLang(s.uiLanguage ?? defaultLang());
+  if (!prev || prev.uiLanguage !== s.uiLanguage) {
+    setFollowsApp(s.uiLanguage === null);
+    setLang(s.uiLanguage ?? defaultLang());
+  }
   if (!prev || prev.theme !== s.theme) setTheme(s.theme);
   if (!prev || prev.hwdec !== s.hwdec) void api.setMpvOption("hwdec", s.hwdec);
   if (!prev || prev.defaultSpeed !== s.defaultSpeed) void api.setMpvOption("speed", String(s.defaultSpeed));

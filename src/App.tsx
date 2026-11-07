@@ -21,10 +21,11 @@ import { LevelIndicator } from "./components/LevelIndicator";
 import { WordPopup, type WordPopupHandle } from "./components/WordPopup";
 import { attachGestures, type GestureHandlers, lineSwipe, type Zone } from "./gestures";
 import { hasHardKeyboard, player, useLang } from "./hooks";
-import { getLang, t } from "./i18n";
+import { type Lang, getLang, t } from "./i18n";
 import { type Action, bindingTable, eventKey, keyParts, keysFor } from "./keymap";
 import { popupMotions } from "./motion";
 import { clampMargin, getSettings, loadSettings, marginKey, updateSettings, useSettings } from "./settings";
+import type { Theme } from "./theme";
 import { fmtTime, setToastHandler, toast } from "./ui";
 
 type Screen = "loading" | "library" | "player";
@@ -78,7 +79,19 @@ function updateSubScale() {
 const SettingsDialog = lazy(() => import("./components/SettingsDialog").then((m) => ({ default: m.SettingsDialog })));
 const SettingsPage = lazy(() => import("./components/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 
-export function App() {
+export function App({
+  initialFile,
+  onClose,
+  onProgress,
+  theme,
+  locale,
+}: {
+  initialFile?: string;
+  onClose?: () => void;
+  onProgress?: (pos: number, dur: number) => void;
+  theme?: Theme;
+  locale?: Lang;
+} = {}) {
   const lang = useLang();
   const { keymap } = useSettings();
   const [screen, setScreen] = useState<Screen>("loading");
@@ -130,8 +143,9 @@ export function App() {
     setPanelOpen(false);
     setTranscriptOpen(false);
     await player.close();
-    setScreen("library");
-  }, []);
+    if (onClose) onClose();
+    else setScreen("library");
+  }, [onClose]);
 
   // ---------- startup (once, even under StrictMode) ----------
 
@@ -166,12 +180,15 @@ export function App() {
     });
     void (async () => {
       const saved = await api.appSettings();
-      loadSettings(saved);
+      loadSettings(saved, { theme, locale });
       setLastFolder(typeof saved.lastFolder === "string" ? saved.lastFolder : null);
 
       await events.playback((p) => {
         clock.update(p);
         player.onPlayback(p);
+        if (onProgress && p.duration > 0) {
+          onProgress(p.time, p.duration);
+        }
       });
       await events.trackUpdated((u) => player.onTrackUpdated(u));
       await events.audioTracks((u) => player.onAudioTracks(u));
@@ -182,7 +199,7 @@ export function App() {
       };
       requestAnimationFrame(frame);
 
-      const initial = await api.initialFile();
+      const initial = initialFile || (await api.initialFile());
       if (initial) await play(initial);
       else setScreen("library");
     })();
@@ -273,7 +290,8 @@ export function App() {
           void api.toggleFullscreen();
           break;
         case "quit":
-          void api.quit();
+          if (onClose) onClose();
+          else void api.quit();
           break;
         case "subtitles":
           setPanelOpen((o) => !o);

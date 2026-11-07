@@ -4,7 +4,7 @@
 
 import type { Cue } from "../types";
 
-export const VIDEO_EXTENSIONS = ["mkv", "mp4", "m4v", "webm", "avi", "mov", "ts", "m2ts", "wmv", "flv", "ogv"];
+export const VIDEO_EXTENSIONS = ["mkv", "mp4", "m4v", "webm", "avi", "mov", "ts", "m2ts", "wmv", "flv", "ogv", "m3u8"];
 export const SUBTITLE_EXTENSIONS = ["srt", "vtt"];
 
 export function extensionOf(name: string): string {

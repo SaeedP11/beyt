@@ -117,12 +117,12 @@ const en = {
   sendToAnki: "Send to Anki",
   exportCsv: "Export CSV",
   ankiResult: "{added} added to Anki, {skipped} already there.",
-  csvDone: "Exported. Copy the media into Anki’s collection.media folder: {path}",
+  csvDone: "Exported. Copy the media into Anki's collection.media folder: {path}",
   inAnki: "in Anki",
   delete: "Delete",
   playClip: "Play clip",
   upNext: "Up next",
-  playingIn: "Playing in {n}s",
+  playingIn: "Playing in {n} s",
   playNow: "Play now",
   cancel: "Cancel",
   minutesLeft: "{n} min left",
@@ -138,7 +138,7 @@ const en = {
   renameHint: "Enter to save, Esc to cancel",
   renameSubs: "Its subtitle files are renamed too.",
   nameTaken: "A file with this name is already in the folder.",
-  nameInvalid: "A name can’t be empty or contain “/”.",
+  nameInvalid: "A name can't be empty or contain “/”.",
   renamed: "Renamed to “{name}”",
   showInFolder: "Show in folder",
   removeRecent: "Remove from Continue watching",
@@ -249,7 +249,7 @@ const en = {
   topMargin: "Distance from the top",
   marginHint: "You can also drag the subtitles up or down on the video.",
   defaultStyles: "Default style per language",
-  defaultStylesHint: "Used for tracks you haven't customised in a series.",
+  defaultStylesHint: "Used for tracks you haven't customized in a series.",
   otherLanguages: "Other languages",
   preview: "Preview",
   autoPauseDefault: "Start each video with auto-pause on",
@@ -294,7 +294,7 @@ const en = {
   confirmAction: "Are you sure?",
   shortcutsTitle: "Keyboard shortcuts",
   searchShortcuts: "Search shortcuts…",
-  customise: "Customise",
+  customise: "Customize",
   helpTip: "Tip: click any word in a subtitle to look it up.",
   volumeToast: "Volume {n}%",
   muted: "Muted",
@@ -378,7 +378,7 @@ const fa: Strings = {
   emptyFolder: "اینجا ویدیو یا پوشه‌ای نیست.",
   searchFiles: "جست‌وجوی فایل‌ها…",
   clearSearch: "پاک کردن جست‌وجو",
-  noSearchResults: "چیزی با «{q}» جور نیست.",
+  noSearchResults: "نتیجه‌ای برای «{q}» پیدا نشد.",
   sortBy: "مرتب‌سازی",
   sort_nameAsc: "نام (الف تا ی)",
   sort_nameDesc: "نام (ی تا الف)",
@@ -394,7 +394,7 @@ const fa: Strings = {
   addSubtitle: "افزودن فایل زیرنویس…",
   removeSubtitle: "حذف فایل زیرنویس",
   findBestMatch: "پیدا کردن بهترین زیرنویس…",
-  matchTitle: "کدام زیرنویس بهتر جور است",
+  matchTitle: "کدام زیرنویس مناسب‌تر است",
   matchChecking: "در حال گوش دادن به صدای فیلم…",
   matchCheckingHint: "بیت چند دقیقه از صدای بخش‌های مختلف ویدیو را برمی‌دارد و دیالوگ‌های هر فایل را با آن تطبیق می‌دهد.",
   matchError: "بررسی زیرنویس‌ها ممکن نشد.",
@@ -403,25 +403,25 @@ const fa: Strings = {
   v_inSync: "هم‌زمان",
   v_shifted: "با جابه‌جایی {offset} ثانیه هم‌زمان می‌شود",
   v_drifts: "کم‌کم ناهم‌زمان می‌شود",
-  v_noMatch: "با صدای فیلم جور نیست",
+  v_noMatch: "با صدای فیلم مطابقت ندارد",
   v_unreadable: "این فایل خوانده نمی‌شود",
   agreeCount: "{agree} از {samples} نمونهٔ صدا موافق‌اند",
   lineCount: "{n} خط",
   r_sameRelease: "برای همین نسخه نام‌گذاری شده ({group})",
   r_otherEpisode: "برای {subtitle} ساخته شده، ولی این ویدیو {video} است",
-  r_frameRate: "برای {subtitle} فریم بر ثانیه زمان‌بندی شده و این ویدیو {video} است؛ جابه‌جایی درستش نمی‌کند",
+  r_frameRate: "برای {subtitle} فریم بر ثانیه زمان‌بندی شده و این ویدیو {video} فریم بر ثانیه است؛ جابه‌جایی درستش نمی‌کند",
   r_endsAfter: "{seconds} ثانیه بعد از پایان ویدیو تمام می‌شود",
   r_partial: "فقط {percent}٪ ویدیو را پوشش می‌دهد",
   pickSubtitle: "انتخاب فایل زیرنویس",
   pickSubtitlesToCompare: "زیرنویس‌ها را برای مقایسه انتخاب کنید",
-  filesPicked: "{n} انتخاب شده",
+  filesPicked: "{n} انتخاب‌شده",
   compareFiles: "مقایسه",
   selectAll: "انتخاب همه",
   noSubtitlesHere: "اینجا فایل زیرنویس یا پوشه‌ای نیست.",
   folderUnreadable: "این پوشه باز نشد.",
   useThis: "استفاده",
   useWithOffset: "استفاده با {offset} ثانیه",
-  useAnyway: "با این حال استفاده کن",
+  useAnyway: "استفاده در هر حال",
   inUse: "در حال استفاده",
   noTracks: "این ویدیو زیرنویس ندارد. یک فایل اضافه کنید.",
   position: "جایگاه",
@@ -480,14 +480,14 @@ const fa: Strings = {
   vocabEmpty: "هنوز چیزی ذخیره نکرده‌اید. روی واژه‌ای در زیرنویس بزنید و ذخیره کنید، یا با W خط فعلی را ذخیره کنید.",
   sendToAnki: "ارسال به Anki",
   exportCsv: "خروجی CSV",
-  ankiResult: "{added} کارت به Anki افزوده شد، {skipped} از قبل بود.",
+  ankiResult: "{added} کارت به Anki افزوده شد، {skipped} مورد از قبل وجود داشت.",
   csvDone: "خروجی گرفته شد. رسانه‌ها را در پوشهٔ collection.media در Anki کپی کنید: {path}",
   inAnki: "در Anki",
   delete: "حذف",
   playClip: "پخش صدا",
   upNext: "قسمت بعد",
   playingIn: "پخش تا {n} ثانیهٔ دیگر",
-  playNow: "پخش کن",
+  playNow: "پخش اکنون",
   cancel: "لغو",
   minutesLeft: "{n} دقیقه مانده",
   moreActions: "کارهای بیشتر",
@@ -501,8 +501,8 @@ const fa: Strings = {
   fileNameLabel: "نام فایل",
   renameHint: "Enter برای ذخیره، Esc برای لغو",
   renameSubs: "نام فایل‌های زیرنویس آن هم تغییر می‌کند.",
-  nameTaken: "فایلی با این نام در پوشه هست.",
-  nameInvalid: "نام نمی‌تواند خالی باشد یا «/» داشته باشد.",
+  nameTaken: "فایلی با این نام از قبل در پوشه وجود دارد.",
+  nameInvalid: "نام نمی‌تواند خالی باشد یا شامل «/» باشد.",
   renamed: "نام به «{name}» تغییر کرد",
   showInFolder: "نمایش در پوشه",
   removeRecent: "حذف از ادامهٔ تماشا",
@@ -519,7 +519,7 @@ const fa: Strings = {
   fileInfoFind: "برای پیدا کردن زیرنویس",
   fileInfoFindHint: "زیرنویسی که برای همین نسخه، با همین نرخ فریم و همین مدت ساخته شده باشد، هم‌زمان است.",
   fileInfoError: "خواندن مشخصات این فایل ممکن نشد.",
-  searchName: "نام برای جستجو",
+  searchName: "نام برای جست‌وجو",
   release: "نسخه",
   frameRate: "نرخ فریم",
   duration: "مدت",
@@ -542,7 +542,7 @@ const fa: Strings = {
   isDefault: "پیش‌فرض",
   copy: "کپی",
   copied: "کپی شد",
-  retry: "دوباره",
+  retry: "تلاش دوباره",
   crashTitle: "بیت با مشکلی روبه‌رو شد",
   crashHint: "دوباره بارگیری کنید تا از همان‌جا ادامه دهید.",
   reload: "بارگیری دوباره",
@@ -557,7 +557,7 @@ const fa: Strings = {
   playThisLine: "پخش این خط",
   speed: "سرعت",
   speedNormal: "عادی",
-  dropHint: "برای شروع یک ویدیو یا پوشه باز کنید.",
+  dropHint: "برای شروع، یک ویدیو یا پوشه باز کنید.",
   lastEpisode: "این آخرین ویدیوی این پوشه بود.",
   selected: "انتخاب‌شده: {name}",
   offsetToast: "{name}: جابه‌جایی {ms} میلی‌ثانیه",
@@ -573,7 +573,7 @@ const fa: Strings = {
   secSubtitles: "زیرنویس",
   secLearning: "یادگیری",
   secAnki: "Anki",
-  secShortcuts: "میانبرهای صفحه‌کلید",
+  secShortcuts: "میان‌برهای صفحه‌کلید",
   secData: "داده‌ها",
   secGeneralSummary: "زبان، پوسته، ادامهٔ پخش، قسمت بعد",
   secPlaybackSummary: "رمزگشایی، سرعت، صدا",
@@ -599,7 +599,7 @@ const fa: Strings = {
   controlsHide: "پنهان شدن کنترل‌ها پس از",
   unitSeconds: "ثانیه",
   hwdec: "رمزگشایی سخت‌افزاری",
-  hwdecHint: "ویدیو با کارت گرافیک رمزگشایی می‌شود (VA-API). اگر اشکال تصویری دیدید خاموشش کنید؛ از ویدیوی بعد اعمال می‌شود.",
+  hwdecHint: "ویدیو با کارت گرافیک رمزگشایی می‌شود (VA-API). اگر اشکال تصویری دیدید خاموشش کنید؛ از ویدیوی بعدی اعمال می‌شود.",
   defaultSpeed: "سرعت پیش‌فرض",
   defaultVolume: "صدای پیش‌فرض",
   preferredLanguages: "زبان‌های پیش‌فرض نمایش",
@@ -622,10 +622,10 @@ const fa: Strings = {
   clipPaddingHint: "صدای اضافه پیش و پس از خط ذخیره‌شده.",
   saveScreenshots: "ذخیرهٔ تصویر با هر مورد",
   dictionary: "فرهنگ آفلاین",
-  dictionaryEntries: "{n} مدخل نصب شده",
-  dictionarySettingsHint: "معنی‌های انگلیسی ↔ فارسی از ویکی‌واژه، برای وقتی روی واژه‌ای در زیرنویس کلیک می‌کنید.",
+  dictionaryEntries: "{n} مدخل نصب‌شده",
+  dictionarySettingsHint: "معنی‌های انگلیسی ↔ فارسی از ویکی‌واژه که هنگام کلیک روی واژه‌ای در زیرنویس نمایش داده می‌شوند.",
   dictionaryNotInstalled: "فرهنگ آفلاین هنوز نصب نشده",
-  dictionaryInstallHint: "معنی‌ها از ویکی‌واژه می‌آیند و پس از نصب بدون اینترنت کار می‌کنند. یک بار دانلود، حدود ۱۳ مگابایت.",
+  dictionaryInstallHint: "معنی‌ها از ویکی‌واژه می‌آیند و پس از نصب بدون اینترنت کار می‌کنند. یک‌بار دانلود، حدود ۱۳ مگابایت.",
   installDictionary: "نصب فرهنگ",
   dictionaryDownloading: "در حال دانلود فرهنگ…",
   dictionaryDownloadingPct: "در حال دانلود فرهنگ… {pct}٪",
@@ -637,27 +637,27 @@ const fa: Strings = {
   dictionaryUpdateHint: "دریافت تازه‌ترین مدخل‌های ویکی‌واژه",
   update: "به‌روزرسانی",
   ankiUrl: "نشانی AnkiConnect",
-  ankiUrlHint: "افزونهٔ AnkiConnect را در Anki نصب کنید و هنگام ارسال Anki را باز نگه دارید.",
+  ankiUrlHint: "افزونهٔ AnkiConnect را در Anki نصب کنید و هنگام ارسال، Anki را باز نگه دارید.",
   ankiDeck: "دسته",
   testConnection: "آزمایش اتصال",
   ankiOk: "به AnkiConnect وصل شد (نسخهٔ {v})",
   change: "تغییر",
   pressKey: "یک کلید بزنید…",
   reset: "بازنشانی",
-  resetAllShortcuts: "بازنشانی همهٔ میانبرها",
-  keyInUse: "{key} برای «{action}» بود که اکنون بدون کلید است.",
-  unbound: "تعریف نشده",
+  resetAllShortcuts: "بازنشانی همهٔ میان‌برها",
+  keyInUse: "{key} برای «{action}» اختصاص یافته بود که اکنون بدون کلید است.",
+  unbound: "تعریف‌نشده",
   dataFolder: "پوشهٔ داده‌ها",
   clearHistory: "پاک کردن تاریخچهٔ تماشا",
   clearHistoryHint: "جای ادامهٔ پخش و فهرست «ادامهٔ تماشا» پاک می‌شود.",
   clearCache: "پاک کردن حافظهٔ زیرنویس",
   clearCacheHint: "زیرنویس‌های درون فایل دفعهٔ بعد دوباره استخراج می‌شوند.",
   resetSettings: "بازنشانی همهٔ تنظیمات",
-  resetSettingsHint: "همهٔ تنظیمات و میانبرها به حالت پیش‌فرض برمی‌گردند.",
+  resetSettingsHint: "همهٔ تنظیمات و میان‌برها به حالت پیش‌فرض برمی‌گردند.",
   done: "انجام شد",
   confirmAction: "مطمئن هستید؟",
-  shortcutsTitle: "میانبرهای صفحه‌کلید",
-  searchShortcuts: "جستجوی میانبرها…",
+  shortcutsTitle: "میان‌برهای صفحه‌کلید",
+  searchShortcuts: "جست‌وجوی میان‌برها…",
   customise: "شخصی‌سازی",
   helpTip: "نکته: برای دیدن معنی، روی هر واژهٔ زیرنویس بزنید.",
   volumeToast: "صدا {n}٪",
@@ -722,7 +722,7 @@ const fa: Strings = {
   act_subtitles: "پنل زیرنویس‌ها",
   act_transcript: "متن کامل",
   act_info: "مشخصات فایل",
-  act_help: "میانبرهای صفحه‌کلید",
+  act_help: "میان‌برهای صفحه‌کلید",
   act_settings: "تنظیمات",
   act_back: "بازگشت / بستن",
   act_quit: "خروج",
@@ -730,13 +730,44 @@ const fa: Strings = {
 
 const STRINGS: Record<Lang, Strings> = { en, fa };
 
-let current: Lang = "en";
+/** Detects host application locale, falling back to navigator.language. */
+export function defaultLang(): Lang {
+  if (typeof document !== "undefined") {
+    const docLang = (document.documentElement.lang || document.body?.getAttribute("lang") || "").trim().toLowerCase();
+    if (docLang.startsWith("fa")) return "fa";
+    if (docLang.startsWith("en")) return "en";
+
+    const docDir = (document.documentElement.dir || document.body?.getAttribute("dir") || "").trim().toLowerCase();
+    if (docDir === "rtl") return "fa";
+    if (docDir === "ltr") return "en";
+  }
+
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return navigator.language.toLowerCase().startsWith("fa") ? "fa" : "en";
+  }
+
+  return "fa";
+}
+
+let current: Lang = defaultLang();
+let followsApp = true;
 const listeners = new Set<() => void>();
 
-export function setLang(lang: Lang): void {
+export function setFollowsApp(follow: boolean): void {
+  followsApp = follow;
+}
+
+export function setLang(lang: Lang, updateDom = true): void {
   current = lang;
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
+  if (updateDom && typeof document !== "undefined") {
+    if (document.documentElement.lang !== lang) {
+      document.documentElement.lang = lang;
+    }
+    const targetDir = lang === "fa" ? "rtl" : "ltr";
+    if (document.documentElement.dir !== targetDir) {
+      document.documentElement.dir = targetDir;
+    }
+  }
   for (const fn of listeners) fn();
 }
 
@@ -750,8 +781,20 @@ export function getLang(): Lang {
   return current;
 }
 
-export function defaultLang(): Lang {
-  return navigator.language.toLowerCase().startsWith("fa") ? "fa" : "en";
+// Observe host application locale changes on <html> if following application
+if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
+  const langObserver = new MutationObserver(() => {
+    if (followsApp) {
+      const detected = defaultLang();
+      if (detected !== current) {
+        setLang(detected, false);
+      }
+    }
+  });
+  langObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang", "dir"],
+  });
 }
 
 export type StringKey = keyof Strings;

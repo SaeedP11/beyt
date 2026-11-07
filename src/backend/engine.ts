@@ -29,6 +29,7 @@ export const VIDEO_BRIGHTNESS = { min: 50, max: 115 };
 
 class Engine {
   readonly video: HTMLVideoElement;
+  private hls: { destroy: () => void; loadSource: (url: string) => void; attachMedia: (video: HTMLVideoElement) => void } | null = null;
   private objectUrl: string | null = null;
   private releaseUrl: (() => void) | null = null;
   private brightness = 100;
@@ -74,16 +75,42 @@ class Engine {
     this.objectUrl = media.url;
     this.releaseUrl = media.release;
     const v = this.video;
-    v.src = media.url;
+    const isM3u8 = media.url.includes(".m3u8") || media.name.endsWith(".m3u8");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const HlsClass = typeof window !== "undefined" ? (window as any).Hls : null;
+
+    if (isM3u8 && HlsClass && typeof HlsClass.isSupported === "function" && HlsClass.isSupported()) {
+      const hls = new HlsClass({ enableWorker: true, lowLatencyMode: true });
+      this.hls = hls;
+      hls.loadSource(media.url);
+      hls.attachMedia(v);
+    } else {
+      v.src = media.url;
+    }
+
     this.applyAspect();
     await new Promise<void>((resolve, reject) => {
-      const ok = () => (cleanup(), resolve());
-      const bad = () => (cleanup(), reject(new Error(`This browser can't play ${media.name}. Try an MP4 or WebM file.`)));
+      let done = false;
+      const ok = () => {
+        if (done) return;
+        done = true;
+        cleanup();
+        resolve();
+      };
+      const bad = () => {
+        if (done) return;
+        done = true;
+        cleanup();
+        reject(new Error(`This browser can't play ${media.name}. Try an MP4 or WebM file.`));
+      };
       const cleanup = () => {
         v.removeEventListener("loadedmetadata", ok);
+        v.removeEventListener("canplay", ok);
         v.removeEventListener("error", bad);
       };
+      if (v.readyState >= 1) return ok();
       v.addEventListener("loadedmetadata", ok);
+      v.addEventListener("canplay", ok);
       v.addEventListener("error", bad);
     });
     if (start) v.currentTime = start;
@@ -92,6 +119,12 @@ class Engine {
   }
 
   unload(): void {
+    if (this.hls) {
+      try {
+        this.hls.destroy();
+      } catch (_) {}
+      this.hls = null;
+    }
     this.video.pause();
     this.video.removeAttribute("src");
     this.video.load();
