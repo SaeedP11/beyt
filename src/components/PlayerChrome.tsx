@@ -130,17 +130,19 @@ export function PlayerChrome({
             {player.media?.title}
           </h1>
         </div>
-        <Button
-          icon={locked ? "pi pi-lock" : "pi pi-lock-open"}
-          rounded
-          text={!locked}
-          aria-label={lockLabel}
-          aria-pressed={locked}
-          tooltip={keyboard && lockKey ? `${lockLabel} (${keyParts(lockKey).join("+")})` : lockLabel}
-          tooltipOptions={{ position: "bottom" }}
-          onClick={onToggleLock}
-          className={`shrink-0 ${locked ? "" : "text-white"}`}
-        />
+        {isAndroid && (
+          <Button
+            icon={locked ? "pi pi-lock" : "pi pi-lock-open"}
+            rounded
+            text={!locked}
+            aria-label={lockLabel}
+            aria-pressed={locked}
+            tooltip={keyboard && lockKey ? `${lockLabel} (${keyParts(lockKey).join("+")})` : lockLabel}
+            tooltipOptions={{ position: "bottom" }}
+            onClick={onToggleLock}
+            className={`shrink-0 ${locked ? "" : "text-white"}`}
+          />
+        )}
       </div>
 
       <div
