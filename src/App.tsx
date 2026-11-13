@@ -386,6 +386,21 @@ export function App({
     else player.adjustVolume(-steps * 5);
   };
 
+  /** Double-clicking the player toggles fullscreen. */
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "button, a, input, select, textarea, [role=slider], .p-button, .p-dialog, .p-dialog-mask, .p-sidebar, .p-sidebar-mask, .p-overlaypanel, .p-contextmenu, .p-menu, .word, .word-sheet, .beyt-sheet, .beyt-scrim",
+      )
+    ) {
+      return;
+    }
+    e.preventDefault();
+    runAction("fullscreen");
+  };
+
   // ---------- touch gestures (see gestures.ts) ----------
 
   const root = useRef<HTMLDivElement>(null);
@@ -566,6 +581,7 @@ export function App({
       className={`relative h-full text-zinc-100 ${screen === "player" ? "touch-none" : ""}`}
       onMouseMove={screen === "player" ? wake : undefined}
       onWheel={screen === "player" ? onWheel : undefined}
+      onDoubleClick={screen === "player" ? onDoubleClick : undefined}
     >
       {!isTauri && <VideoSurface visible={screen === "player"} />}
       {/* TrackView draws subtitle lines into these two stacks. */}
