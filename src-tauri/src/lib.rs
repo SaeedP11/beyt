@@ -7,6 +7,7 @@ mod audio;
 mod brightness;
 mod dict;
 mod info;
+mod inhibit;
 mod library;
 mod media;
 // Android has no GTK to host mpv's video, so it gets a stand-in until it has
@@ -57,6 +58,8 @@ struct App {
     /// The audio tracks last sent to the page (see `audio_changed`); cleared
     /// when a file opens, so its tracks are always sent.
     audio_signature: Mutex<Option<String>>,
+    /// Prevents the screen from going idle or turning off during video playback.
+    inhibit: inhibit::ScreenInhibitor,
 }
 
 struct Current {
@@ -107,6 +110,13 @@ impl App {
             && let Err(err) = self.store.save_watch_state(&path.to_string_lossy(), p.time, p.duration) {
                 eprintln!("beyt: saving position: {err:#}");
             }
+    }
+
+    /// Keeps the screen awake while a video is playing, and lets it go idle when
+    /// paused, ended, or stopped.
+    fn update_screen_inhibit(&self, playback: &player::Playback) {
+        let playing = !playback.paused && !playback.eof && playback.duration > 0.0;
+        self.inhibit.set_inhibited(playing);
     }
 }
 
@@ -313,6 +323,7 @@ fn remove_subtitle(app: State<App>, id: usize) -> Result<Vec<TrackKey>, String> 
 #[tauri::command]
 async fn stop(app: State<'_, App>) -> Result<(), String> {
     app.save_position();
+    app.inhibit.set_inhibited(false);
     *app.current() = None;
     *app.audio_signature() = None;
     app.mpv.command("stop", &[]).map_err(|e| format!("{e:?}"))
@@ -807,6 +818,7 @@ fn hard_keyboard() -> bool {
 #[tauri::command]
 fn quit(app: State<App>, handle: AppHandle) {
     app.save_position();
+    app.inhibit.set_inhibited(false);
     handle.exit(0);
 }
 
@@ -819,8 +831,10 @@ fn spawn_clock(handle: AppHandle) {
         let mut tick = 0u64;
         loop {
             tick += 1;
-            let _ = handle.emit("playback", player::playback(app.mpv));
+            let playback = player::playback(app.mpv);
+            let _ = handle.emit("playback", &playback);
             player::fit_auto(app.mpv);
+            app.update_screen_inhibit(&playback);
             if tick.is_multiple_of(5) {
                 app.audio_changed(&handle);
             }
@@ -960,6 +974,7 @@ pub fn run() {
                 dictionary_path,
                 installing_dictionary: AtomicBool::new(false),
                 audio_signature: Mutex::new(None),
+                inhibit: inhibit::ScreenInhibitor::new(),
             });
 
             let window = app.get_webview_window("main").expect("main window");
@@ -971,7 +986,9 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event {
-                window.state::<App>().save_position();
+                let app = window.state::<App>();
+                app.save_position();
+                app.inhibit.set_inhibited(false);
             }
         })
         .run(tauri::generate_context!())
