@@ -17,7 +17,7 @@
       let
         pkgs = import nixpkgs { inherit system; };
         # Pinned to a major version: pnpm's store format changes between majors.
-        pnpm = pkgs.pnpm_11;
+        pnpm = pkgs.pnpm_11 or (pkgs.pnpm_10 or pkgs.pnpm);
 
         # The Android SDK is unfree; its licence is accepted for the Android
         # shell only, so the desktop build stays free software throughout.
