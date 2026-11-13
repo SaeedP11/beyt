@@ -3,6 +3,22 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.29.0 (2026-11-13)
+
+### Added
+
+- Beyt now prompts to become your default video player after you have used the
+  "Open with Beyt" option three times to play videos. You can set it as default
+  with a single click or skip the message if you prefer.
+- On Android, Beyt now registers as a video player so file managers and external
+  apps can open video files directly in Beyt, and you can manage default app
+  preferences from Android system settings.
+- On desktop devices (Linux), Beyt registers its file associations with your
+  desktop environment to handle video playback automatically when set as
+  default.
+- A new "Default video player" option in Settings lets you check your status or
+  set Beyt as your default player at any time.
+
 ## 0.28.1 (2026-11-05)
 
 ### Fixed

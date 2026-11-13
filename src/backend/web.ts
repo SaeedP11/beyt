@@ -448,6 +448,10 @@ export const webApi = {
   async logError(message: string): Promise<void> {
     console.error(`[beyt] ${message}`);
   },
+  async isDefaultPlayer(): Promise<boolean> {
+    return false;
+  },
+  async setDefaultPlayer(): Promise<void> {},
 };
 
 export const webEvents = {
@@ -457,6 +461,7 @@ export const webEvents = {
   matchProgress: async (_cb: (f: number) => void) => () => {},
   dictionaryProgress: async (_cb: (f: number | null) => void) => () => {},
   hardKeyboard: async (_cb: (attached: boolean) => void) => () => {},
+  openUrl: async (_cb: (url: string) => void) => () => {},
 };
 
 void VIDEO_BRIGHTNESS;

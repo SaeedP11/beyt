@@ -368,6 +368,18 @@ const en = {
   act_settings: "Settings",
   act_back: "Back / close",
   act_quit: "Quit",
+  setDefaultPlayerTitle: "Set Beyt as Default Player?",
+  setDefaultPlayerBody: "You've opened videos with Beyt multiple times. Set it as your default player to automatically open videos with dual subtitles and language tools every time.",
+  setDefaultPlayerHintAndroid: "This will open your system settings where you can set Beyt to open supported videos by default.",
+  setDefaultPlayerHintDesktop: "Beyt will be registered as your system's default player for video files (MP4, MKV, WebM, and more).",
+  setDefaultPlayerAction: "Set as default",
+  setDefaultPlayerSkip: "Not now",
+  setDefaultPlayerSuccess: "Beyt is now set as your default video player.",
+  setDefaultPlayerError: "Couldn't set Beyt as default player automatically.",
+  defaultPlayerSettingsOpened: "Settings opened. Choose Beyt to open supported links and videos by default.",
+  defaultVideoPlayer: "Default video player",
+  defaultVideoPlayerHint: "Open video files with Beyt by default",
+  isDefaultPlayerLabel: "Default player",
 };
 
 type Strings = typeof en;
@@ -738,6 +750,18 @@ const fa: Strings = {
   act_settings: "تنظیمات",
   act_back: "بازگشت / بستن",
   act_quit: "خروج",
+  setDefaultPlayerTitle: "تنظیم بیت به عنوان پخش‌کننده پیش‌فرض؟",
+  setDefaultPlayerBody: "شما چندین بار ویدیوها را با بیت باز کرده‌اید. بیت را به عنوان پخش‌کنندهٔ پیش‌فرض خود تنظیم کنید تا ویدیوها همیشه با زیرنویس دوگانه و ابزارهای یادگیری باز شوند.",
+  setDefaultPlayerHintAndroid: "تنظیمات دستگاه باز می‌شود تا بتوانید بیت را به عنوان برنامهٔ پیش‌فرض باز کردن ویدیوها انتخاب کنید.",
+  setDefaultPlayerHintDesktop: "بیت به عنوان پخش‌کنندهٔ پیش‌فرض سیستم برای فرمت‌های ویدیویی رایج (MP4، MKV، WebM و...) ثبت می‌شود.",
+  setDefaultPlayerAction: "تنظیم به عنوان پیش‌فرض",
+  setDefaultPlayerSkip: "فعلاً نه",
+  setDefaultPlayerSuccess: "بیت به عنوان پخش‌کنندهٔ پیش‌فرض ویدیو تنظیم شد.",
+  setDefaultPlayerError: "تنظیم خودکار پخش‌کنندهٔ پیش‌فرض انجام نشد.",
+  defaultPlayerSettingsOpened: "تنظیمات باز شد. بیت را به عنوان پیش‌فرض باز کردن ویدیوها انتخاب کنید.",
+  defaultVideoPlayer: "پخش‌کنندهٔ پیش‌فرض ویدیو",
+  defaultVideoPlayerHint: "باز کردن خودکار فایل‌های ویدیو با بیت",
+  isDefaultPlayerLabel: "پخش‌کنندهٔ پیش‌فرض",
 };
 
 const STRINGS: Record<Lang, Strings> = { en, fa };

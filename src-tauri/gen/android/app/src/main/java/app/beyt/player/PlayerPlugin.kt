@@ -21,6 +21,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.Settings
 import android.view.Gravity
 import android.view.SurfaceView
@@ -782,5 +784,118 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       }
     }
     invoke.resolve()
+  }
+
+  private fun resolveUri(uri: Uri): String {
+    if (uri.scheme == "file") {
+      return uri.path ?: uri.toString()
+    }
+    if (uri.scheme == "content") {
+      try {
+        val proj = arrayOf(MediaStore.MediaColumns.DATA)
+        activity.contentResolver.query(uri, proj, null, null, null)?.use { cursor ->
+          if (cursor.moveToFirst()) {
+            val idx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+            if (idx >= 0) {
+              val path = cursor.getString(idx)
+              if (!path.isNullOrEmpty() && File(path).exists()) {
+                return path
+              }
+            }
+          }
+        }
+      } catch (_: Exception) {}
+
+      try {
+        if (DocumentsContract.isDocumentUri(activity, uri)) {
+          val docId = DocumentsContract.getDocumentId(uri)
+          if (uri.authority == "com.android.externalstorage.documents") {
+            val split = docId.split(":")
+            if (split.size >= 2) {
+              val type = split[0]
+              val relPath = split[1]
+              if (type.equals("primary", ignoreCase = true)) {
+                val file = File(Environment.getExternalStorageDirectory(), relPath)
+                if (file.exists()) return file.absolutePath
+              } else {
+                val file = File("/storage/$type", relPath)
+                if (file.exists()) return file.absolutePath
+              }
+            }
+          }
+        }
+      } catch (_: Exception) {}
+    }
+    return uri.toString()
+  }
+
+  @Command
+  fun getIntentUrl(invoke: Invoke) {
+    val intent = activity.intent
+    val uri = if (intent?.action == Intent.ACTION_VIEW) intent.data else null
+    val resolved = uri?.let { resolveUri(it) }
+    invoke.resolve(JSObject().apply {
+      put("url", resolved)
+    })
+  }
+
+  @Command
+  fun isDefaultPlayer(invoke: Invoke) {
+    try {
+      val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(Uri.parse("file:///dummy.mp4"), "video/mp4")
+      }
+      val resolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        activity.packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+      } else {
+        @Suppress("DEPRECATION")
+        activity.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+      }
+      val isDefault = resolveInfo?.activityInfo?.packageName == activity.packageName
+      invoke.resolve(JSObject().apply {
+        put("isDefault", isDefault)
+      })
+    } catch (_: Exception) {
+      invoke.resolve(JSObject().apply {
+        put("isDefault", false)
+      })
+    }
+  }
+
+  @Command
+  fun openDefaultAppSettings(invoke: Invoke) {
+    var opened = false
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      try {
+        val intent = Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, Uri.parse("package:${activity.packageName}"))
+        activity.startActivity(intent)
+        opened = true
+      } catch (_: Exception) {}
+    }
+    if (!opened) {
+      try {
+        val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+        activity.startActivity(intent)
+        opened = true
+      } catch (_: Exception) {}
+    }
+    if (!opened) {
+      try {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${activity.packageName}"))
+        activity.startActivity(intent)
+        opened = true
+      } catch (_: Exception) {}
+    }
+    invoke.resolve(JSObject().apply {
+      put("success", opened)
+    })
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
+      val resolved = resolveUri(intent.data!!)
+      trigger("openUrl", JSObject().apply { put("url", resolved) })
+    }
   }
 }

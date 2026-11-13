@@ -370,3 +370,22 @@ pub fn playback(mpv: &Mpv) -> Playback {
     let s = mpv.state();
     Playback { time: s.time, paused: s.paused, speed: s.speed, duration: s.duration, eof: s.eof }
 }
+
+pub fn get_intent_file() -> Option<String> {
+    let mpv = MPV.get()?;
+    let res: Value = mpv.call("getIntentUrl", json!({})).ok()?;
+    res.get("url").and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
+pub fn is_default_player() -> bool {
+    let Some(mpv) = MPV.get() else { return false };
+    let Ok(res) = mpv.call::<Value>("isDefaultPlayer", json!({})) else { return false };
+    res.get("isDefault").and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
+pub fn open_default_app_settings() -> Result<(), String> {
+    let mpv = MPV.get().ok_or_else(|| "the video player hasn't started".to_string())?;
+    mpv.call::<Value>("openDefaultAppSettings", json!({}))
+        .map(|_| ())
+        .map_err(|e| e.0)
+}

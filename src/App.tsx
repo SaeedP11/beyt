@@ -8,6 +8,7 @@ import { onBackButton } from "./platform";
 import * as clock from "./clock";
 import { AppContextMenu } from "./components/AppContextMenu";
 import { ConfirmHost } from "./components/Confirm";
+import { DefaultPlayerDialog } from "./components/DefaultPlayerDialog";
 import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library } from "./components/Library";
 import { VideoSurface } from "./components/VideoSurface";
@@ -115,6 +116,66 @@ export function App({
   const wordPopup = useRef<WordPopupHandle>(null);
   const idleTimer = useRef<number | undefined>(undefined);
 
+  const openedViaOpenWith = useRef(false);
+  const countedThisSession = useRef(false);
+  const [defaultPromptOpen, setDefaultPromptOpen] = useState(false);
+  const [defaultSettingLoading, setDefaultSettingLoading] = useState(false);
+
+  const handleSkipDefault = useCallback(async () => {
+    setDefaultPromptOpen(false);
+    try {
+      await api.setAppSetting("defaultPlayerPromptDismissed", true);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const handleSetDefault = useCallback(async () => {
+    setDefaultSettingLoading(true);
+    try {
+      await api.setDefaultPlayer();
+      await api.setAppSetting("defaultPlayerPromptDismissed", true);
+      setDefaultPromptOpen(false);
+      if (isAndroid) {
+        toast(t("defaultPlayerSettingsOpened"), 4000);
+      } else {
+        toast(t("setDefaultPlayerSuccess"), 3000);
+      }
+    } catch (e) {
+      toast(t("setDefaultPlayerError"), 4000);
+      console.error(e);
+    } finally {
+      setDefaultSettingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "player" || !openedViaOpenWith.current || countedThisSession.current) return;
+    countedThisSession.current = true;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const settings = await api.appSettings();
+        if (Boolean(settings.defaultPlayerPromptDismissed)) return;
+
+        const isAlreadyDefault = await api.isDefaultPlayer().catch(() => false);
+        if (isAlreadyDefault) return;
+
+        const currentCount = typeof settings.openWithCount === "number" ? settings.openWithCount : 0;
+        const newCount = currentCount + 1;
+        await api.setAppSetting("openWithCount", newCount);
+
+        if (newCount === 3) {
+          setDefaultPromptOpen(true);
+        }
+      } catch (e) {
+        console.error("Failed to update openWithCount:", e);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [screen]);
+
   const closeTranscript = useCallback(() => setTranscriptOpen(false), []);
 
   const openSettings = useCallback((section?: Section) => {
@@ -192,6 +253,11 @@ export function App({
       });
       await events.trackUpdated((u) => player.onTrackUpdated(u));
       await events.audioTracks((u) => player.onAudioTracks(u));
+      await events.openUrl(async (url) => {
+        openedViaOpenWith.current = true;
+        countedThisSession.current = false;
+        await play(url);
+      });
 
       const frame = () => {
         player.render(clock.now());
@@ -200,8 +266,12 @@ export function App({
       requestAnimationFrame(frame);
 
       const initial = initialFile || (await api.initialFile());
-      if (initial) await play(initial);
-      else setScreen("library");
+      if (initial) {
+        openedViaOpenWith.current = true;
+        await play(initial);
+      } else {
+        setScreen("library");
+      }
     })();
   }, [play]);
 
@@ -640,6 +710,13 @@ export function App({
         visible={infoOpen && screen === "player"}
         path={player.media?.path ?? null}
         onHide={() => setInfoOpen(false)}
+      />
+      <DefaultPlayerDialog
+        visible={defaultPromptOpen}
+        onHide={handleSkipDefault}
+        onSkip={handleSkipDefault}
+        onSetDefault={handleSetDefault}
+        loading={defaultSettingLoading}
       />
       <ShortcutsDialog visible={helpOpen} onHide={() => setHelpOpen(false)} onCustomise={() => openSettings("shortcuts")} />
       {settingsSeen.current && (

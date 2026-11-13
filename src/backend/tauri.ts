@@ -101,6 +101,8 @@ export const tauriApi = {
   clearSubtitleCache: () => invoke<void>("clear_subtitle_cache"),
   dataInfo: () => invoke<{ dataDir: string; dictionaryEntries: number | null }>("data_info"),
   logError: (message: string) => invoke<void>("log_error", { message }),
+  isDefaultPlayer: () => invoke<boolean>("is_default_player"),
+  setDefaultPlayer: () => invoke<void>("set_as_default_player"),
 };
 
 export const tauriEvents = {
@@ -119,4 +121,7 @@ export const tauriEvents = {
   /** Android: a physical keyboard was plugged in (true) or removed (false). */
   hardKeyboard: (cb: (attached: boolean) => void): Promise<UnlistenFn> =>
     listen<boolean>("hard-keyboard", (e) => cb(e.payload)),
+  /** Android: video file/URL received from an external intent while running. */
+  openUrl: (cb: (url: string) => void): Promise<UnlistenFn> =>
+    listen<{ url: string }>("plugin:player|openUrl", (e) => cb(e.payload.url)),
 };

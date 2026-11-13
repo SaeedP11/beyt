@@ -168,7 +168,30 @@ struct OpenOptions {
 #[tauri::command]
 fn initial_file(app: State<App>) -> Option<String> {
     let current = app.current().as_ref().map(|c| c.path.clone());
+    #[cfg(target_os = "android")]
+    {
+        if let Some(path) = player::get_intent_file() {
+            return Some(path);
+        }
+    }
     current.or_else(|| app.initial_file.clone()).map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn is_default_player() -> bool {
+    player::is_default_player()
+}
+
+#[tauri::command]
+fn set_as_default_player() -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        player::open_default_app_settings()
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        player::set_as_default_player()
+    }
 }
 
 /// Writes an error from the page to the log, since the page's own console is
@@ -186,7 +209,11 @@ async fn open_media(
     options: OpenOptions,
 ) -> Result<Media, String> {
     let video = PathBuf::from(&path);
-    if !video.is_file() {
+    #[cfg(target_os = "android")]
+    let is_valid = video.is_file() || path.starts_with("content://");
+    #[cfg(not(target_os = "android"))]
+    let is_valid = video.is_file();
+    if !is_valid {
         return Err(format!("not a file: {path}"));
     }
     app.save_position();
@@ -951,6 +978,8 @@ pub fn run() {
             move_to_background,
             hard_keyboard,
             translate_externally,
+            is_default_player,
+            set_as_default_player,
         ])
         .setup(move |app| {
             let paths = app.path();

@@ -326,3 +326,150 @@ pub fn playback(mpv: &Mpv) -> Playback {
         eof: mpv.get_property("eof-reached").unwrap_or(false),
     }
 }
+
+const DESKTOP_FILE_NAME: &str = "beyt.desktop";
+const VIDEO_MIME_TYPES: &[&str] = &[
+    "video/mp4",
+    "video/x-matroska",
+    "video/webm",
+    "video/x-msvideo",
+    "video/quicktime",
+    "video/mp2t",
+    "video/x-flv",
+    "video/ogg",
+    "video/3gpp",
+    "video/x-matroska-3d",
+];
+
+#[allow(dead_code)]
+pub fn get_intent_file() -> Option<String> {
+    None
+}
+
+pub fn is_default_player() -> bool {
+    // 1. Try querying xdg-mime
+    if let Ok(output) = std::process::Command::new("xdg-mime")
+        .args(["query", "default", "video/mp4"])
+        .output()
+        && output.status.success()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.trim() == DESKTOP_FILE_NAME {
+            return true;
+        }
+    }
+
+    // 2. Fall back to checking ~/.config/mimeapps.list
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    if let Some(home) = home {
+        let config_dir = std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| home.join(".config"));
+        let mimeapps = config_dir.join("mimeapps.list");
+        if let Ok(content) = std::fs::read_to_string(&mimeapps) {
+            let mut in_defaults = false;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') {
+                    in_defaults = trimmed == "[Default Applications]";
+                    continue;
+                }
+                if in_defaults && trimmed.starts_with("video/mp4=") && trimmed.contains(DESKTOP_FILE_NAME) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+fn ensure_desktop_entry() -> std::io::Result<()> {
+    let home = match std::env::var_os("HOME").map(std::path::PathBuf::from) {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+    let data_dir = std::env::var_os("XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| home.join(".local/share"));
+    let apps_dir = data_dir.join("applications");
+    let target = apps_dir.join(DESKTOP_FILE_NAME);
+    if target.exists() || std::path::Path::new("/usr/share/applications").join(DESKTOP_FILE_NAME).exists() {
+        return Ok(());
+    }
+
+    let _ = std::fs::create_dir_all(&apps_dir);
+    let exec = std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "beyt".to_string());
+    let content = format!(
+        "[Desktop Entry]\n\
+         Type=Application\n\
+         Name=Beyt\n\
+         GenericName=Video Player\n\
+         Comment=Watch movies and series with two subtitles at once\n\
+         Comment[fa]=تماشای فیلم و سریال با دو زیرنویس هم‌زمان\n\
+         Exec={exec} %f\n\
+         Icon=beyt\n\
+         Terminal=false\n\
+         Categories=AudioVideo;Video;Player;Education;Languages;\n\
+         MimeType=video/x-matroska;video/mp4;video/webm;video/x-msvideo;video/quicktime;video/mp2t;video/x-flv;video/ogg;\n\
+         Keywords=video;player;subtitles;persian;farsi;language;\n\
+         StartupWMClass=beyt\n"
+    );
+    std::fs::write(&target, content)
+}
+
+fn update_mimeapps_list() -> std::io::Result<()> {
+    let home = match std::env::var_os("HOME").map(std::path::PathBuf::from) {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+    let config_dir = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| home.join(".config"));
+    let _ = std::fs::create_dir_all(&config_dir);
+    let mimeapps = config_dir.join("mimeapps.list");
+
+    let content = std::fs::read_to_string(&mimeapps).unwrap_or_default();
+    let mut lines: Vec<String> = content.lines().map(String::from).collect();
+
+    let mut section_idx = lines.iter().position(|l| l.trim() == "[Default Applications]");
+    if section_idx.is_none() {
+        lines.push("[Default Applications]".to_string());
+        section_idx = Some(lines.len() - 1);
+    }
+    let section_idx = section_idx.unwrap();
+
+    for mime in VIDEO_MIME_TYPES {
+        let prefix = format!("{mime}=");
+        let mut found = false;
+        let mut i = section_idx + 1;
+        while i < lines.len() && !lines[i].trim().starts_with('[') {
+            if lines[i].trim().starts_with(&prefix) {
+                lines[i] = format!("{mime}={DESKTOP_FILE_NAME}");
+                found = true;
+                break;
+            }
+            i += 1;
+        }
+        if !found {
+            lines.insert(section_idx + 1, format!("{mime}={DESKTOP_FILE_NAME}"));
+        }
+    }
+
+    std::fs::write(&mimeapps, lines.join("\n") + "\n")
+}
+
+pub fn set_as_default_player() -> Result<(), String> {
+    let _ = ensure_desktop_entry();
+    let _ = update_mimeapps_list();
+
+    let mut args = vec!["default", DESKTOP_FILE_NAME];
+    args.extend(VIDEO_MIME_TYPES);
+    let _ = std::process::Command::new("xdg-mime")
+        .args(&args)
+        .status();
+
+    Ok(())
+}

@@ -11,7 +11,7 @@ import { SelectButton } from "primereact/selectbutton";
 import { Slider } from "primereact/slider";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 
-import { type Brightness, api } from "../api";
+import { type Brightness, api, isAndroid } from "../api";
 import { player } from "../hooks";
 import { type StringKey, languageName, t } from "../i18n";
 import { ACTIONS, type Action, DEFAULT_KEYS, GROUPS, eventKey, keysFor } from "../keymap";
@@ -238,6 +238,31 @@ function General() {
   const s = useSettings();
   const wide = useWide();
   const compact = useContext(Compact);
+  const [isDefault, setIsDefault] = useState<boolean | null>(null);
+  const [settingDefault, setSettingDefault] = useState(false);
+
+  useEffect(() => {
+    void api.isDefaultPlayer().then(setIsDefault, () => setIsDefault(false));
+  }, []);
+
+  const handleMakeDefault = async () => {
+    setSettingDefault(true);
+    try {
+      await api.setDefaultPlayer();
+      const updated = await api.isDefaultPlayer().catch(() => true);
+      setIsDefault(updated);
+      if (isAndroid) {
+        toast(t("defaultPlayerSettingsOpened"), 4000);
+      } else {
+        toast(t("setDefaultPlayerSuccess"), 3000);
+      }
+    } catch {
+      toast(t("setDefaultPlayerError"), 4000);
+    } finally {
+      setSettingDefault(false);
+    }
+  };
+
   return (
     <>
       <Group>
@@ -273,6 +298,25 @@ function General() {
             className={compact ? "flex w-full" : ""}
             pt={{ button: { className: `py-2 px-3 text-sm ${compact ? "flex-1" : ""}` } }}
           />
+        </Row>
+      </Group>
+      <Group>
+        <Row label={t("defaultVideoPlayer")} hint={t("defaultVideoPlayerHint")}>
+          {isDefault ? (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+              <i className="pi pi-check-circle" />
+              {t("isDefaultPlayerLabel")}
+            </span>
+          ) : (
+            <Button
+              label={t("setDefaultPlayerAction")}
+              icon="pi pi-check"
+              size="small"
+              outlined
+              loading={settingDefault}
+              onClick={() => void handleMakeDefault()}
+            />
+          )}
         </Row>
       </Group>
       <Group>
