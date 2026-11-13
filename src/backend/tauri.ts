@@ -122,6 +122,22 @@ export const tauriEvents = {
   hardKeyboard: (cb: (attached: boolean) => void): Promise<UnlistenFn> =>
     listen<boolean>("hard-keyboard", (e) => cb(e.payload)),
   /** Android: video file/URL received from an external intent while running. */
-  openUrl: (cb: (url: string) => void): Promise<UnlistenFn> =>
-    listen<{ url: string }>("plugin:player|openUrl", (e) => cb(e.payload.url)),
+  openUrl: async (cb: (url: string) => void): Promise<UnlistenFn> => {
+    if (typeof navigator !== "undefined" && navigator.userAgent.includes("Android")) {
+      try {
+        const { addPluginListener } = await import("@tauri-apps/api/core");
+        const listener = await addPluginListener<{ url: string }>("player", "openUrl", (event) => {
+          const url = (event as { url?: string; payload?: { url?: string } })?.url ?? (event as { payload?: { url?: string } })?.payload?.url;
+          if (typeof url === "string") cb(url);
+        });
+        return () => {
+          void listener.unregister();
+        };
+      } catch (e) {
+        console.error("beyt: failed to listen for player openUrl:", e);
+        return () => {};
+      }
+    }
+    return () => {};
+  },
 };

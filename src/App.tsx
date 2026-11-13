@@ -240,36 +240,41 @@ export function App({
       toastRef.current?.show(message);
     });
     void (async () => {
-      const saved = await api.appSettings();
-      loadSettings(saved, { theme, locale });
-      setLastFolder(typeof saved.lastFolder === "string" ? saved.lastFolder : null);
+      try {
+        const saved = await api.appSettings();
+        loadSettings(saved, { theme, locale });
+        setLastFolder(typeof saved.lastFolder === "string" ? saved.lastFolder : null);
 
-      await events.playback((p) => {
-        clock.update(p);
-        player.onPlayback(p);
-        if (onProgress && p.duration > 0) {
-          onProgress(p.time, p.duration);
-        }
-      });
-      await events.trackUpdated((u) => player.onTrackUpdated(u));
-      await events.audioTracks((u) => player.onAudioTracks(u));
-      await events.openUrl(async (url) => {
-        openedViaOpenWith.current = true;
-        countedThisSession.current = false;
-        await play(url);
-      });
+        await events.playback((p) => {
+          clock.update(p);
+          player.onPlayback(p);
+          if (onProgress && p.duration > 0) {
+            onProgress(p.time, p.duration);
+          }
+        });
+        await events.trackUpdated((u) => player.onTrackUpdated(u));
+        await events.audioTracks((u) => player.onAudioTracks(u));
+        await events.openUrl(async (url) => {
+          openedViaOpenWith.current = true;
+          countedThisSession.current = false;
+          await play(url);
+        });
 
-      const frame = () => {
-        player.render(clock.now());
+        const frame = () => {
+          player.render(clock.now());
+          requestAnimationFrame(frame);
+        };
         requestAnimationFrame(frame);
-      };
-      requestAnimationFrame(frame);
 
-      const initial = initialFile || (await api.initialFile());
-      if (initial) {
-        openedViaOpenWith.current = true;
-        await play(initial);
-      } else {
+        const initial = initialFile || (await api.initialFile());
+        if (initial) {
+          openedViaOpenWith.current = true;
+          await play(initial);
+        } else {
+          setScreen("library");
+        }
+      } catch (err) {
+        console.error("beyt: failed to initialize app:", err);
         setScreen("library");
       }
     })();

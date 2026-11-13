@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.29.1 (2026-11-13)
+
+### Fixed
+
+- Fixed an issue where the app launched into a black screen due to an invalid
+  event name registration for external URL handling on desktop systems.
+- Robust initialization error handling to ensure the player falls back to the
+  library view if any background service or startup check fails.
+
 ## 0.29.0 (2026-11-13)
 
 ### Added
