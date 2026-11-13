@@ -312,7 +312,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
 
   const trash = (v: Video, subtitles: boolean) => {
     setTrashing(null);
-    deferred(v.path, t("trashed", { name: splitName(v.name)[0] }), () => api.trashVideo(v.path, subtitles));
+    deferred(v.path, t(isAndroid ? "deleted" : "trashed", { name: splitName(v.name)[0] }), () => api.trashVideo(v.path, subtitles));
   };
 
   /** Returns an error to show, or null once renamed. */
@@ -337,13 +337,17 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     const started = v.fraction > 0 && v.fraction < WATCHED;
     return [
       menuRow(started ? t("resume") : t("play"), "pi pi-play", undefined, () => onPlay(v.path)),
-      menuRow(t("rename"), "pi pi-pencil", "F2", () => startRename(v)),
-      menuRow(t("showInFolder"), "pi pi-folder-open", undefined, () => {
-        api.showInFolder(v.path).catch((e) => toast(String(e), 5000));
-      }),
+      menuRow(t("rename"), "pi pi-pencil", isAndroid ? undefined : "F2", () => startRename(v)),
+      ...(!isAndroid
+        ? [
+            menuRow(t("showInFolder"), "pi pi-folder-open", undefined, () => {
+              api.showInFolder(v.path).catch((e) => toast(String(e), 5000));
+            }),
+          ]
+        : []),
       ...(v.recent ? [menuRow(t("removeRecent"), "pi pi-times", undefined, () => removeRecent(v))] : []),
       { separator: true },
-      menuRow(t("moveToTrash"), "pi pi-trash", "Del", () => setTrashing(v), true),
+      menuRow(isAndroid ? t("deleteVideo") : t("moveToTrash"), "pi pi-trash", isAndroid ? undefined : "Del", () => setTrashing(v), true),
     ];
   };
 
@@ -1145,7 +1149,7 @@ function TrashDialog({ video, onHide, onConfirm }: TrashProps) {
     <div className="flex justify-end gap-2">
       <Button label={t("cancel")} outlined severity="secondary" onClick={onHide} />
       <Button
-        label={t("trashConfirm")}
+        label={t(isAndroid ? "deleteConfirm" : "trashConfirm")}
         icon="pi pi-trash"
         severity="danger"
         autoFocus
@@ -1156,7 +1160,7 @@ function TrashDialog({ video, onHide, onConfirm }: TrashProps) {
 
   return (
     <Dialog
-      header={t("trashTitle")}
+      header={t(isAndroid ? "deleteTitle" : "trashTitle")}
       visible={video !== null}
       onHide={onHide}
       footer={footer}
@@ -1173,12 +1177,12 @@ function TrashDialog({ video, onHide, onConfirm }: TrashProps) {
               {shown.name}
             </span>
           </div>
-          <p className="m-0 text-sm leading-relaxed text-zinc-400">{t("trashBody")}</p>
+          <p className="m-0 text-sm leading-relaxed text-zinc-400">{t(isAndroid ? "deleteBody" : "trashBody")}</p>
           {subtitles.length > 0 && (
             <div className="flex items-start gap-3">
               <Checkbox inputId={id} checked={withSubtitles} onChange={(e) => setWithSubtitles(!!e.checked)} />
               <label htmlFor={id} className="min-w-0 cursor-pointer text-sm">
-                {t("trashSubs", { n: subtitles.length })}
+                {t(isAndroid ? "deleteSubs" : "trashSubs", { n: subtitles.length })}
                 <span className="mt-0.5 block truncate text-xs text-zinc-500" dir="ltr">
                   {subtitles.map(baseName).join(", ")}
                 </span>

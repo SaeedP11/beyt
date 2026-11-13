@@ -172,10 +172,27 @@ pub fn show_in_folder(path: &Path) -> Result<()> {
     Ok(())
 }
 
-// Android keeps no Trash for plain files, and its file managers take no
-// "select this file" request.
+// Android keeps no Trash for plain files (so deleting removes them directly),
+// and its file managers take no "select this file" request.
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(target_os = "android", test))]
+fn delete_files(paths: &[PathBuf]) -> Result<()> {
+    for path in paths {
+        if let Err(e) = fs::remove_file(path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(e).with_context(|| format!("deleting {}", path.display()));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+pub fn trash(paths: &[PathBuf]) -> Result<()> {
+    delete_files(paths)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 pub fn trash(_paths: &[PathBuf]) -> Result<()> {
     bail!("Moving to the Trash is not available on this system.")
 }
@@ -230,6 +247,19 @@ mod tests {
         assert!(dir.join("Pilot.mkv").exists() && dir.join("Pilot.en.srt").exists());
         assert!(!video.exists());
         assert!(rename(&dir.join("Pilot.mkv"), "Pilot").unwrap().is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn delete_files_removes_existing_and_ignores_missing() {
+        let dir = temp_dir("delete");
+        let video = touch(&dir, "Ep1.mkv");
+        let sub = touch(&dir, "Ep1.en.srt");
+        let missing = dir.join("nonexistent.srt");
+
+        assert!(video.exists() && sub.exists());
+        delete_files(&[video.clone(), sub.clone(), missing]).unwrap();
+        assert!(!video.exists() && !sub.exists());
         fs::remove_dir_all(dir).unwrap();
     }
 }
