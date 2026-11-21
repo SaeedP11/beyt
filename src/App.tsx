@@ -397,7 +397,7 @@ export function App({
       return true;
     }
 
-    // 4. Library: folder history, tab history, or dialogs
+    // 4. Library: folder history or dialogs (tabs do not trap back)
     if (screen === "library") {
       if (libraryRef.current?.handleBack()) {
         return true;
@@ -504,7 +504,8 @@ export function App({
   onAndroidBack.current = () => {
     const handled = handleBackAction();
     if (!handled) {
-      void api.moveToBackground();
+      if (onClose) onClose();
+      else void api.moveToBackground();
     }
   };
 

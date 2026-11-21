@@ -230,12 +230,8 @@ export const Library = forwardRef<LibraryHandle, Props>(function Library(
   const [switched, setSwitched] = useState(false);
   const keyboard = useHardKeyboard();
   const scroller = useRef<HTMLDivElement>(null);
-  const tabHistory = useRef<number[]>([]);
-  const showTab = useCallback((next: number, pushHistory = true) => {
+  const showTab = useCallback((next: number) => {
     if (next === lastTab) return;
-    if (pushHistory) {
-      tabHistory.current.push(lastTab);
-    }
     setForward(next > lastTab);
     setSwitched(true);
     setTab(next);
@@ -520,19 +516,8 @@ export const Library = forwardRef<LibraryHandle, Props>(function Library(
       }
     }
 
-    if (tabHistory.current.length > 0) {
-      const prev = tabHistory.current.pop()!;
-      showTab(prev, false);
-      return true;
-    }
-
-    if (tab !== TAB_RECENT) {
-      showTab(TAB_RECENT, false);
-      return true;
-    }
-
     return false;
-  }, [trashing, renaming, menuFor, tab, folder, showFolder, showTab]);
+  }, [trashing, renaming, menuFor, tab, folder, showFolder]);
 
   useImperativeHandle(ref, () => ({ handleBack }), [handleBack]);
 

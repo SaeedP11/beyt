@@ -8,6 +8,7 @@ and the data in `~/.local/share/app.beyt.player/` may change between versions.
 ### Changed
 
 - Prevent screen off on Android devices and desktop (Linux) when the player is in lock mode, even while playback is paused.
+- In Android, back button/gesture does not navigate between bottom navigation tabs; it navigates backward through folder hierarchies and exits the app when pressed at the tab level.
 
 ## 0.29.2 (2026-11-21)
 
