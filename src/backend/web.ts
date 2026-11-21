@@ -39,6 +39,8 @@ import {
   naturalCompare,
 } from "./subtitles";
 
+let wakeLockSentinel: WakeLockSentinel | null = null;
+
 const RESUME_MARGIN_START = 30;
 const RESUME_MARGIN_END = 60;
 
@@ -412,6 +414,22 @@ export const webApi = {
   removeAudio: (_id: number): Promise<void> => unsupported("Removing an audio file"),
   async setAspect(aspect: Parameters<typeof engine.setAspect>[0]): Promise<void> {
     engine.setAspect(aspect);
+  },
+  async setLocked(locked: boolean): Promise<void> {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    try {
+      if (locked && !wakeLockSentinel) {
+        wakeLockSentinel = await navigator.wakeLock.request("screen");
+        wakeLockSentinel.addEventListener("release", () => {
+          wakeLockSentinel = null;
+        });
+      } else if (!locked && wakeLockSentinel) {
+        await wakeLockSentinel.release();
+        wakeLockSentinel = null;
+      }
+    } catch {
+      // Ignored if wake lock is unavailable or rejected
+    }
   },
   async toggleFullscreen(): Promise<void> {
     if (document.fullscreenElement) await document.exitFullscreen();

@@ -86,6 +86,7 @@ export const tauriApi = {
   addAudio: (path: string) => invoke<void>("add_audio", { path }),
   removeAudio: (id: number) => invoke<void>("remove_audio", { id }),
   setAspect: (aspect: Aspect) => invoke<void>("set_aspect", { aspect }),
+  setLocked: (locked: boolean) => invoke<void>("set_locked", { locked }),
   toggleFullscreen: () => invoke<void>("toggle_fullscreen"),
   quit: () => invoke<void>("quit"),
 

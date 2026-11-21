@@ -324,6 +324,17 @@ export function App({
     if (screen !== "player") setLocked(false);
   }, [screen]);
 
+  // Keep the screen awake on desktop and mobile while controls are locked.
+  useEffect(() => {
+    void api.setLocked(locked);
+  }, [locked]);
+
+  useEffect(() => {
+    return () => {
+      void api.setLocked(false);
+    };
+  }, []);
+
   // ---------- actions (keyboard and right-click menu) ----------
 
   /** Navigates back one level across pages, folders, tabs, panels and dialogs. */

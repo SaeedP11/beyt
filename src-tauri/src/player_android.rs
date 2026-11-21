@@ -119,6 +119,7 @@ impl Mpv {
             "speed" => self.set(json!({ "speed": number(&value)? })),
             "volume" => self.set(json!({ "volume": number(&value)? })),
             "mute" => self.set(json!({ "mute": flag(&value)? })),
+            "locked" => self.set(json!({ "locked": flag(&value)? })),
             "start" => {
                 // "none" or seconds, as `open_media` gives it.
                 *self.start.lock().unwrap_or_else(|e| e.into_inner()) = number(&value).ok();
@@ -223,6 +224,11 @@ pub fn screen_brightness() -> Result<f64> {
 /// Sets the screen's brightness (0–1) while Beyt is in front.
 pub fn set_screen_brightness(level: f64) -> Result<()> {
     create_mpv()?.set(json!({ "brightness": level })).map_err(|e| anyhow!("{}", e.0))
+}
+
+/// Informs Android whether the player is in lock mode so the screen stays on.
+pub fn set_locked(mpv: &Mpv, locked: bool) -> Result<()> {
+    mpv.set(json!({ "locked": locked })).map_err(|e| anyhow!("{}", e.0))
 }
 
 /// Opens `path` with `audio` files as extra audio tracks; see `player.rs`.

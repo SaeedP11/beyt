@@ -60,6 +60,8 @@ struct App {
     audio_signature: Mutex<Option<String>>,
     /// Prevents the screen from going idle or turning off during video playback.
     inhibit: inhibit::ScreenInhibitor,
+    /// Prevents the screen from going idle or turning off while controls are locked.
+    locked: AtomicBool,
 }
 
 struct Current {
@@ -112,11 +114,12 @@ impl App {
             }
     }
 
-    /// Keeps the screen awake while a video is playing, and lets it go idle when
-    /// paused, ended, or stopped.
+    /// Keeps the screen awake while a video is playing, or while the player
+    /// is locked, and lets it go idle when paused/stopped and unlocked.
     fn update_screen_inhibit(&self, playback: &player::Playback) {
         let playing = !playback.paused && !playback.eof && playback.duration > 0.0;
-        self.inhibit.set_inhibited(playing);
+        let locked = self.locked.load(Ordering::Relaxed);
+        self.inhibit.set_inhibited(playing || locked);
     }
 }
 
@@ -350,9 +353,12 @@ fn remove_subtitle(app: State<App>, id: usize) -> Result<Vec<TrackKey>, String> 
 #[tauri::command]
 async fn stop(app: State<'_, App>) -> Result<(), String> {
     app.save_position();
+    app.locked.store(false, Ordering::Relaxed);
     app.inhibit.set_inhibited(false);
     *app.current() = None;
     *app.audio_signature() = None;
+    #[cfg(target_os = "android")]
+    let _ = player::set_locked(app.mpv, false);
     app.mpv.command("stop", &[]).map_err(|e| format!("{e:?}"))
 }
 
@@ -769,6 +775,16 @@ async fn set_mpv_subtitle(app: State<'_, App>, sid: Option<i64>) -> Result<(), S
     app.mpv.set_property("sid", value.as_str()).map_err(|e| format!("{e:?}"))
 }
 
+/// Keeps the screen awake while the player is locked on desktop and Android.
+#[tauri::command]
+async fn set_locked(app: State<'_, App>, locked: bool) -> Result<(), String> {
+    app.locked.store(locked, Ordering::Relaxed);
+    app.update_screen_inhibit(&player::playback(app.mpv));
+    #[cfg(target_os = "android")]
+    player::set_locked(app.mpv, locked).map_err(|e| format!("{e:#}"))?;
+    Ok(())
+}
+
 #[tauri::command]
 fn toggle_fullscreen(window: WebviewWindow) -> Result<(), String> {
     #[cfg(desktop)]
@@ -845,6 +861,7 @@ fn hard_keyboard() -> bool {
 #[tauri::command]
 fn quit(app: State<App>, handle: AppHandle) {
     app.save_position();
+    app.locked.store(false, Ordering::Relaxed);
     app.inhibit.set_inhibited(false);
     handle.exit(0);
 }
@@ -971,6 +988,7 @@ pub fn run() {
             remove_audio,
             set_aspect,
             toggle_fullscreen,
+            set_locked,
             quit,
             log_error,
             storage_access,
@@ -1004,6 +1022,7 @@ pub fn run() {
                 installing_dictionary: AtomicBool::new(false),
                 audio_signature: Mutex::new(None),
                 inhibit: inhibit::ScreenInhibitor::new(),
+                locked: AtomicBool::new(false),
             });
 
             let window = app.get_webview_window("main").expect("main window");
@@ -1017,6 +1036,7 @@ pub fn run() {
             if let WindowEvent::CloseRequested { .. } = event {
                 let app = window.state::<App>();
                 app.save_position();
+                app.locked.store(false, Ordering::Relaxed);
                 app.inhibit.set_inhibited(false);
             }
         })

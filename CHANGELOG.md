@@ -3,6 +3,12 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.29.3 (2026-11-21)
+
+### Changed
+
+- Prevent screen off on Android devices and desktop (Linux) when the player is in lock mode, even while playback is paused.
+
 ## 0.29.2 (2026-11-21)
 
 ### Changed

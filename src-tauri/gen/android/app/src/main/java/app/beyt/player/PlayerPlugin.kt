@@ -77,6 +77,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private var lastError: String? = null
   /** The picture's shape: `original`, a ratio like `16:9`, `fill` or `stretch`. */
   private var aspect = "original"
+  /** Prevents screen off while the player is in lock mode, even when paused. */
+  private var locked = false
 
   /** The open video, and audio files played alongside it as extra tracks. */
   private var video: Uri? = null
@@ -115,12 +117,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         override fun onVideoSizeChanged(videoSize: VideoSize) = fitSurface()
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-          // Keep the screen on while a video plays, as other players do.
-          if (isPlaying) {
-            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-          } else {
-            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-          }
+          // Keep the screen on while a video plays or while the player is locked.
+          updateKeepScreenOn()
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -168,12 +166,31 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  /** Keeps the screen on while a video is playing, or while locked even if paused. */
+  private fun updateKeepScreenOn() {
+    activity.runOnUiThread {
+      val keepOn = (::player.isInitialized && player.isPlaying) || locked
+      if (keepOn) {
+        activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      } else {
+        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      }
+    }
+  }
+
   // Phones stop video when the app goes to the background.
   override fun onPause(activity: AppCompatActivity) {
     if (::player.isInitialized) player.pause()
+    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+  }
+
+  override fun onResume(activity: AppCompatActivity) {
+    updateKeepScreenOn()
   }
 
   override fun onDestroy(activity: AppCompatActivity) {
+    locked = false
+    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     if (::player.isInitialized) player.release()
   }
 
@@ -221,6 +238,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
   @Command
   fun stop(invoke: Invoke) {
+    locked = false
+    updateKeepScreenOn()
     player.stop()
     player.clearMediaItems()
     video = null
@@ -234,6 +253,10 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun set(invoke: Invoke) {
     val args = invoke.getArgs()
+    if (args.has("locked")) {
+      locked = args.getBoolean("locked")
+      updateKeepScreenOn()
+    }
     if (args.has("paused")) player.playWhenReady = !args.getBoolean("paused")
     if (args.has("position")) {
       // A finished video plays again from where it is sought to.
