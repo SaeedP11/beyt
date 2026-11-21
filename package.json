@@ -1,6 +1,6 @@
 {
   "name": "beyt",
-  "version": "0.29.1",
+  "version": "0.29.2",
   "description": "Beyt: a video player for language learning that shows two subtitle tracks at once. React component for the browser.",
   "keywords": [
     "video",

@@ -10,7 +10,7 @@ import { AppContextMenu } from "./components/AppContextMenu";
 import { ConfirmHost } from "./components/Confirm";
 import { DefaultPlayerDialog } from "./components/DefaultPlayerDialog";
 import { FileInfoDialog } from "./components/FileInfoDialog";
-import { Library } from "./components/Library";
+import { Library, type LibraryHandle } from "./components/Library";
 import { VideoSurface } from "./components/VideoSurface";
 import { PlayerChrome } from "./components/PlayerChrome";
 import type { Section } from "./components/SettingsDialog";
@@ -114,6 +114,7 @@ export function App({
   lockedRef.current = locked;
   const toastRef = useRef<Toast>(null);
   const wordPopup = useRef<WordPopupHandle>(null);
+  const libraryRef = useRef<LibraryHandle>(null);
   const idleTimer = useRef<number | undefined>(undefined);
 
   const openedViaOpenWith = useRef(false);
@@ -325,6 +326,89 @@ export function App({
 
   // ---------- actions (keyboard and right-click menu) ----------
 
+  /** Navigates back one level across pages, folders, tabs, panels and dialogs. */
+  const handleBackAction = useCallback((): boolean => {
+    // 1. Any active high-level overlay, confirm, sheet, or dialog
+    const overlay = document.querySelector(
+      ".p-dialog-mask, .p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay, .beyt-scrim, .p-menu-overlay, .p-contextmenu",
+    );
+    if (overlay) {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+      return true;
+    }
+
+    if (helpOpen) {
+      setHelpOpen(false);
+      return true;
+    }
+
+    if (infoOpen) {
+      setInfoOpen(false);
+      return true;
+    }
+
+    if (defaultPromptOpen) {
+      void handleSkipDefault();
+      return true;
+    }
+
+    if (menuOpen) {
+      setMenuOpen(false);
+      return true;
+    }
+
+    // 2. Settings: in Android, go back from a section to sections list, or close settings
+    if (settingsOpen) {
+      const popup = document.querySelector(".p-dropdown-panel, .p-multiselect-panel, .p-colorpicker-panel, .p-confirm-popup");
+      if (popup) {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+        return true;
+      }
+      if (isAndroid && settingsSection !== null) {
+        setSettingsSection(null);
+        return true;
+      }
+      setSettingsOpen(false);
+      return true;
+    }
+
+    // 3. Player: panels, countdown, or leave player back to library
+    if (screen === "player") {
+      if (panelOpen || transcriptOpen) {
+        setPanelOpen(false);
+        setTranscriptOpen(false);
+        return true;
+      }
+      if (player.cancelCountdown()) {
+        return true;
+      }
+      void backToLibrary();
+      return true;
+    }
+
+    // 4. Library: folder history, tab history, or dialogs
+    if (screen === "library") {
+      if (libraryRef.current?.handleBack()) {
+        return true;
+      }
+    }
+
+    // At root of the app: nothing left to go back to
+    return false;
+  }, [
+    helpOpen,
+    infoOpen,
+    defaultPromptOpen,
+    menuOpen,
+    settingsOpen,
+    settingsSection,
+    screen,
+    panelOpen,
+    transcriptOpen,
+    backToLibrary,
+    handleSkipDefault,
+  ]);
+
   /** Runs an action; returns false if it doesn't apply here. */
   const runAction = useCallback(
     (action: Action): boolean => {
@@ -348,12 +432,7 @@ export function App({
       if (!playing && !GLOBAL_ACTIONS.has(action)) return false;
       switch (action) {
         case "back":
-          if (panelOpen || transcriptOpen) {
-            setPanelOpen(false);
-            setTranscriptOpen(false);
-          } else if (!player.cancelCountdown() && playing) {
-            void backToLibrary();
-          }
+          handleBackAction();
           break;
         case "help":
           setHelpOpen(true);
@@ -385,7 +464,7 @@ export function App({
       if (playing) wake();
       return true;
     },
-    [screen, locked, panelOpen, transcriptOpen, backToLibrary, openSettings, wake, flash, showLocked],
+    [screen, locked, panelOpen, transcriptOpen, backToLibrary, openSettings, wake, flash, showLocked, handleBackAction],
   );
 
   useEffect(() => {
@@ -407,27 +486,23 @@ export function App({
     return () => window.removeEventListener("keydown", onKey);
   }, [keymap, helpOpen, settingsOpen, infoOpen, menuOpen, runAction]);
 
-  // Android's Back button does what Escape does: closes a dialog or popup,
-  // or leaves the video for the library. In the library it sends Beyt to
-  // the background. Without this, Back closed Beyt from anywhere.
+  // Android's Back button does what Escape does: navigates back a page/level,
+  // closes a dialog or popup, or leaves the video for the library. Only at
+  // the app root does it send Beyt to the background.
   const onAndroidBack = useRef(() => {});
   onAndroidBack.current = () => {
-    const overlay = document.querySelector(
-      ".p-dialog-mask, .p-overlaypanel, .word-sheet, .beyt-sheet.p-component-overlay, .beyt-scrim, .p-menu-overlay, .p-contextmenu",
-    );
-    if (helpOpen || settingsOpen || infoOpen || menuOpen || overlay) {
-      // They close on Escape, as on the desktop.
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
-    } else if (screen === "player") {
-      runAction("back");
-    } else {
+    const handled = handleBackAction();
+    if (!handled) {
       void api.moveToBackground();
     }
   };
+
+  const isAndroidDevice = isAndroid || (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent));
+
   useEffect(() => {
-    if (!isAndroid) return;
+    if (!isAndroidDevice) return;
     return onBackButton(() => onAndroidBack.current());
-  }, []);
+  }, [isAndroidDevice]);
 
   /** Opens the dictionary popup for a subtitle word element. */
   const lookUp = (e: React.MouseEvent | MouseEvent, el: HTMLElement) => {
@@ -704,6 +779,7 @@ export function App({
 
       {screen === "library" && (
         <Library
+          ref={libraryRef}
           folder={lastFolder}
           onPlay={(path) => void play(path)}
           onHelp={() => setHelpOpen(true)}

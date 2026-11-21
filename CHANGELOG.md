@@ -3,6 +3,20 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.29.2 (2026-11-21)
+
+### Changed
+
+- On Android devices, pressing the back button or back gesture now acts as a
+  hierarchical back action across all screens, subfolders, tabs, panels, and
+  dialogs instead of quitting the application.
+- Folder browsing in the Library now maintains a navigation history stack,
+  allowing back navigation through parent folders.
+- Bottom navigation tabs in the Library now support back navigation to return
+  to previously viewed tabs before exiting the app.
+- Subtitle browser in the player now supports back navigation when exploring
+  subdirectories.
+
 ## 0.29.1 (2026-11-13)
 
 ### Fixed

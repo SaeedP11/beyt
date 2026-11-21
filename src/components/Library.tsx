@@ -6,7 +6,7 @@ import { Dialog } from "primereact/dialog";
 import { Dropdown } from "primereact/dropdown";
 import type { MenuItem, MenuItemOptions } from "primereact/menuitem";
 import { TabPanel, TabView } from "primereact/tabview";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
 import { api, isAndroid } from "../api";
 import { useHardKeyboard } from "../hooks";
@@ -205,7 +205,14 @@ interface Props {
   onSettings: () => void;
 }
 
-export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: Props) {
+export interface LibraryHandle {
+  handleBack: () => boolean;
+}
+
+export const Library = forwardRef<LibraryHandle, Props>(function Library(
+  { folder: initialFolder, onPlay, onHelp, onSettings }: Props,
+  ref,
+) {
   const [recent, setRecent] = useState<Recent[]>([]);
   const [sources, setSources] = useState<MountedSource[]>(listSources);
   useEffect(() => onSourcesChanged(() => setSources(listSources())), []);
@@ -223,8 +230,12 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   const [switched, setSwitched] = useState(false);
   const keyboard = useHardKeyboard();
   const scroller = useRef<HTMLDivElement>(null);
-  const showTab = useCallback((next: number) => {
+  const tabHistory = useRef<number[]>([]);
+  const showTab = useCallback((next: number, pushHistory = true) => {
     if (next === lastTab) return;
+    if (pushHistory) {
+      tabHistory.current.push(lastTab);
+    }
     setForward(next > lastTab);
     setSwitched(true);
     setTab(next);
@@ -234,10 +245,21 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
   const menu = useRef<PopupMenuHandle>(null);
   const contextMenu = useRef<ContextMenu>(null);
   const folderPath = useRef<string | null>(null);
+  const folderHistory = useRef<string[]>([]);
   const pending = useRef(new Map<string, { timer: number; finish: () => Promise<void> }>());
 
-  const showFolder = useCallback(async (path: string) => {
+  const showFolder = useCallback(async (path: string, pushHistory = true) => {
     try {
+      if (pushHistory && folderPath.current && folderPath.current !== path) {
+        if (
+          folderHistory.current.length > 0 &&
+          folderHistory.current[folderHistory.current.length - 1] === path
+        ) {
+          folderHistory.current.pop();
+        } else {
+          folderHistory.current.push(folderPath.current);
+        }
+      }
       setFolder(await api.listFolder(path));
       folderPath.current = path;
     } catch (e) {
@@ -469,6 +491,66 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
     { id: "vocabulary", label: t("vocabulary"), icon: "pi pi-bookmark", content: <VocabularyView /> },
   ];
 
+  const handleBack = useCallback((): boolean => {
+    if (trashing) {
+      setTrashing(null);
+      return true;
+    }
+    if (renaming) {
+      setRenaming(null);
+      return true;
+    }
+    if (menuFor) {
+      setMenuFor(null);
+      return true;
+    }
+
+    if (tab === TAB_FOLDER) {
+      if (folderHistory.current.length > 0) {
+        const prev = folderHistory.current.pop()!;
+        void showFolder(prev, false);
+        return true;
+      }
+      if (folder?.parent) {
+        const crumbs = crumbsOf(folder.path);
+        if (crumbs.length > 1) {
+          void showFolder(folder.parent, false);
+          return true;
+        }
+      }
+    }
+
+    if (tabHistory.current.length > 0) {
+      const prev = tabHistory.current.pop()!;
+      showTab(prev, false);
+      return true;
+    }
+
+    if (tab !== TAB_RECENT) {
+      showTab(TAB_RECENT, false);
+      return true;
+    }
+
+    return false;
+  }, [trashing, renaming, menuFor, tab, folder, showFolder, showTab]);
+
+  useImperativeHandle(ref, () => ({ handleBack }), [handleBack]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const overlay = document.querySelector(
+        ".p-dropdown-panel, .p-multiselect-panel, .p-colorpicker-panel, .p-confirm-popup, .p-overlaypanel, .p-dialog-mask",
+      );
+      if (overlay) return;
+      if (handleBack()) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleBack]);
+
   return (
     <main className="absolute inset-0 flex flex-col bg-ink-950">
       {/* In a narrow window: the wordmark and settings on one line, the two
@@ -560,7 +642,7 @@ export function Library({ folder: initialFolder, onPlay, onHelp, onSettings }: P
       <TrashDialog video={trashing} onHide={() => setTrashing(null)} onConfirm={trash} />
     </main>
   );
-}
+});
 
 function SectionTitle({ children, count }: { children: React.ReactNode; count?: number }) {
   return (
@@ -940,7 +1022,7 @@ function FolderView({ folder, hidden, onOpen, handlers }: FolderProps) {
 const ANDROID_ROOT = "/storage/emulated/0";
 
 /** The folder's path as clickable steps, from the root down. */
-function crumbsOf(path: string): { name: string; path: string }[] {
+export function crumbsOf(path: string): { name: string; path: string }[] {
   const root = isAndroid && (path === ANDROID_ROOT || path.startsWith(`${ANDROID_ROOT}/`)) ? ANDROID_ROOT : "/";
   const crumbs = [{ name: "", path: root }];
   let at = root;

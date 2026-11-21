@@ -1,13 +1,13 @@
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { Dialog } from "primereact/dialog";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
 import { getLang, t } from "../i18n";
 import { useDialogMotion } from "../motion";
 import type { Folder, FolderEntry } from "../types";
-import { PathBar } from "./Library";
+import { crumbsOf, PathBar } from "./Library";
 
 interface Props {
   /** Folder to start in (the video's); the browser shows while this is set. */
@@ -26,8 +26,18 @@ export function SubtitleBrowser({ start, multiple, onPick, onHide }: Props) {
   const motion = useDialogMotion();
   const [state, setState] = useState<State>({ phase: "loading" });
   const [picked, setPicked] = useState<string[]>([]);
+  const history = useRef<string[]>([]);
+  const currentPath = useRef<string | null>(null);
 
-  const show = async (path: string) => {
+  const show = async (path: string, pushHistory = true) => {
+    if (pushHistory && currentPath.current && currentPath.current !== path) {
+      if (history.current.length > 0 && history.current[history.current.length - 1] === path) {
+        history.current.pop();
+      } else {
+        history.current.push(currentPath.current);
+      }
+    }
+    currentPath.current = path;
     setState((s) => (s.phase === "ready" ? s : { phase: "loading" }));
     try {
       setState({ phase: "ready", folder: await api.listSubtitleFolder(path) });
@@ -39,9 +49,41 @@ export function SubtitleBrowser({ start, multiple, onPick, onHide }: Props) {
   useEffect(() => {
     if (start === null) return;
     setPicked([]);
+    history.current = [];
+    currentPath.current = null;
     setState({ phase: "loading" });
-    void show(start);
+    void show(start, false);
   }, [start]);
+
+  const goBack = useCallback((): boolean => {
+    if (history.current.length > 0) {
+      const prev = history.current.pop()!;
+      void show(prev, false);
+      return true;
+    }
+    const cur = state.phase === "ready" ? state.folder : null;
+    if (cur?.parent) {
+      const crumbs = crumbsOf(cur.path);
+      if (crumbs.length > 1) {
+        void show(cur.parent, false);
+        return true;
+      }
+    }
+    return false;
+  }, [state]);
+
+  useEffect(() => {
+    if (start === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (goBack()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [start, goBack]);
 
   const folder = state.phase === "ready" ? state.folder : null;
   const dirs = folder?.entries.filter((e) => e.isDir) ?? [];

@@ -135,18 +135,31 @@ export async function appVersion(): Promise<string> {
   return getVersion();
 }
 
-/** Android's Back button. Returns a function that stops listening. */
+/** Android's Back button / backward event. Returns a function that stops listening. */
 export function onBackButton(cb: () => void): () => void {
-  if (!isTauri) return () => {};
-  let stop: (() => void) | undefined;
+  let stopTauri: (() => void) | undefined;
   let gone = false;
-  void import("@tauri-apps/api/app").then(async ({ onBackButtonPress }) => {
-    const l = await onBackButtonPress(cb);
-    if (gone) void l.unregister();
-    else stop = () => void l.unregister();
-  });
+
+  if (isTauri) {
+    void import("@tauri-apps/api/app").then(async ({ onBackButtonPress }) => {
+      const l = await onBackButtonPress(cb);
+      if (gone) void l.unregister();
+      else stopTauri = () => void l.unregister();
+    });
+  }
+
+  const onPopState = () => {
+    cb();
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("popstate", onPopState);
+  }
+
   return () => {
     gone = true;
-    stop?.();
+    stopTauri?.();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", onPopState);
+    }
   };
 }
