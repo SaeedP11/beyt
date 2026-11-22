@@ -24,6 +24,7 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.SurfaceView
 import android.view.View
@@ -122,7 +123,12 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-          lastError = error.cause?.message ?: error.message ?: error.errorCodeName
+          val message = error.cause?.message ?: error.message ?: error.errorCodeName
+          lastError = message
+          Log.e("beyt", "Playback error: $message", error)
+          trigger("playbackError", JSObject().apply {
+            put("error", message)
+          })
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -214,12 +220,25 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
   private fun uriOf(path: String): Uri = if (path.contains("://")) Uri.parse(path) else Uri.fromFile(File(path))
 
+  private fun createMediaItem(uri: Uri): MediaItem {
+    val builder = MediaItem.Builder().setUri(uri)
+    if (uri.scheme == "content") {
+      try {
+        activity.contentResolver.getType(uri)?.let { mimeType ->
+          builder.setMimeType(mimeType)
+        }
+      } catch (_: Exception) {}
+    }
+    return builder.build()
+  }
+
   /** The video, merged with the audio files when there are any. */
   private fun mediaSource(): MediaSource {
     val factory = DefaultMediaSourceFactory(activity)
-    val main = factory.createMediaSource(MediaItem.fromUri(video ?: Uri.EMPTY))
+    val mainItem = video?.let { createMediaItem(it) } ?: MediaItem.EMPTY
+    val main = factory.createMediaSource(mainItem)
     if (audioFiles.isEmpty()) return main
-    val extra = audioFiles.map { factory.createMediaSource(MediaItem.fromUri(uriOf(it))) }
+    val extra = audioFiles.map { factory.createMediaSource(createMediaItem(uriOf(it))) }
     return MergingMediaSource(main, *extra.toTypedArray())
   }
 
@@ -465,7 +484,11 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     Thread {
       val retriever = MediaMetadataRetriever()
       try {
-        retriever.setDataSource(path)
+        if (path.contains("://")) {
+          retriever.setDataSource(activity, Uri.parse(path))
+        } else {
+          retriever.setDataSource(path)
+        }
         val length = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
         val wanted = at?.let { (it * 1_000_000).toLong() }?.takeIf { length == 0L || it < length * 1000 }
         val frame = listOf(wanted ?: length * 150, 0L).firstNotNullOfOrNull { frameAt(retriever, it, width) }
@@ -513,7 +536,11 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       val extractor = MediaExtractor()
       var codec: MediaCodec? = null
       try {
-        extractor.setDataSource(path)
+        if (path.contains("://")) {
+          extractor.setDataSource(activity, Uri.parse(path), null)
+        } else {
+          extractor.setDataSource(path)
+        }
         val track = (0 until extractor.trackCount).firstOrNull {
           extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
         } ?: throw IllegalStateException("no audio track")
@@ -612,7 +639,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val path = invoke.getArgs().getString("path")
     Thread {
       try {
-        val item = MediaItem.fromUri(Uri.fromFile(File(path)))
+        val uri = uriOf(path)
+        val item = createMediaItem(uri)
         val (groups, durationUs) = MetadataRetriever.Builder(activity, item).build().use {
           it.retrieveTrackGroups().get(20, TimeUnit.SECONDS) to it.retrieveDurationUs().get(20, TimeUnit.SECONDS)
         }
@@ -628,12 +656,13 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         }
         val seconds = if (durationUs == C.TIME_UNSET || durationUs <= 0) null else durationUs / 1e6
         val (title, bitrate) = fileTags(path)
+        val fileLength = if (path.contains("://")) null else try { File(path).length() } catch (_: Exception) { null }
         invoke.resolve(JSObject().apply {
           put("format", JSObject().apply {
             formatName(container, path)?.let { put("format_name", it) }
             seconds?.let { put("duration", it.toString()) }
             // Matroska keeps no overall bitrate; ffprobe works it out the same way.
-            (bitrate ?: seconds?.let { (File(path).length() * 8 / it).toLong() })?.let { put("bit_rate", it.toString()) }
+            (bitrate ?: seconds?.let { sec -> fileLength?.let { len -> (len * 8 / sec).toLong() } })?.let { put("bit_rate", it.toString()) }
             put("tags", JSObject().apply { title?.let { put("title", it) } })
           })
           put("streams", streams)
@@ -692,7 +721,11 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private fun fileTags(path: String): Pair<String?, Long?> {
     val retriever = MediaMetadataRetriever()
     return try {
-      retriever.setDataSource(path)
+      if (path.contains("://")) {
+        retriever.setDataSource(activity, Uri.parse(path))
+      } else {
+        retriever.setDataSource(path)
+      }
       val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
       val bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toLongOrNull()
       title to bitrate
@@ -809,45 +842,77 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     invoke.resolve()
   }
 
+  private fun extractUri(intent: Intent?): Uri? {
+    if (intent == null) return null
+    val action = intent.action
+    if (action != Intent.ACTION_VIEW && action != Intent.ACTION_SEND) return null
+
+    var uri = intent.data
+    if (uri == null && intent.clipData != null && intent.clipData!!.itemCount > 0) {
+      uri = intent.clipData!!.getItemAt(0).uri
+    }
+    if (uri == null) {
+      uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+      } else {
+        @Suppress("DEPRECATION")
+        intent.getParcelableExtra(Intent.EXTRA_STREAM)
+      }
+    }
+    if (uri != null && uri.scheme == "content") {
+      try {
+        val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if (flags != 0) {
+          activity.contentResolver.takePersistableUriPermission(uri, flags)
+        }
+      } catch (_: Exception) {}
+    }
+    return uri
+  }
+
   private fun resolveUri(uri: Uri): String {
     if (uri.scheme == "file") {
       return uri.path ?: uri.toString()
     }
     if (uri.scheme == "content") {
-      try {
-        val proj = arrayOf(MediaStore.MediaColumns.DATA)
-        activity.contentResolver.query(uri, proj, null, null, null)?.use { cursor ->
-          if (cursor.moveToFirst()) {
-            val idx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
-            if (idx >= 0) {
-              val path = cursor.getString(idx)
-              if (!path.isNullOrEmpty() && File(path).exists()) {
-                return path
+      if (hasStorageAccess()) {
+        try {
+          val proj = arrayOf(MediaStore.MediaColumns.DATA)
+          activity.contentResolver.query(uri, proj, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+              val idx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+              if (idx >= 0) {
+                val path = cursor.getString(idx)
+                if (!path.isNullOrEmpty()) {
+                  val file = File(path)
+                  if (file.exists() && file.canRead()) {
+                    return path
+                  }
+                }
               }
             }
           }
-        }
-      } catch (_: Exception) {}
+        } catch (_: Exception) {}
 
-      try {
-        if (DocumentsContract.isDocumentUri(activity, uri)) {
-          val docId = DocumentsContract.getDocumentId(uri)
-          if (uri.authority == "com.android.externalstorage.documents") {
-            val split = docId.split(":")
-            if (split.size >= 2) {
-              val type = split[0]
-              val relPath = split[1]
-              if (type.equals("primary", ignoreCase = true)) {
-                val file = File(Environment.getExternalStorageDirectory(), relPath)
-                if (file.exists()) return file.absolutePath
-              } else {
-                val file = File("/storage/$type", relPath)
-                if (file.exists()) return file.absolutePath
+        try {
+          if (DocumentsContract.isDocumentUri(activity, uri)) {
+            val docId = DocumentsContract.getDocumentId(uri)
+            if (uri.authority == "com.android.externalstorage.documents") {
+              val split = docId.split(":")
+              if (split.size >= 2) {
+                val type = split[0]
+                val relPath = split[1]
+                val file = if (type.equals("primary", ignoreCase = true)) {
+                  File(Environment.getExternalStorageDirectory(), relPath)
+                } else {
+                  File("/storage/$type", relPath)
+                }
+                if (file.exists() && file.canRead()) return file.absolutePath
               }
             }
           }
-        }
-      } catch (_: Exception) {}
+        } catch (_: Exception) {}
+      }
     }
     return uri.toString()
   }
@@ -855,8 +920,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun getIntentUrl(invoke: Invoke) {
     val intent = activity.intent
-    val uri = if (intent?.action == Intent.ACTION_VIEW) intent.data else null
+    val uri = extractUri(intent)
     val resolved = uri?.let { resolveUri(it) }
+    activity.intent = Intent()
     invoke.resolve(JSObject().apply {
       put("url", resolved)
     })
@@ -916,8 +982,10 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
-      val resolved = resolveUri(intent.data!!)
+    activity.intent = intent
+    val uri = extractUri(intent)
+    if (uri != null) {
+      val resolved = resolveUri(uri)
       trigger("openUrl", JSObject().apply { put("url", resolved) })
     }
   }

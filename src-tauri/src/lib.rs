@@ -204,6 +204,28 @@ fn log_error(message: String) {
     eprintln!("beyt: [page] {message}");
 }
 
+/// Decodes percent-encoded bytes in a URL segment.
+fn percent_decode(s: &str) -> String {
+    let mut bytes = Vec::with_capacity(s.len());
+    let mut chars = s.bytes();
+    while let Some(b) = chars.next() {
+        if b == b'%' {
+            let h1 = chars.next();
+            let h2 = chars.next();
+            if let (Some(h1), Some(h2)) = (h1, h2) {
+                if let Ok(hex) = std::str::from_utf8(&[h1, h2]) {
+                    if let Ok(byte) = u8::from_str_radix(hex, 16) {
+                        bytes.push(byte);
+                        continue;
+                    }
+                }
+            }
+        }
+        bytes.push(b);
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
 #[tauri::command]
 async fn open_media(
     app: State<'_, App>,
@@ -249,8 +271,20 @@ async fn open_media(
     spawn_extraction(&handle, &video, &tracks);
 
     let folder = video.parent().unwrap_or(Path::new("/")).to_string_lossy().into_owned();
+    let title = if path.starts_with("content://") {
+        let last_segment = path.rsplit(['/', ':']).next().unwrap_or(&path);
+        let decoded = percent_decode(last_segment);
+        let stem = Path::new(&decoded)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        if stem.is_empty() { "Media".to_string() } else { stem }
+    } else {
+        video.file_stem().unwrap_or_default().to_string_lossy().into_owned()
+    };
     Ok(Media {
-        title: video.file_stem().unwrap_or_default().to_string_lossy().into_owned(),
+        title,
         series: app.store.series_settings(&folder).map_err(err)?,
         folder,
         tracks,

@@ -181,7 +181,7 @@ export class Player {
     this.media = media;
     clock.jump(media.resumedAt ?? 0);
     this.views = media.tracks.map(
-      (tr) => new TrackView(tr, { ...defaultStyle(tr), ...media.series?.tracks[tr.key] }),
+      (tr) => new TrackView(tr, { ...defaultStyle(tr), ...media.series?.tracks?.[tr.key] }),
     );
     this.selected = Math.max(0, this.views.findIndex((v) => v.style.enabled && v.isText));
     this.eofHandled = false;

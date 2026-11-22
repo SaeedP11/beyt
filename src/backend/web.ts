@@ -480,6 +480,7 @@ export const webEvents = {
   dictionaryProgress: async (_cb: (f: number | null) => void) => () => {},
   hardKeyboard: async (_cb: (attached: boolean) => void) => () => {},
   openUrl: async (_cb: (url: string) => void) => () => {},
+  playbackError: async (_cb: (error: string) => void) => () => {},
 };
 
 void VIDEO_BRIGHTNESS;

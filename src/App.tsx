@@ -198,6 +198,7 @@ export function App({
       });
     } catch (e) {
       toast(String(e), 5000);
+      setScreen((s) => (s === "loading" ? "library" : s));
     }
   }, []);
 
@@ -255,6 +256,10 @@ export function App({
         });
         await events.trackUpdated((u) => player.onTrackUpdated(u));
         await events.audioTracks((u) => player.onAudioTracks(u));
+        await events.playbackError((err) => {
+          toast(err, 5000);
+          setScreen((s) => (s === "loading" ? "library" : s));
+        });
         await events.openUrl(async (url) => {
           openedViaOpenWith.current = true;
           countedThisSession.current = false;

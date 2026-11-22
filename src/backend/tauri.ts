@@ -141,4 +141,25 @@ export const tauriEvents = {
     }
     return () => {};
   },
+  /** Android: playback error received from ExoPlayer. */
+  playbackError: async (cb: (error: string) => void): Promise<UnlistenFn> => {
+    if (typeof navigator !== "undefined" && navigator.userAgent.includes("Android")) {
+      try {
+        const { addPluginListener } = await import("@tauri-apps/api/core");
+        const listener = await addPluginListener<{ error: string }>("player", "playbackError", (event) => {
+          const err =
+            (event as { error?: string; payload?: { error?: string } })?.error ??
+            (event as { payload?: { error?: string } })?.payload?.error;
+          if (typeof err === "string") cb(err);
+        });
+        return () => {
+          void listener.unregister();
+        };
+      } catch (e) {
+        console.error("beyt: failed to listen for player playbackError:", e);
+        return () => {};
+      }
+    }
+    return () => {};
+  },
 };
