@@ -3,6 +3,14 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.30.0 (2026-11-22)
+
+### Added
+
+- Support playing A/52 (AC-3 / Dolby Digital) and E-AC-3 (Dolby Digital Plus) audio streams across platforms, including hardware decoding on Android.
+- Allow selecting external `.a52` and `.ec3` audio files to play alongside video.
+- Display normalized codec details for A/52 and E-AC-3 streams in the File Info dialog.
+
 ## 0.29.4 (2026-11-22)
 
 ### Fixed
