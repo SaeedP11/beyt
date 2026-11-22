@@ -298,7 +298,17 @@ const CODECS: Record<string, string> = {
   mpeg2video: "MPEG-2",
   aac: "AAC",
   ac3: "AC-3 (Dolby Digital)",
+  "ac-3": "AC-3 (Dolby Digital)",
+  a52: "AC-3 (Dolby Digital)",
+  "a/52": "AC-3 (Dolby Digital)",
+  a_ac3: "AC-3 (Dolby Digital)",
   eac3: "E-AC-3 (Dolby Digital Plus)",
+  "e-ac3": "E-AC-3 (Dolby Digital Plus)",
+  a52b: "E-AC-3 (Dolby Digital Plus)",
+  "a/52b": "E-AC-3 (Dolby Digital Plus)",
+  ec3: "E-AC-3 (Dolby Digital Plus)",
+  "ec-3": "E-AC-3 (Dolby Digital Plus)",
+  a_eac3: "E-AC-3 (Dolby Digital Plus)",
   truehd: "Dolby TrueHD",
   dts: "DTS",
   opus: "Opus",
@@ -318,7 +328,20 @@ const CODECS: Record<string, string> = {
 };
 
 function codecName(codec: string): string {
-  return CODECS[codec] ?? codec.toUpperCase();
+  const normalized = codec
+    .toLowerCase()
+    .trim()
+    .replace(/\s+audio\b/, "")
+    .replace(/^atsc\s+/, "");
+  if (normalized in CODECS) return CODECS[normalized]!;
+  if (CODECS[codec]) return CODECS[codec]!;
+  if (normalized.includes("e-ac3") || normalized.includes("eac3") || normalized.includes("a52b") || normalized.includes("ec3")) {
+    return CODECS["eac3"] ?? "E-AC-3 (Dolby Digital Plus)";
+  }
+  if (normalized.includes("a52") || normalized.includes("a/52") || normalized.includes("ac3") || normalized.includes("ac-3")) {
+    return CODECS["ac3"] ?? "AC-3 (Dolby Digital)";
+  }
+  return codec.toUpperCase();
 }
 
 function containerName(format: string): string {
@@ -326,5 +349,7 @@ function containerName(format: string): string {
   if (format.startsWith("mov,mp4")) return "MP4";
   if (format === "avi") return "AVI";
   if (format === "mpegts") return "MPEG-TS";
+  if (format === "ac3" || format === "a52") return "AC-3";
+  if (format === "eac3" || format === "ec3") return "E-AC-3";
   return format;
 }

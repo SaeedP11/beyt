@@ -47,6 +47,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.MetadataRetriever
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -112,7 +113,10 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val root = webView.parent as ViewGroup
     root.addView(stage, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
-    player = ExoPlayer.Builder(activity).build().apply {
+    val renderersFactory = DefaultRenderersFactory(activity).apply {
+      setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+    }
+    player = ExoPlayer.Builder(activity, renderersFactory).build().apply {
       setVideoSurfaceView(surface)
       addListener(object : Player.Listener {
         override fun onVideoSizeChanged(videoSize: VideoSize) = fitSurface()
@@ -224,10 +228,20 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val builder = MediaItem.Builder().setUri(uri)
     if (uri.scheme == "content") {
       try {
-        activity.contentResolver.getType(uri)?.let { mimeType ->
-          builder.setMimeType(mimeType)
+        val mime = when (val t = activity.contentResolver.getType(uri)) {
+          "audio/a52", "audio/x-a52", "audio/ac-3" -> MimeTypes.AUDIO_AC3
+          "audio/e-ac3", "audio/x-eac3", "audio/ec3", "audio/x-ec3" -> MimeTypes.AUDIO_E_AC3
+          else -> t
         }
+        mime?.let { builder.setMimeType(it) }
       } catch (_: Exception) {}
+    } else {
+      val ext = uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
+      if (ext == "a52") {
+        builder.setMimeType(MimeTypes.AUDIO_AC3)
+      } else if (ext == "ec3" || ext == "eac3") {
+        builder.setMimeType(MimeTypes.AUDIO_E_AC3)
+      }
     }
     return builder.build()
   }
@@ -546,7 +560,13 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         } ?: throw IllegalStateException("no audio track")
         extractor.selectTrack(track)
         val input = extractor.getTrackFormat(track)
-        val decoder = MediaCodec.createDecoderByType(input.getString(MediaFormat.KEY_MIME)!!)
+        val rawMime = input.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("missing audio mime")
+        val mime = when (rawMime) {
+          "audio/a52", "audio/x-a52", "audio/ac-3" -> MediaFormat.MIMETYPE_AUDIO_AC3
+          "audio/e-ac3", "audio/x-eac3", "audio/ec3", "audio/x-ec3" -> MediaFormat.MIMETYPE_AUDIO_EAC3
+          else -> rawMime
+        }
+        val decoder = MediaCodec.createDecoderByType(mime)
         codec = decoder
         decoder.configure(input, null, null, 0)
         decoder.start()
@@ -685,7 +705,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val mime = if (format.sampleMimeType == MimeTypes.APPLICATION_MEDIA3_CUES) format.codecs else format.sampleMimeType
     return JSObject().apply {
       put("codec_type", kind)
-      put("codec_name", codecName(mime))
+      put("codec_name", codecName(mime ?: format.codecs))
       put("tags", JSObject().apply {
         format.language?.let { put("language", it) }
         format.label?.let { put("title", it) }
@@ -747,38 +767,47 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       "mp4", "m4v", "mov" -> "mov,mp4,m4a,3gp,3g2,mj2"
       "avi" -> "avi"
       "ts", "m2ts" -> "mpegts"
+      "ac3", "a52" -> "ac3"
+      "eac3", "ec3" -> "eac3"
       else -> container
     }
   }
 
-  /** ffprobe's codec names for Android's MIME types. */
-  private fun codecName(mime: String?): String = when (mime) {
+  /** ffprobe's codec names for Android's MIME types and codec strings. */
+  private fun codecName(mime: String?): String = when (mime?.lowercase()) {
     null -> "unknown"
-    MimeTypes.VIDEO_H264 -> "h264"
-    MimeTypes.VIDEO_H265, MimeTypes.VIDEO_DOLBY_VISION -> "hevc"
-    MimeTypes.VIDEO_AV1 -> "av1"
-    MimeTypes.VIDEO_VP9 -> "vp9"
-    MimeTypes.VIDEO_VP8 -> "vp8"
-    MimeTypes.VIDEO_MP4V -> "mpeg4"
-    MimeTypes.VIDEO_MPEG2 -> "mpeg2video"
-    MimeTypes.AUDIO_AAC -> "aac"
-    MimeTypes.AUDIO_AC3 -> "ac3"
-    MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> "eac3"
-    MimeTypes.AUDIO_TRUEHD -> "truehd"
-    MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_DTS_EXPRESS -> "dts"
-    MimeTypes.AUDIO_OPUS -> "opus"
-    MimeTypes.AUDIO_VORBIS -> "vorbis"
-    MimeTypes.AUDIO_FLAC -> "flac"
-    MimeTypes.AUDIO_MPEG -> "mp3"
+    MimeTypes.VIDEO_H264, "h264", "avc" -> "h264"
+    MimeTypes.VIDEO_H265, MimeTypes.VIDEO_DOLBY_VISION, "hevc", "h265" -> "hevc"
+    MimeTypes.VIDEO_AV1, "av1" -> "av1"
+    MimeTypes.VIDEO_VP9, "vp9" -> "vp9"
+    MimeTypes.VIDEO_VP8, "vp8" -> "vp8"
+    MimeTypes.VIDEO_MP4V, "mp4v" -> "mpeg4"
+    MimeTypes.VIDEO_MPEG2, "mpeg2" -> "mpeg2video"
+    MimeTypes.AUDIO_AAC, "aac" -> "aac"
+    MimeTypes.AUDIO_AC3, "audio/a52", "audio/x-a52", "audio/ac-3", "ac3", "ac-3", "a52", "a/52" -> "ac3"
+    MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC, "audio/e-ac3", "audio/x-eac3", "audio/a52b", "audio/x-a52b", "audio/ec3", "audio/x-ec3", "eac3", "e-ac3", "ec3", "ec-3", "a52b" -> "eac3"
+    MimeTypes.AUDIO_TRUEHD, "truehd" -> "truehd"
+    MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_DTS_EXPRESS, "dts" -> "dts"
+    MimeTypes.AUDIO_OPUS, "opus" -> "opus"
+    MimeTypes.AUDIO_VORBIS, "vorbis" -> "vorbis"
+    MimeTypes.AUDIO_FLAC, "flac" -> "flac"
+    MimeTypes.AUDIO_MPEG, "mp3" -> "mp3"
     MimeTypes.AUDIO_RAW -> "pcm_s16le"
-    MimeTypes.APPLICATION_SUBRIP -> "subrip"
-    MimeTypes.TEXT_SSA -> "ass"
-    MimeTypes.TEXT_VTT -> "webvtt"
+    MimeTypes.APPLICATION_SUBRIP, "subrip", "srt" -> "subrip"
+    MimeTypes.TEXT_SSA, "ass", "ssa" -> "ass"
+    MimeTypes.TEXT_VTT, "vtt", "webvtt" -> "webvtt"
     MimeTypes.APPLICATION_TX3G -> "mov_text"
     MimeTypes.APPLICATION_PGS -> "hdmv_pgs_subtitle"
     MimeTypes.APPLICATION_VOBSUB -> "dvd_subtitle"
     MimeTypes.APPLICATION_DVBSUBS -> "dvb_subtitle"
-    else -> mime.substringAfter('/').removePrefix("x-")
+    else -> {
+      val sub = mime.substringAfter('/').removePrefix("x-")
+      when (sub) {
+        "ac-3", "a52" -> "ac3"
+        "e-ac3", "ec-3", "ec3", "a52b" -> "eac3"
+        else -> sub
+      }
+    }
   }
 
   /** The profile from an RFC 6381 codec string: "avc1.640028" → "High", "hvc1.2.4.L120" → "Main 10". */

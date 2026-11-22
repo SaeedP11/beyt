@@ -91,7 +91,13 @@ pub fn file_info(video: &Path) -> Result<FileInfo> {
     };
 
     for s in &probe.streams {
-        let codec = s.codec_name.clone().unwrap_or_else(|| "unknown".into());
+        let codec = s
+            .codec_name
+            .as_deref()
+            .filter(|c| !c.is_empty() && *c != "unknown")
+            .or_else(|| s.codec_tag_string.as_deref().filter(|t| !t.is_empty()))
+            .unwrap_or("unknown")
+            .to_string();
         let lang = || {
             let raw = tag(&s.tags, "language").unwrap_or("und");
             subs::normalize_lang(raw).map_or_else(|| raw.to_ascii_lowercase(), str::to_string)
@@ -149,6 +155,7 @@ struct ProbeFormat {
 struct ProbeStream {
     codec_type: Option<String>,
     codec_name: Option<String>,
+    codec_tag_string: Option<String>,
     profile: Option<String>,
     width: Option<u32>,
     height: Option<u32>,

@@ -9,7 +9,7 @@ import { audioLabel } from "./player";
 import { toast } from "./ui";
 
 /** Audio files the add dialog offers (see audio.rs). */
-const EXTENSIONS = ["mka", "mp3", "m4a", "aac", "ac3", "eac3", "dts", "flac", "ogg", "oga", "opus", "wav", "wv"];
+const EXTENSIONS = ["mka", "mp3", "m4a", "aac", "ac3", "eac3", "a52", "ec3", "dts", "flac", "ogg", "oga", "opus", "wav", "wv"];
 
 /** Asks for an audio file and plays it alongside the video, e.g. a dub kept next to it. */
 export async function addAudioFile(): Promise<void> {
