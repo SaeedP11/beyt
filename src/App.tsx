@@ -26,7 +26,7 @@ import { type Lang, getLang, t } from "./i18n";
 import { type Action, bindingTable, eventKey, keyParts, keysFor } from "./keymap";
 import { popupMotions } from "./motion";
 import { clampMargin, getSettings, loadSettings, marginKey, updateSettings, useSettings } from "./settings";
-import type { Theme } from "./theme";
+import type { BeytColor, Theme } from "./theme";
 import { fmtTime, setToastHandler, toast } from "./ui";
 
 type Screen = "loading" | "library" | "player";
@@ -91,6 +91,7 @@ export function App({
   onClose?: () => void;
   onProgress?: (pos: number, dur: number) => void;
   theme?: Theme;
+  color?: BeytColor;
   locale?: Lang;
 } = {}) {
   const lang = useLang();

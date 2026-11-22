@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.30.0 (2026-11-22)
+
+### Added
+
+- Developers using the Beyt npm package can now declare and customize theme and color options for the Beyt layer.
+- The `<Beyt />` React component and `mountBeyt()` function accept a `color` option supporting 8 color palette presets (`blue`, `green`, `amber`, `cyan`, `indigo`, `pink`, `purple`, `teal`) and custom hex/RGB colors.
+- All Beyt component styles, custom variables, and theme tokens are now declared within `@layer beyt`, enabling seamless integration with CSS cascade layers and conflict-free theme customization in host applications.
+- Scoped `.beyt-layer` container styling prevents global theme variable leakage into host application stylesheets.
+
 ## 0.29.3 (2026-11-21)
 
 ### Changed

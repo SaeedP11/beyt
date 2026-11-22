@@ -111,9 +111,30 @@ import { Beyt } from "beyt";
 import "beyt/style.css";
 
 // Give the parent a size: Beyt fills it.
-<div style={{ height: "100vh" }}><Beyt /></div>;
-// Without React in your app: mountBeyt(element) returns a function that removes it.
+<div style={{ height: "100vh" }}>
+  <Beyt theme="dark" color="teal" />
+</div>;
+// Without React in your app: mountBeyt(element, { theme: "light", color: "green" }) returns a function that removes it.
 ```
+
+### Theming and Colors for Beyt Layer
+
+You can declare theme and color either programmatically or declaratively:
+
+1. **Via component props / options**:
+   - `theme`: `"dark" | "light" | "auto"` (defaults to host app theme or system preference).
+   - `color`: Predefined palette (`"blue" | "green" | "amber" | "cyan" | "indigo" | "pink" | "purple" | "teal"`) or custom hex/RGB (`"#10b981"`).
+
+2. **Via CSS Cascade Layers (`@layer beyt`)**:
+   Beyt's styles and custom properties are scoped inside `@layer beyt`. You can declare or override theme variables and colors in your CSS without specificity battles:
+   ```css
+   @layer beyt {
+     .beyt-layer {
+       --accent: #10b981;
+       --word-accent: 16 185 129;
+     }
+   }
+   ```
 
 Browsers play MP4 and WebM; embedded subtitle tracks, the offline dictionary and
 subtitle matching need the desktop app. To browse videos on FTP, SFTP, WebDAV or
