@@ -136,6 +136,24 @@ You can declare theme and color either programmatically or declaratively:
    }
    ```
 
+### Configuring Optional Player Features
+
+Developers can selectively show or hide any player control or feature by passing `features` to `<Beyt />` or `mountBeyt`:
+
+```tsx
+<Beyt
+  initialFile="/path/to/video.mp4"
+  features={{
+    speed: true,         // Playback speed control (1×, 2×, 4×, and custom dialog)
+    subtitles: true,     // Subtitle tracks button and panel
+    settings: false,     // Hide settings dialog button
+    fileInfo: false,     // Hide file info dialog button
+    shortcuts: false,    // Hide keyboard shortcuts help button
+    transcript: false,   // Hide transcript button
+  }}
+/>
+```
+
 Browsers play MP4 and WebM; embedded subtitle tracks, the offline dictionary and
 subtitle matching need the desktop app. To browse videos on FTP, SFTP, WebDAV or
 cloud storage, and to keep history and saved words on a server, pass `sources`

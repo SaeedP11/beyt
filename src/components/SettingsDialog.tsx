@@ -38,7 +38,7 @@ export const SECTIONS: { id: Section; icon: string; label: StringKey; summary: S
 const LANGUAGES = ["fa", "en", "ar", "tr", "fr", "de", "es", "it", "ru", "ja", "ko", "zh"];
 const PERSIAN_FONTS = ["Vazirmatn", "Noto Naskh Arabic", "Noto Sans Arabic", "Sahel", "Samim", "Shabnam", "IRANSans"];
 const LATIN_FONTS = ["Inter", "Noto Sans", "Roboto", "Open Sans", "Ubuntu", "DejaVu Sans", "Arial"];
-const SPEEDS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
+const SPEEDS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2, 4];
 
 interface Props {
   visible: boolean;

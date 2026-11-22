@@ -13,6 +13,7 @@ import { connectServer, type BeytServer } from "./backend/remote";
 import { mountSource, type FileSource } from "./backend/sources";
 import { CrashScreen } from "./components/CrashScreen";
 import { type Lang, defaultLang, setLang } from "./i18n";
+import type { PlayerFeatures } from "./types";
 import {
   COLOR_PRESETS,
   colorToRgbTriplet,
@@ -45,6 +46,10 @@ export interface BeytOptions {
   locale?: Lang | "auto";
   /** Alias for locale */
   lang?: Lang | "auto";
+  /** Configure which optional player features are hidden or displayed. All default to true. */
+  features?: PlayerFeatures;
+  /** Alias for features */
+  playerFeatures?: PlayerFeatures;
 }
 
 /** Mounts the sources and connects the server. Safe to call more than once. */
@@ -148,6 +153,7 @@ export function Beyt(options: BeytOptions = {}) {
               theme={effectiveTheme}
               color={effectiveColor}
               locale={effectiveLocale}
+              features={options.features ?? options.playerFeatures}
             />
           </CrashScreen>
         </PrimeReactProvider>
@@ -185,3 +191,4 @@ export type { FileSource, HttpFileSourceOptions, RemoteEntry } from "./backend/s
 export { httpServer } from "./backend/remote";
 export type { BeytServer, BeytState, HttpServerOptions } from "./backend/remote";
 export type { Watch as BeytWatch } from "./backend/store";
+export type { PlayerFeatures, BeytFeatures } from "./types";

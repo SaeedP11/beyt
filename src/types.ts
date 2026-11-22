@@ -258,10 +258,66 @@ export interface Candidate {
   reasons: MatchReason[];
 }
 
+export interface MatchReasonPartial {
+  kind: "partial";
+  percent: number;
+}
+
 export type MatchReason =
   | { kind: "sameRelease"; group: string }
   | { kind: "otherEpisode"; subtitle: string; video: string }
   | { kind: "frameRate"; subtitle: number; video: number }
   | { kind: "endsAfter"; seconds: number }
-  | { kind: "partial"; percent: number }
+  | MatchReasonPartial
   | { kind: "error"; message: string };
+
+/** Configurable optional features and UI controls for the Beyt player. */
+export interface PlayerFeatures {
+  /** Top bar back button. Default: true */
+  backButton?: boolean;
+  /** Top bar media title. Default: true */
+  title?: boolean;
+  /** Mobile screen lock button. Default: true */
+  lock?: boolean;
+
+  /** Play/pause toggle button. Default: true */
+  playPause?: boolean;
+  /** Current time and duration label. Default: true */
+  time?: boolean;
+  /** Timeline seek scrubber bar. Default: true */
+  seekBar?: boolean;
+  /** Auto-pause at end of subtitle line toggle button. Default: true */
+  autoPause?: boolean;
+  /** Transcript view toggle button and sidebar. Default: true */
+  transcript?: boolean;
+  /** Subtitle tracks selector button and panel. Default: true */
+  subtitles?: boolean;
+  /** Playback speed button and menu (1x, 2x, 4x, custom). Default: true */
+  speed?: boolean;
+  /** Audio track selector button and menu. Default: true */
+  audioTracks?: boolean;
+  /** Aspect ratio selector button and menu. Default: true */
+  aspectRatio?: boolean;
+  /** File info dialog button. Default: true */
+  fileInfo?: boolean;
+  /** Keyboard shortcuts help dialog button. Default: true */
+  shortcuts?: boolean;
+  /** Settings dialog button. Default: true */
+  settings?: boolean;
+  /** Fullscreen toggle button. Default: true */
+  fullscreen?: boolean;
+
+  /** On-screen subtitle overlay tracks (subs-top and subs-bottom). Default: true */
+  subtitlesOverlay?: boolean;
+  /** Word click popup for dictionary lookups and saving. Default: true */
+  wordLookup?: boolean;
+  /** Right-click app context menu. Default: true */
+  contextMenu?: boolean;
+  /** Mouse wheel and touch gesture controls (volume, brightness, seek). Default: true */
+  gestures?: boolean;
+  /** "Up Next" episode countdown card. Default: true */
+  upNext?: boolean;
+}
+
+export type BeytFeatures = PlayerFeatures;
+

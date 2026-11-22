@@ -34,6 +34,19 @@ export function aspectLabel(aspect: Aspect): string {
   return aspect;
 }
 
+/** Standard playback speeds shown in the player control bar and menus. */
+export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2, 4];
+
+export function formatSpeed(speed: number): string {
+  if (Math.abs(speed - 1) < 0.01) return "1×";
+  return `${speed.toFixed(2).replace(/\.?0+$/, "")}×`;
+}
+
+export function speedLabel(speed: number): string {
+  if (Math.abs(speed - 1) < 0.01) return t("speedNormal");
+  return formatSpeed(speed);
+}
+
 /** A volume or brightness change, as the level indicator shows it. */
 export interface LevelChange {
   kind: "volume" | "brightness";

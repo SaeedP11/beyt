@@ -9,14 +9,13 @@ import { hasHardKeyboard, player } from "../hooks";
 import { t } from "../i18n";
 import { type Action, type Keymap, keyParts, keysFor } from "../keymap";
 import { popupMotions } from "../motion";
-import { ASPECTS, aspectLabel } from "../player";
+import { ASPECTS, aspectLabel, SPEEDS, speedLabel } from "../player";
 import { getSettings } from "../settings";
 import { sheetEdge } from "../sheet";
 import { translateExternally } from "../translate";
+import type { PlayerFeatures } from "../types";
 import { toast } from "../ui";
 import { MenuSheet } from "./SheetMenu";
-
-const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /** Right-clicks here keep the browser's menu (copy and paste). */
 const NATIVE = "input, textarea, [contenteditable='true']";
@@ -27,11 +26,13 @@ interface Props {
   screen: "loading" | "library" | "player";
   /** The player is locked: the menu offers only unlocking. */
   locked: boolean;
+  features?: PlayerFeatures;
   /** Runs an action the same way its keyboard shortcut does. */
   runAction: (action: Action) => void;
   /** Opens the dictionary popup for a subtitle word. */
   onLookUp: (event: MouseEvent, wordEl: HTMLElement) => void;
   onBack: () => void;
+  onCustomSpeed: () => void;
   onVisibleChange: (visible: boolean) => void;
 }
 
@@ -153,8 +154,9 @@ function playerItems(
   target: HTMLElement,
   event: MouseEvent,
   keymap: Keymap,
-  { runAction: run, onLookUp, onBack }: Props,
+  props: Props,
 ): MenuItem[] {
+  const { runAction: run, onLookUp, onBack, onCustomSpeed, features } = props;
   const items: MenuItem[] = [];
 
   // A subtitle line under the pointer comes first: that's what was clicked.
@@ -162,7 +164,7 @@ function playerItems(
   if (line) {
     const isWord = target.classList.contains("word");
     const word = isWord ? (target.textContent ?? "").trim() : "";
-    if (word) {
+    if (word && features?.wordLookup !== false) {
       // After the menu's own click has finished, or the popup would see it as an outside click.
       items.push(row(t("lookUp", { word }), "pi pi-book", undefined, () => setTimeout(() => onLookUp(event, target))));
     }
@@ -185,37 +187,70 @@ function playerItems(
   );
   if (!line) items.push(actionRow("replayLine", t("act_replayLine"), "pi pi-replay", keymap, run));
   items.push(actionRow("restart", t("act_restart"), "pi pi-step-backward-alt", keymap, run));
-  items.push(
-    ...(player.selectedView()
-      ? [actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run)]
-      : []),
-    row(
-      `${t("speed")}: ${Math.abs(speed - 1) < 0.01 ? t("speedNormal") : `${speed.toFixed(2).replace(/0$/, "")}×`}`,
-      "pi pi-gauge",
-      SPEEDS.map((n) =>
-        row(n === 1 ? t("speedNormal") : `${n}×`, Math.abs(n - speed) < 0.01 ? "pi pi-check" : null, undefined, () => {
-          void api.setMpvOption("speed", String(n)).then(() => toast(t("speedToast", { n: n === 1 ? "1.0" : n })));
-        }),
+  if (player.selectedView() && features?.autoPause !== false) {
+    items.push(actionRow("autoPause", t("autoPause"), player.autoPause ? "pi pi-check" : null, keymap, run));
+  }
+  if (features?.speed !== false) {
+    items.push(
+      row(
+        `${t("speed")}: ${speedLabel(speed)}`,
+        "pi pi-gauge",
+        [
+          ...SPEEDS.map((n) =>
+            row(n === 1 ? `1× (${t("speedNormal")})` : `${n}×`, Math.abs(n - speed) < 0.01 ? "pi pi-check" : null, undefined, () => {
+              void api.setMpvOption("speed", String(n)).then(() => toast(t("speedToast", { n: n === 1 ? "1.0" : n })));
+            }),
+          ),
+          { separator: true },
+          row(
+            `${t("customSpeed")}...`,
+            !SPEEDS.some((n) => Math.abs(n - speed) < 0.01) ? "pi pi-check" : "pi pi-sliders-h",
+            undefined,
+            () => setTimeout(onCustomSpeed),
+          ),
+        ],
       ),
-    ),
-    audioRow(),
-    row(
-      `${t("aspect")}: ${aspectLabel(player.aspect)}`,
-      "pi pi-expand",
-      ASPECTS.map((a) => row(aspectLabel(a), a === player.aspect ? "pi pi-check" : null, undefined, () => player.setAspect(a))),
-    ),
-    { separator: true },
-    actionRow("subtitles", t("tracks"), "pi pi-comments", keymap, run),
-    ...(player.selectedView() ? [actionRow("transcript", t("transcript"), "pi pi-align-left", keymap, run)] : []),
-    actionRow("info", t("fileInfo"), "pi pi-info-circle", keymap, run),
-    { separator: true },
-    actionRow("fullscreen", t("fullscreen"), "pi pi-window-maximize", keymap, run),
-    ...helpRow(keymap, run),
-    actionRow("settings", t("settings"), "pi pi-cog", keymap, run),
-    { separator: true },
-    actionRow("lock", t("lock"), "pi pi-lock", keymap, run),
-    // Not the "back" action: with a panel open that only closes the panel.
-    row(t("back"), "pi pi-arrow-left rtl:rotate-180", keysFor("back", keymap)[0], onBack),
-  );
+    );
+  }
+  if (features?.audioTracks !== false) {
+    items.push(audioRow());
+  }
+  if (features?.aspectRatio !== false) {
+    items.push(
+      row(
+        `${t("aspect")}: ${aspectLabel(player.aspect)}`,
+        "pi pi-expand",
+        ASPECTS.map((a) => row(aspectLabel(a), a === player.aspect ? "pi pi-check" : null, undefined, () => player.setAspect(a))),
+      ),
+    );
+  }
+  items.push({ separator: true });
+  if (features?.subtitles !== false) {
+    items.push(actionRow("subtitles", t("tracks"), "pi pi-comments", keymap, run));
+  }
+  if (player.selectedView() && features?.transcript !== false) {
+    items.push(actionRow("transcript", t("transcript"), "pi pi-align-left", keymap, run));
+  }
+  if (features?.fileInfo !== false) {
+    items.push(actionRow("info", t("fileInfo"), "pi pi-info-circle", keymap, run));
+  }
+  items.push({ separator: true });
+  if (features?.fullscreen !== false) {
+    items.push(actionRow("fullscreen", t("fullscreen"), "pi pi-window-maximize", keymap, run));
+  }
+  if (features?.shortcuts !== false) {
+    items.push(...helpRow(keymap, run));
+  }
+  if (features?.settings !== false) {
+    items.push(actionRow("settings", t("settings"), "pi pi-cog", keymap, run));
+  }
+  items.push({ separator: true });
+  if (features?.lock !== false) {
+    items.push(actionRow("lock", t("lock"), "pi pi-lock", keymap, run));
+  }
+  // Not the "back" action: with a panel open that only closes the panel.
+  if (features?.backButton !== false) {
+    items.push(row(t("back"), "pi pi-arrow-left rtl:rotate-180", keysFor("back", keymap)[0], onBack));
+  }
   return items;
 }
