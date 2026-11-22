@@ -3,6 +3,15 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.29.4 (2026-11-22)
+
+### Fixed
+
+- Resolve black screen on Android when opening media files from external apps or file managers.
+- Support `content://` URIs when direct storage access is not granted or files cannot be opened by path directly.
+- Handle `clipData`, `EXTRA_STREAM`, and `ACTION_SEND` intents on Android.
+- Fallback from player loading screen to library on playback or open error.
+
 ## 0.29.3 (2026-11-21)
 
 ### Changed
