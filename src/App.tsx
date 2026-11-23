@@ -13,6 +13,7 @@ import { FileInfoDialog } from "./components/FileInfoDialog";
 import { Library, type LibraryHandle } from "./components/Library";
 import { VideoSurface } from "./components/VideoSurface";
 import { PlayerChrome } from "./components/PlayerChrome";
+import { CustomSpeedDialog } from "./components/CustomSpeedDialog";
 import type { Section } from "./components/SettingsDialog";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SubtitlePanel } from "./components/SubtitlePanel";
@@ -26,7 +27,8 @@ import { type Lang, getLang, t } from "./i18n";
 import { type Action, bindingTable, eventKey, keyParts, keysFor } from "./keymap";
 import { popupMotions } from "./motion";
 import { clampMargin, getSettings, loadSettings, marginKey, updateSettings, useSettings } from "./settings";
-import type { Theme } from "./theme";
+import type { BeytColor, Theme } from "./theme";
+import type { PlayerFeatures } from "./types";
 import { fmtTime, setToastHandler, toast } from "./ui";
 
 type Screen = "loading" | "library" | "player";
@@ -86,12 +88,15 @@ export function App({
   onProgress,
   theme,
   locale,
+  features,
 }: {
   initialFile?: string;
   onClose?: () => void;
   onProgress?: (pos: number, dur: number) => void;
   theme?: Theme;
+  color?: BeytColor;
   locale?: Lang;
+  features?: PlayerFeatures;
 } = {}) {
   const lang = useLang();
   const { keymap } = useSettings();
@@ -102,6 +107,7 @@ export function App({
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [customSpeedOpen, setCustomSpeedOpen] = useState(false);
   const settingsSeen = useRef(false);
   if (settingsOpen) settingsSeen.current = true;
   // Null only on Android: its settings page then shows the list of sections.
@@ -528,7 +534,10 @@ export function App({
     const picked = player.wordContext(el);
     if (picked && picked.word.trim()) wordPopup.current?.open(e, el, picked);
   };
-  const pickWord = (e: React.MouseEvent) => lookUp(e, e.target as HTMLElement);
+  const pickWord = (e: React.MouseEvent) => {
+    if (features?.wordLookup === false) return;
+    lookUp(e, e.target as HTMLElement);
+  };
 
   const rtl = lang === "fa";
 
@@ -640,7 +649,7 @@ export function App({
   };
   useEffect(() => {
     const el = root.current;
-    if (!el || screen !== "player") return;
+    if (!el || screen !== "player" || features?.gestures === false) return;
     const h = () => gestureHandlers.current!;
     return attachGestures(
       el,
@@ -747,35 +756,40 @@ export function App({
       // While a video plays, the page itself doesn't pan or zoom: touches are gestures.
       className={`relative h-full text-zinc-100 ${screen === "player" ? "touch-none" : ""}`}
       onMouseMove={screen === "player" ? wake : undefined}
-      onWheel={screen === "player" ? onWheel : undefined}
-      onDoubleClick={screen === "player" ? onDoubleClick : undefined}
+      onWheel={screen === "player" && features?.gestures !== false ? onWheel : undefined}
+      onDoubleClick={screen === "player" && features?.gestures !== false ? onDoubleClick : undefined}
     >
       {!isTauri && <VideoSurface visible={screen === "player"} />}
       {/* TrackView draws subtitle lines into these two stacks. */}
-      <div
-        id="subs-top"
-        className="sub-stack top"
-        onClick={pickWordUnlessSwiped}
-        onPointerDown={onSubDown}
-        onPointerMove={onSubMove}
-        onPointerUp={onSubUp}
-        onPointerCancel={onSubCancel}
-      />
-      <div
-        id="subs-bottom"
-        className="sub-stack bottom"
-        onClick={pickWordUnlessSwiped}
-        onPointerDown={onSubDown}
-        onPointerMove={onSubMove}
-        onPointerUp={onSubUp}
-        onPointerCancel={onSubCancel}
-      />
-      {hint && screen === "player" && <GestureHint hint={hint} />}
+      {features?.subtitlesOverlay !== false && (
+        <>
+          <div
+            id="subs-top"
+            className="sub-stack top"
+            onClick={pickWordUnlessSwiped}
+            onPointerDown={onSubDown}
+            onPointerMove={onSubMove}
+            onPointerUp={onSubUp}
+            onPointerCancel={onSubCancel}
+          />
+          <div
+            id="subs-bottom"
+            className="sub-stack bottom"
+            onClick={pickWordUnlessSwiped}
+            onPointerDown={onSubDown}
+            onPointerMove={onSubMove}
+            onPointerUp={onSubUp}
+            onPointerCancel={onSubCancel}
+          />
+        </>
+      )}
+      {hint && screen === "player" && features?.gestures !== false && <GestureHint hint={hint} />}
 
       {screen === "player" && (
         <PlayerChrome
           visible={showControls}
           locked={locked}
+          features={features}
           onToggleLock={() => runAction("lock")}
           onBack={() => void backToLibrary()}
           onToggleSubtitles={() => setPanelOpen((o) => !o)}
@@ -783,16 +797,19 @@ export function App({
           onToggleTranscript={() => setTranscriptOpen((o) => !o)}
           onHelp={() => setHelpOpen(true)}
           onSettings={() => openSettings()}
+          onCustomSpeed={() => setCustomSpeedOpen(true)}
           onMenuVisibleChange={setMenuOpen}
         />
       )}
       <SubtitlePanel visible={panelOpen && screen === "player"} rtl={rtl} onHide={() => setPanelOpen(false)} />
       <Transcript visible={transcriptOpen && screen === "player"} rtl={rtl} onHide={closeTranscript} />
       {screen === "player" && <LevelIndicator />}
-      <div className="contents" inert={locked}>
-        <UpNextCard />
-      </div>
-      <WordPopup ref={wordPopup} />
+      {features?.upNext !== false && (
+        <div className="contents" inert={locked}>
+          <UpNextCard />
+        </div>
+      )}
+      {features?.wordLookup !== false && <WordPopup ref={wordPopup} />}
 
       {screen === "library" && (
         <Library
@@ -836,14 +853,23 @@ export function App({
       )}
         </Suspense>
       )}
-      <AppContextMenu
-        screen={screen}
-        locked={locked}
-        runAction={runAction}
-        onLookUp={lookUp}
-        onBack={() => void backToLibrary()}
-        onVisibleChange={setMenuOpen}
+      <CustomSpeedDialog
+        visible={customSpeedOpen && screen === "player"}
+        currentSpeed={clock.snapshot().speed}
+        onHide={() => setCustomSpeedOpen(false)}
       />
+      {features?.contextMenu !== false && (
+        <AppContextMenu
+          screen={screen}
+          locked={locked}
+          features={features}
+          runAction={runAction}
+          onLookUp={lookUp}
+          onBack={() => void backToLibrary()}
+          onCustomSpeed={() => setCustomSpeedOpen(true)}
+          onVisibleChange={setMenuOpen}
+        />
+      )}
       <ConfirmHost />
       <Toast ref={toastRef} position={rtl ? "top-left" : "top-right"} transitionOptions={popupMotions.toast} />
     </div>

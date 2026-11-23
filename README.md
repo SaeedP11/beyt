@@ -111,8 +111,47 @@ import { Beyt } from "beyt";
 import "beyt/style.css";
 
 // Give the parent a size: Beyt fills it.
-<div style={{ height: "100vh" }}><Beyt /></div>;
-// Without React in your app: mountBeyt(element) returns a function that removes it.
+<div style={{ height: "100vh" }}>
+  <Beyt theme="dark" color="teal" />
+</div>;
+// Without React in your app: mountBeyt(element, { theme: "light", color: "green" }) returns a function that removes it.
+```
+
+### Theming and Colors for Beyt Layer
+
+You can declare theme and color either programmatically or declaratively:
+
+1. **Via component props / options**:
+   - `theme`: `"dark" | "light" | "auto"` (defaults to host app theme or system preference).
+   - `color`: Predefined palette (`"blue" | "green" | "amber" | "cyan" | "indigo" | "pink" | "purple" | "teal"`) or custom hex/RGB (`"#10b981"`).
+
+2. **Via CSS Cascade Layers (`@layer beyt`)**:
+   Beyt's styles and custom properties are scoped inside `@layer beyt`. You can declare or override theme variables and colors in your CSS without specificity battles:
+   ```css
+   @layer beyt {
+     .beyt-layer {
+       --accent: #10b981;
+       --word-accent: 16 185 129;
+     }
+   }
+   ```
+
+### Configuring Optional Player Features
+
+Developers can selectively show or hide any player control or feature by passing `features` to `<Beyt />` or `mountBeyt`:
+
+```tsx
+<Beyt
+  initialFile="/path/to/video.mp4"
+  features={{
+    speed: true,         // Playback speed control (1×, 2×, 4×, and custom dialog)
+    subtitles: true,     // Subtitle tracks button and panel
+    settings: false,     // Hide settings dialog button
+    fileInfo: false,     // Hide file info dialog button
+    shortcuts: false,    // Hide keyboard shortcuts help button
+    transcript: false,   // Hide transcript button
+  }}
+/>
 ```
 
 Browsers play MP4 and WebM; embedded subtitle tracks, the offline dictionary and

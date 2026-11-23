@@ -13,7 +13,16 @@ import { connectServer, type BeytServer } from "./backend/remote";
 import { mountSource, type FileSource } from "./backend/sources";
 import { CrashScreen } from "./components/CrashScreen";
 import { type Lang, defaultLang, setLang } from "./i18n";
-import { type Theme, defaultTheme, setTheme } from "./theme";
+import type { PlayerFeatures } from "./types";
+import {
+  COLOR_PRESETS,
+  colorToRgbTriplet,
+  defaultTheme,
+  isThemeColor,
+  setThemeAndColor,
+  type BeytColor,
+  type Theme,
+} from "./theme";
 import { VERSION } from "./version";
 
 export interface BeytOptions {
@@ -31,10 +40,16 @@ export interface BeytOptions {
   onProgress?: (pos: number, dur: number) => void;
   /** Theme to apply ("dark" | "light" | "auto"). If omitted or "auto", follows host application theme. */
   theme?: Theme | "auto";
+  /** Color palette preset ("blue" | "green" | "amber" | "cyan" | "indigo" | "pink" | "purple" | "teal") or custom hex/rgb color string. Defaults to "blue". */
+  color?: BeytColor;
   /** Locale / language to apply ("fa" | "en" | "auto"). If omitted or "auto", follows host application locale. */
   locale?: Lang | "auto";
   /** Alias for locale */
   lang?: Lang | "auto";
+  /** Configure which optional player features are hidden or displayed. All default to true. */
+  features?: PlayerFeatures;
+  /** Alias for features */
+  playerFeatures?: PlayerFeatures;
 }
 
 /** Mounts the sources and connects the server. Safe to call more than once. */
@@ -49,6 +64,7 @@ export function Beyt(options: BeytOptions = {}) {
   const [ready, setReady] = useState(!options.server);
 
   const effectiveTheme = options.theme && options.theme !== "auto" ? options.theme : undefined;
+  const effectiveColor = options.color;
   const effectiveLocale =
     (options.locale && options.locale !== "auto" ? options.locale : undefined) ??
     (options.lang && options.lang !== "auto" ? options.lang : undefined);
@@ -59,12 +75,11 @@ export function Beyt(options: BeytOptions = {}) {
     const initialDir = document.documentElement.dir;
     const initialDark = document.documentElement.classList.contains("dark");
     const initialLight = document.documentElement.classList.contains("light");
+    const initialAccent = document.documentElement.style.getPropertyValue("--accent");
+    const initialWordAccent = document.documentElement.style.getPropertyValue("--word-accent");
+    const initialPrimaryColor = document.documentElement.style.getPropertyValue("--primary-color");
 
-    if (effectiveTheme) {
-      setTheme(effectiveTheme, false);
-    } else {
-      setTheme(defaultTheme(), false);
-    }
+    setThemeAndColor(effectiveTheme ?? defaultTheme(), effectiveColor ?? null, false);
 
     if (effectiveLocale) {
       setLang(effectiveLocale);
@@ -78,8 +93,14 @@ export function Beyt(options: BeytOptions = {}) {
       if (initialDir) document.documentElement.dir = initialDir;
       document.documentElement.classList.toggle("dark", initialDark);
       document.documentElement.classList.toggle("light", initialLight);
+      if (initialAccent) document.documentElement.style.setProperty("--accent", initialAccent);
+      else document.documentElement.style.removeProperty("--accent");
+      if (initialWordAccent) document.documentElement.style.setProperty("--word-accent", initialWordAccent);
+      else document.documentElement.style.removeProperty("--word-accent");
+      if (initialPrimaryColor) document.documentElement.style.setProperty("--primary-color", initialPrimaryColor);
+      else document.documentElement.style.removeProperty("--primary-color");
     };
-  }, [effectiveTheme, effectiveLocale]);
+  }, [effectiveTheme, effectiveColor, effectiveLocale]);
 
   useEffect(() => {
     let alive = true;
@@ -98,36 +119,76 @@ export function Beyt(options: BeytOptions = {}) {
   }, []);
 
   if (!ready) return null;
+
+  const customColorVars: Record<string, string> = {};
+  if (effectiveColor) {
+    if (isThemeColor(effectiveColor)) {
+      const mode = effectiveTheme ?? defaultTheme();
+      const preset = COLOR_PRESETS[effectiveColor][mode];
+      customColorVars["--accent"] = preset.accent;
+      customColorVars["--word-accent"] = preset.wordAccent;
+      customColorVars["--primary-color"] = preset.accent;
+    } else {
+      customColorVars["--accent"] = effectiveColor;
+      customColorVars["--primary-color"] = effectiveColor;
+      const triplet = colorToRgbTriplet(effectiveColor);
+      if (triplet) customColorVars["--word-accent"] = triplet;
+    }
+  }
+
   return (
-    <StrictMode>
-      <PrimeReactProvider value={{ ripple: true }}>
-        <CrashScreen>
-          <App
-            initialFile={options.initialFile}
-            onClose={options.onClose}
-            onProgress={options.onProgress}
-            theme={effectiveTheme}
-            locale={effectiveLocale}
-          />
-        </CrashScreen>
-      </PrimeReactProvider>
-    </StrictMode>
+    <div
+      className={`beyt-layer relative h-full w-full select-none overflow-hidden font-sans ${effectiveTheme ?? ""}`}
+      data-theme={effectiveTheme}
+      data-color={effectiveColor}
+      style={customColorVars as React.CSSProperties}
+    >
+      <StrictMode>
+        <PrimeReactProvider value={{ ripple: true }}>
+          <CrashScreen>
+            <App
+              initialFile={options.initialFile}
+              onClose={options.onClose}
+              onProgress={options.onProgress}
+              theme={effectiveTheme}
+              color={effectiveColor}
+              locale={effectiveLocale}
+              features={options.features ?? options.playerFeatures}
+            />
+          </CrashScreen>
+        </PrimeReactProvider>
+      </StrictMode>
+    </div>
   );
 }
 
 /** Renders Beyt into `element` without needing React in the host app.
  *  Returns a function that removes it again. */
 export function mountBeyt(element: HTMLElement, options: BeytOptions = {}): () => void {
+  element.classList.add("beyt-layer");
+  if (options.theme && options.theme !== "auto") {
+    element.setAttribute("data-theme", options.theme);
+  }
+  if (options.color) {
+    element.setAttribute("data-color", options.color);
+  }
   const root: Root = createRoot(element);
   root.render(<Beyt {...options} />);
-  return () => root.unmount();
+  return () => {
+    root.unmount();
+    element.classList.remove("beyt-layer");
+    element.removeAttribute("data-theme");
+    element.removeAttribute("data-color");
+  };
 }
 
 export { VERSION };
-export type { Theme } from "./theme";
+export { COLOR_PRESETS, isThemeColor, colorToRgbTriplet } from "./theme";
+export type { Theme, ThemeColor, BeytColor } from "./theme";
 export type { Lang } from "./i18n";
 export { httpFileSource, mountSource, unmountSource } from "./backend/sources";
 export type { FileSource, HttpFileSourceOptions, RemoteEntry } from "./backend/sources";
 export { httpServer } from "./backend/remote";
 export type { BeytServer, BeytState, HttpServerOptions } from "./backend/remote";
 export type { Watch as BeytWatch } from "./backend/store";
+export type { PlayerFeatures, BeytFeatures } from "./types";

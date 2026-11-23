@@ -8,9 +8,10 @@ import * as clock from "../clock";
 import { player, useHardKeyboard, useMediaQuery, usePlayback, usePlayer } from "../hooks";
 import { t } from "../i18n";
 import { keyParts, keysFor } from "../keymap";
-import { ASPECTS, aspectLabel } from "../player";
+import { ASPECTS, aspectLabel, SPEEDS, speedLabel } from "../player";
 import { useSettings } from "../settings";
-import { fmtTime } from "../ui";
+import type { PlayerFeatures } from "../types";
+import { fmtTime, toast } from "../ui";
 import { SeekBar } from "./SeekBar";
 import { PopupMenu, type PopupMenuHandle } from "./SheetMenu";
 
@@ -21,6 +22,7 @@ interface Props {
   visible: boolean;
   /** Every control but the lock button is shown disabled. */
   locked: boolean;
+  features?: PlayerFeatures;
   onToggleLock: () => void;
   onBack: () => void;
   onToggleSubtitles: () => void;
@@ -28,6 +30,7 @@ interface Props {
   onToggleTranscript: () => void;
   onHelp: () => void;
   onSettings: () => void;
+  onCustomSpeed: () => void;
   /** The ⋯ menu opened or closed; the controls stay up while it's open. */
   onMenuVisibleChange: (visible: boolean) => void;
 }
@@ -36,6 +39,7 @@ interface Props {
 export function PlayerChrome({
   visible,
   locked,
+  features,
   onToggleLock,
   onBack,
   onToggleSubtitles,
@@ -43,6 +47,7 @@ export function PlayerChrome({
   onToggleTranscript,
   onHelp,
   onSettings,
+  onCustomSpeed,
   onMenuVisibleChange,
 }: Props) {
   usePlayer();
@@ -58,28 +63,61 @@ export function PlayerChrome({
   const moreButton = useRef<EventTarget | null>(null);
   const aspectMenu = useRef<PopupMenuHandle>(null);
   const audioMenu = useRef<PopupMenuHandle>(null);
+  const speedMenu = useRef<PopupMenuHandle>(null);
   // Widening the window unmounts the menu without an onHide.
   useEffect(() => {
     if (!narrow) onMenuVisibleChange(false);
   }, [narrow, onMenuVisibleChange]);
   const moreItems: MenuItem[] = [
-    { label: t("fileInfo"), icon: "pi pi-info-circle", command: onInfo },
-    ...(keyboard ? [{ label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp }] : []),
-    { label: t("settings"), icon: "pi pi-cog", command: onSettings },
+    ...(features?.fileInfo !== false ? [{ label: t("fileInfo"), icon: "pi pi-info-circle", command: onInfo }] : []),
+    ...(keyboard && features?.shortcuts !== false ? [{ label: t("shortcutsTitle"), icon: "pi pi-question-circle", command: onHelp }] : []),
+    ...(features?.settings !== false ? [{ label: t("settings"), icon: "pi pi-cog", command: onSettings }] : []),
+    ...(features?.speed !== false
+      ? [
+          {
+            label: `${t("speed")}: ${speedLabel(p.speed)}`,
+            icon: "pi pi-gauge",
+            command: () => setTimeout(() => speedMenu.current?.show({ currentTarget: moreButton.current } as never)),
+          },
+        ]
+      : []),
+    ...(features?.audioTracks !== false
+      ? [
+          {
+            label: audioMenuLabel(),
+            icon: "pi pi-headphones",
+            command: () => setTimeout(() => audioMenu.current?.show({ currentTarget: moreButton.current } as never)),
+          },
+        ]
+      : []),
+    ...(features?.aspectRatio !== false
+      ? [
+          {
+            label: `${t("aspect")}: ${aspectLabel(player.aspect)}`,
+            icon: "pi pi-expand",
+            command: () => setTimeout(() => aspectMenu.current?.show({ currentTarget: moreButton.current } as never)),
+          },
+        ]
+      : []),
+    // Phone apps already fill the screen.
+    ...(!isAndroid && features?.fullscreen !== false
+      ? [{ label: t("fullscreen"), icon: "pi pi-window-maximize", command: () => void api.toggleFullscreen() }]
+      : []),
+  ];
+  const speedMenuItems: MenuItem[] = [
+    ...SPEEDS.map((n) => ({
+      label: n === 1 ? `1× (${t("speedNormal")})` : `${n}×`,
+      icon: Math.abs(n - p.speed) < 0.01 ? "pi pi-check" : "pi pi-fw",
+      command: () => {
+        void api.setMpvOption("speed", String(n)).then(() => toast(t("speedToast", { n: n === 1 ? "1.0" : n })));
+      },
+    })),
     { separator: true },
     {
-      label: audioMenuLabel(),
-      icon: "pi pi-headphones",
-      command: () => setTimeout(() => audioMenu.current?.show({ currentTarget: moreButton.current } as never)),
+      label: `${t("customSpeed")}...`,
+      icon: !SPEEDS.some((n) => Math.abs(n - p.speed) < 0.01) ? "pi pi-check" : "pi pi-sliders-h",
+      command: () => setTimeout(onCustomSpeed),
     },
-    {
-      label: `${t("aspect")}: ${aspectLabel(player.aspect)}`,
-      icon: "pi pi-expand",
-      // Opens from the ⋯ button once this menu has closed.
-      command: () => setTimeout(() => aspectMenu.current?.show({ currentTarget: moreButton.current } as never)),
-    },
-    // Phone apps already fill the screen.
-    ...(isAndroid ? [] : [{ label: t("fullscreen"), icon: "pi pi-window-maximize", command: () => void api.toggleFullscreen() }]),
   ];
   const aspectItems: MenuItem[] = [
     {
@@ -115,22 +153,26 @@ export function PlayerChrome({
     <>
       <div className={`dark absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/75 to-transparent px-2 pb-10 pt-2 sm:gap-3 sm:px-4 sm:pt-3 ${fade}`}>
         <div inert={locked} className={`flex min-w-0 flex-1 items-center gap-2 sm:gap-3 ${disabled}`}>
-          <Button
-            icon="pi pi-arrow-left rtl:rotate-180"
-            rounded
-            text
-            severity="secondary"
-            aria-label={t("back")}
-            tooltip={t("back")}
-            tooltipOptions={{ position: "bottom" }}
-            onClick={onBack}
-            className="shrink-0 text-white"
-          />
-          <h1 className="min-w-0 truncate text-base font-semibold drop-shadow sm:text-lg" dir="auto">
-            {player.media?.title}
-          </h1>
+          {features?.backButton !== false && (
+            <Button
+              icon="pi pi-arrow-left rtl:rotate-180"
+              rounded
+              text
+              severity="secondary"
+              aria-label={t("back")}
+              tooltip={t("back")}
+              tooltipOptions={{ position: "bottom" }}
+              onClick={onBack}
+              className="shrink-0 text-white"
+            />
+          )}
+          {features?.title !== false && (
+            <h1 className="min-w-0 truncate text-base font-semibold drop-shadow sm:text-lg" dir="auto">
+              {player.media?.title}
+            </h1>
+          )}
         </div>
-        {isAndroid && (
+        {isAndroid && features?.lock !== false && (
           <Button
             icon={locked ? "pi pi-lock" : "pi pi-lock-open"}
             rounded
@@ -150,94 +192,110 @@ export function PlayerChrome({
         className={`dark absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pb-2 pt-12 sm:px-5 sm:pb-3 ${fade}`}
       >
         <div className={disabled}>
-          <div dir="ltr" className="px-2 sm:px-1">
-            <SeekBar time={time} duration={duration} onScrub={setDragging} onSeek={seek} />
-          </div>
+          {features?.seekBar !== false && (
+            <div dir="ltr" className="px-2 sm:px-1">
+              <SeekBar time={time} duration={duration} onScrub={setDragging} onSeek={seek} />
+            </div>
+          )}
           <div className="mt-2 flex items-center gap-0.5 sm:mt-3 sm:gap-1">
-            <Button
-              icon={p.paused ? "pi pi-play" : "pi pi-pause"}
-              rounded
-              text
-              aria-label={p.paused ? t("play") : t("pause")}
-              onClick={() => void api.togglePause()}
-              className={plain}
-            />
-            <span className="ms-1 min-w-0 truncate whitespace-nowrap text-sm tabular-nums text-zinc-200 sm:ms-2" dir="ltr">
-              {fmtTime(time)} <span className="text-zinc-500">/ {fmtTime(p.duration)}</span>
-            </span>
+            {features?.playPause !== false && (
+              <Button
+                icon={p.paused ? "pi pi-play" : "pi pi-pause"}
+                rounded
+                text
+                aria-label={p.paused ? t("play") : t("pause")}
+                onClick={() => void api.togglePause()}
+                className={plain}
+              />
+            )}
+            {features?.time !== false && (
+              <span className="ms-1 min-w-0 truncate whitespace-nowrap text-sm tabular-nums text-zinc-200 sm:ms-2" dir="ltr">
+                {fmtTime(time)} <span className="text-zinc-500">/ {fmtTime(p.duration)}</span>
+              </span>
+            )}
             <div className="flex-1" />
             {/* Both work on the selected subtitle track's lines. */}
             {player.selectedView() && (
               <>
-                <Button
-                  icon="pi pi-stopwatch"
-                  rounded
-                  text={!player.autoPause}
-                  aria-label={t("autoPause")}
-                  aria-pressed={player.autoPause}
-                  tooltip={`${t("autoPause")} (P)`}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={() => player.toggleAutoPause()}
-                  className={player.autoPause ? size : plain}
-                />
-                <Button
-                  icon="pi pi-align-left"
-                  rounded
-                  text
-                  aria-label={t("transcript")}
-                  tooltip={`${t("transcript")} (R)`}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={onToggleTranscript}
-                  className={plain}
-                />
+                {features?.autoPause !== false && (
+                  <Button
+                    icon="pi pi-stopwatch"
+                    rounded
+                    text={!player.autoPause}
+                    aria-label={t("autoPause")}
+                    aria-pressed={player.autoPause}
+                    tooltip={`${t("autoPause")} (P)`}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={() => player.toggleAutoPause()}
+                    className={player.autoPause ? size : plain}
+                  />
+                )}
+                {features?.transcript !== false && (
+                  <Button
+                    icon="pi pi-align-left"
+                    rounded
+                    text
+                    aria-label={t("transcript")}
+                    tooltip={`${t("transcript")} (R)`}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={onToggleTranscript}
+                    className={plain}
+                  />
+                )}
               </>
             )}
-            <Button
-              icon="pi pi-comments"
-              rounded
-              text
-              aria-label={t("tracks")}
-              tooltip={`${t("tracks")} (L)`}
-              tooltipOptions={{ position: "top" }}
-              onClick={onToggleSubtitles}
-              className={plain}
-            />
+            {features?.subtitles !== false && (
+              <Button
+                icon="pi pi-comments"
+                rounded
+                text
+                aria-label={t("tracks")}
+                tooltip={`${t("tracks")} (L)`}
+                tooltipOptions={{ position: "top" }}
+                onClick={onToggleSubtitles}
+                className={plain}
+              />
+            )}
             {narrow ? (
-              <>
-                <Button
-                  icon="pi pi-ellipsis-v"
-                  rounded
-                  text
-                  aria-label={t("moreActions")}
-                  aria-haspopup="menu"
-                  tooltip={t("moreActions")}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={(e) => {
-                    moreButton.current = e.currentTarget;
-                    more.current?.toggle(e);
-                  }}
-                  className={plain}
-                />
-                <PopupMenu
-                  ref={more}
-                  model={moreItems}
-                  onShow={() => onMenuVisibleChange(true)}
-                  onHide={() => onMenuVisibleChange(false)}
-                />
-              </>
+              moreItems.length > 0 && (
+                <>
+                  <Button
+                    icon="pi pi-ellipsis-v"
+                    rounded
+                    text
+                    aria-label={t("moreActions")}
+                    aria-haspopup="menu"
+                    tooltip={t("moreActions")}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={(e) => {
+                      moreButton.current = e.currentTarget;
+                      more.current?.toggle(e);
+                    }}
+                    className={plain}
+                  />
+                  <PopupMenu
+                    ref={more}
+                    model={moreItems}
+                    onShow={() => onMenuVisibleChange(true)}
+                    onHide={() => onMenuVisibleChange(false)}
+                  />
+                </>
+              )
             ) : (
               <>
-                <Button
-                  icon="pi pi-info-circle"
-                  rounded
-                  text
-                  aria-label={t("fileInfo")}
-                  tooltip={`${t("fileInfo")} (I)`}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={onInfo}
-                  className={plain}
-                />
-                {keyboard && (
+                {features?.fileInfo !== false && (
+                  <Button
+                    icon="pi pi-info-circle"
+                    rounded
+                    text
+                    aria-label={t("fileInfo")}
+                    tooltip={`${t("fileInfo")} (I)`}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={onInfo}
+                    className={plain}
+                  />
+                )}
+                {keyboard && features?.shortcuts !== false && (
                   <Button
                     icon="pi pi-question-circle"
                     rounded
@@ -249,40 +307,59 @@ export function PlayerChrome({
                     className={plain}
                   />
                 )}
-                <Button
-                  icon="pi pi-cog"
-                  rounded
-                  text
-                  aria-label={t("settings")}
-                  tooltip={`${t("settings")} (,)`}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={onSettings}
-                  className={plain}
-                />
-                <Button
-                  icon="pi pi-headphones"
-                  rounded
-                  text
-                  aria-label={t("audioTrack")}
-                  aria-haspopup="menu"
-                  tooltip={audioKey ? `${t("audioTrack")} (${keyParts(audioKey).join("+")})` : t("audioTrack")}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={(e) => audioMenu.current?.toggle(e)}
-                  className={plain}
-                />
-                <Button
-                  icon="pi pi-expand"
-                  rounded
-                  text
-                  aria-label={t("aspect")}
-                  aria-haspopup="menu"
-                  tooltip={`${t("aspect")} (Z)`}
-                  tooltipOptions={{ position: "top" }}
-                  onClick={(e) => aspectMenu.current?.toggle(e)}
-                  className={plain}
-                />
+                {features?.settings !== false && (
+                  <Button
+                    icon="pi pi-cog"
+                    rounded
+                    text
+                    aria-label={t("settings")}
+                    tooltip={`${t("settings")} (,)`}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={onSettings}
+                    className={plain}
+                  />
+                )}
+                {features?.speed !== false && (
+                  <Button
+                    icon="pi pi-gauge"
+                    rounded
+                    text={Math.abs(p.speed - 1) < 0.01}
+                    aria-label={t("speed")}
+                    aria-haspopup="menu"
+                    tooltip={`${t("speed")}: ${speedLabel(p.speed)}`}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={(e) => speedMenu.current?.toggle(e)}
+                    className={Math.abs(p.speed - 1) >= 0.01 ? size : plain}
+                  />
+                )}
+                {features?.audioTracks !== false && (
+                  <Button
+                    icon="pi pi-headphones"
+                    rounded
+                    text
+                    aria-label={t("audioTrack")}
+                    aria-haspopup="menu"
+                    tooltip={audioKey ? `${t("audioTrack")} (${keyParts(audioKey).join("+")})` : t("audioTrack")}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={(e) => audioMenu.current?.toggle(e)}
+                    className={plain}
+                  />
+                )}
+                {features?.aspectRatio !== false && (
+                  <Button
+                    icon="pi pi-expand"
+                    rounded
+                    text
+                    aria-label={t("aspect")}
+                    aria-haspopup="menu"
+                    tooltip={`${t("aspect")} (Z)`}
+                    tooltipOptions={{ position: "top" }}
+                    onClick={(e) => aspectMenu.current?.toggle(e)}
+                    className={plain}
+                  />
+                )}
                 {/* Phone apps already fill the screen. */}
-                {!isAndroid && (
+                {!isAndroid && features?.fullscreen !== false && (
                   <Button
                     icon="pi pi-window-maximize"
                     rounded
@@ -296,6 +373,12 @@ export function PlayerChrome({
                 )}
               </>
             )}
+            <PopupMenu
+              ref={speedMenu}
+              model={speedMenuItems}
+              onShow={() => onMenuVisibleChange(true)}
+              onHide={() => onMenuVisibleChange(false)}
+            />
             <PopupMenu
               ref={audioMenu}
               model={audioMenuItems}

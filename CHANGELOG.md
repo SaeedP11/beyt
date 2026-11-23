@@ -3,13 +3,25 @@
 Beyt follows [semantic versioning](https://semver.org). Until 1.0.0, settings
 and the data in `~/.local/share/app.beyt.player/` may change between versions.
 
+## 0.31.0 (2026-11-22)
+
+### Added
+
+- Playback speed control in the player control bar, narrow menu, and right-click context menu, supporting 1×, 2×, 4× presets, common language-learning speed presets (0.5×, 0.75×, 1.25×, 1.5×), and customizable speed.
+- Interactive Custom Speed Dialog with continuous slider (0.25×–4.0×), fine-tuning steppers (±0.05), quick preset chips, instant live video speed feedback, and quick reset to 1×.
+- `PlayerFeatures` (alias `BeytFeatures`) configuration option in `BeytOptions` for developers embedding the `beyt` package, allowing selective hiding or displaying of any player control or feature (back button, title, lock, play/pause, time, seek bar, auto-pause, transcript, subtitles, playback speed, audio tracks, aspect ratio, file info, shortcuts, settings, fullscreen, subtitle overlays, word lookup, context menu, gestures, and up next cards). All features default to enabled for complete backward compatibility.
+- Support playing A/52 (AC-3 / Dolby Digital) and E-AC-3 (Dolby Digital Plus) audio streams across platforms, including hardware decoding on Android.
+- Allow selecting external `.a52` and `.ec3` audio files to play alongside video.
+- Display normalized codec details for A/52 and E-AC-3 streams in the File Info dialog.
+
 ## 0.30.0 (2026-11-22)
 
 ### Added
 
-- Support playing A/52 (AC-3 / Dolby Digital) and E-AC-3 (Dolby Digital Plus) audio streams across platforms, including hardware decoding on Android.
-- Allow selecting external `.a52` and `.ec3` audio files to play alongside video.
-- Display normalized codec details for A/52 and E-AC-3 streams in the File Info dialog.
+- Developers using the Beyt npm package can now declare and customize theme and color options for the Beyt layer.
+- The `<Beyt />` React component and `mountBeyt()` function accept a `color` option supporting 8 color palette presets (`blue`, `green`, `amber`, `cyan`, `indigo`, `pink`, `purple`, `teal`) and custom hex/RGB colors.
+- All Beyt component styles, custom variables, and theme tokens are now declared within `@layer beyt`, enabling seamless integration with CSS cascade layers and conflict-free theme customization in host applications.
+- Scoped `.beyt-layer` container styling prevents global theme variable leakage into host application stylesheets.
 
 ## 0.29.4 (2026-11-22)
 
